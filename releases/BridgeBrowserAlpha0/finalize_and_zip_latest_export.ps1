@@ -1,5 +1,5 @@
 param(
-  [string]$Root = "D:\temp\bridge-browser"
+  [string]$Root = "D:\projects\open-browser"
 )
 
 $ErrorActionPreference = "Stop"

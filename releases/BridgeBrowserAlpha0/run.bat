@@ -1,6 +1,6 @@
 @echo off
 setlocal
-set ROOT=D:\temp\bridge-browser
+set ROOT=D:\projects\open-browser
 set APP=%ROOT%\releases\BridgeBrowserAlpha0
 set CSPROJ=%APP%\src\BridgeBrowserAlpha0\BridgeBrowserAlpha0.csproj
 

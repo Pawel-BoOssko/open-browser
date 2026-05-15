@@ -3,7 +3,7 @@ setlocal EnableExtensions EnableDelayedExpansion
 chcp 65001 > nul
 set DOTNET_CLI_UI_LANGUAGE=en
 
-set "ROOT=D:\temp\bridge-browser"
+set "ROOT=D:\projects\open-browser"
 set "TARGET=%ROOT%\releases\BridgeBrowserAlpha0"
 set "SRC=%~dp0"
 set "LOG_DIR=%ROOT%\logs"

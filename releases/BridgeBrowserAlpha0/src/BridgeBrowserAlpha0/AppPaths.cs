@@ -24,7 +24,9 @@ public static class AppPaths
         var dir = AppContext.BaseDirectory;
         while (!string.IsNullOrEmpty(dir))
         {
-            if (Directory.Exists(Path.Combine(dir, "modules")) || Directory.Exists(Path.Combine(dir, "src")))
+            if (Directory.Exists(Path.Combine(dir, "modules")) && 
+                Directory.Exists(Path.Combine(dir, "config")) && 
+                File.Exists(Path.Combine(dir, "src", "BridgeBrowserAlpha0", "BridgeBrowserAlpha0.csproj")))
             {
                 return dir;
             }

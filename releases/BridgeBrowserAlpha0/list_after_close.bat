@@ -2,7 +2,7 @@
 setlocal EnableExtensions
 chcp 65001 >nul
 
-set ROOT=D:\temp\bridge-browser
+set ROOT=D:\projects\open-browser
 set LOGDIR=%ROOT%\logs
 if not exist "%LOGDIR%" mkdir "%LOGDIR%" 2>nul
 set LOG=%LOGDIR%\list_after_close.log
@@ -22,7 +22,7 @@ exit /b %EXITCODE%
 
 :main
 @echo on
-set ROOT=D:\temp\bridge-browser
+set ROOT=D:\projects\open-browser
 ver
 cd /d "%ROOT%"
 

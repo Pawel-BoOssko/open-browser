@@ -3,7 +3,7 @@ setlocal EnableExtensions
 chcp 65001 > nul
 set DOTNET_CLI_UI_LANGUAGE=en
 
-set "ROOT=D:\temp\bridge-browser"
+set "ROOT=D:\projects\open-browser"
 set "EXE=%ROOT%\releases\BridgeBrowserAlpha0\src\BridgeBrowserAlpha0\bin\Release\net8.0-windows\BridgeBrowserAlpha0.exe"
 
 if not exist "%EXE%" (
