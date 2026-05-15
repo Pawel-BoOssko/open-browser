@@ -31,7 +31,7 @@ public sealed class MainForm : Form
     private readonly ResponseExtractor _extractor;
     private readonly BridgeBrowserModuleManager _moduleManager;
     private readonly WebViewMessageHandler _messageHandler;
-    private NetworkLogger? _networkLogger;
+    private BrowserTabRuntime? _tabRuntime;
     private bool _webHidden;
 
     public MainForm()
@@ -68,7 +68,7 @@ public sealed class MainForm : Form
         Controls.Add(_diagnostics);
         Controls.Add(panel);
 
-        _newLogButton.Click += (_, _) => StartNewRun();
+        _newLogButton.Click += (_, _) => _tabRuntime?.StartNewRun();
         _openLogsButton.Click += (_, _) => OpenFolder(AppPaths.Logs);
         _openExtractedButton.Click += (_, _) => OpenFolder(AppPaths.Extracted);
         _exportRedactedButton.Click += (_, _) => ExportRedactedRun();
@@ -98,60 +98,26 @@ public sealed class MainForm : Form
 
             var env = await CoreWebView2Environment.CreateAsync(null, AppPaths.Profile);
             await _webView.EnsureCoreWebView2Async(env);
-            _webView.CoreWebView2.Settings.AreDevToolsEnabled = true;
-            _webView.CoreWebView2.Settings.IsWebMessageEnabled = true;
-            _webView.CoreWebView2.Settings.AreDefaultContextMenusEnabled = true;
-            _webView.CoreWebView2.Settings.IsStatusBarEnabled = true;
 
-            _webView.CoreWebView2.NavigationStarting += (_, e) =>
-            {
-                _log.WriteRun("webview", "navigation_start", "ok", e.Uri);
-                SetStatus("Navigation: " + e.Uri);
-            };
-            _webView.CoreWebView2.NavigationCompleted += async (_, e) =>
-            {
-                _log.WriteRun("webview", "navigation_completed", e.IsSuccess ? "ok" : "error", e.IsSuccess ? "Navigation completed" : e.WebErrorStatus.ToString(), new { e.HttpStatusCode });
-                SetStatus(e.IsSuccess ? "Ready" : "Navigation error: " + e.WebErrorStatus);
-                await RefreshDiagnosticsAsync(false);
-            };
-            _webView.CoreWebView2.ProcessFailed += (_, e) =>
-            {
-                _log.WriteRun("webview", "error", "error", "WebView process failed", new { e.ProcessFailedKind, e.Reason, e.ExitCode });
-                SetStatus("WebView process failed: " + e.ProcessFailedKind);
-            };
-            _webView.CoreWebView2.WebMessageReceived += (_, e) => _messageHandler.HandleWebMessage(e);
+            _tabRuntime = new BrowserTabRuntime(
+                _webView.CoreWebView2,
+                _log,
+                _extractor,
+                _moduleManager,
+                _messageHandler,
+                SetStatus,
+                RefreshDiagnosticsAsync
+            );
 
-            await _webView.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(PageTap.Script);
-            await _moduleManager.InitializeAsync(_webView.CoreWebView2);
-
-            _networkLogger = new NetworkLogger(_webView.CoreWebView2, _log, _extractor);
-            StartNewRun();
-            await _networkLogger.InitializeAsync();
+            await _tabRuntime.InitializeAsync();
 
             _diagnosticsTimer.Start();
-            _log.WriteRun("webview", "webview_ready", "ok", "WebView2 ready");
-            _webView.CoreWebView2.Navigate("https://chatgpt.com/");
         }
         catch (Exception ex)
         {
             _log.WriteApp("app", "error", "error", "Startup failed", new { ex.Message, ex.StackTrace });
             MessageBox.Show("Bridge Browser startup failed:\n" + ex.Message, "Bridge Browser", MessageBoxButtons.OK, MessageBoxIcon.Error);
             SetStatus("Startup failed: " + ex.Message);
-        }
-    }
-
-    private void StartNewRun()
-    {
-        try
-        {
-            var runId = _log.StartNewRun();
-            _extractor.StartRun();
-            SetStatus("Run: " + runId);
-        }
-        catch (Exception ex)
-        {
-            _log.WriteApp("app", "error", "error", "Cannot start new run", new { ex.Message });
-            SetStatus("Cannot start new run: " + ex.Message);
         }
     }
 
