@@ -41,7 +41,7 @@ public sealed class MainForm : Form
         _moduleManager = new BridgeBrowserModuleManager(_log);
         _diagnosticsController = new DiagnosticsController(_log, _moduleManager, SetDiagnostics, () => _webView.CoreWebView2 != null);
         _messageHandler = new WebViewMessageHandler(_log, _extractor, () => { _ = _diagnosticsController.RefreshAsync(false); });
-        Text = "Bridge Browser v0.01.0-alpha.13";
+        Text = "Open Browser v0.01.0-alpha.13";
         Width = 1500;
         Height = 950;
         StartPosition = FormStartPosition.CenterScreen;
@@ -95,7 +95,7 @@ public sealed class MainForm : Form
         try
         {
             AppPaths.EnsureAll();
-            _log.WriteApp("app", "app_start", "ok", "Bridge Browser alpha started", new { root = AppPaths.Root, version = "v0.01.0-alpha.13" });
+            _log.WriteApp("app", "app_start", "ok", "Open Browser alpha started", new { root = AppPaths.Root, version = "v0.01.0-alpha.13" });
             SetStatus("Creating WebView2 environment...");
 
             var env = await CoreWebView2Environment.CreateAsync(null, AppPaths.Profile);
@@ -118,7 +118,7 @@ public sealed class MainForm : Form
         catch (Exception ex)
         {
             _log.WriteApp("app", "error", "error", "Startup failed", new { ex.Message, ex.StackTrace });
-            MessageBox.Show("Bridge Browser startup failed:\n" + ex.Message, "Bridge Browser", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            MessageBox.Show("Open Browser startup failed:\n" + ex.Message, "Open Browser", MessageBoxButtons.OK, MessageBoxIcon.Error);
             SetStatus("Startup failed: " + ex.Message);
         }
     }
@@ -158,7 +158,7 @@ public sealed class MainForm : Form
     private async Task ShowTrimmerStatusAsync()
     {
         await _diagnosticsController.RefreshAsync(true);
-        MessageBox.Show(_diagnostics.Text, "Bridge Browser trimmer status", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        MessageBox.Show(_diagnostics.Text, "Open Browser trimmer status", MessageBoxButtons.OK, MessageBoxIcon.Information);
     }
 
     private void ExportRedactedRun()
@@ -175,7 +175,7 @@ public sealed class MainForm : Form
         {
             _log.WriteRun("export", "redacted_export", "error", "Redacted export failed", new { ex.Message });
             SetStatus("Redacted export failed: " + ex.Message);
-            MessageBox.Show("Redacted export failed:\n" + ex.Message, "Bridge Browser", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            MessageBox.Show("Redacted export failed:\n" + ex.Message, "Open Browser", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
     }
 

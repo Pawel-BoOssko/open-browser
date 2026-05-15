@@ -1,8 +1,8 @@
-# Bridge Browser v0.01.0-alpha.11
+# Open Browser v0.01.0-alpha.11
 
-Alpha 11 adds the first ChatGPT Conversation Trimmer integration to the existing Bridge Browser alpha line.
+Alpha 11 adds the first ChatGPT Conversation Trimmer integration to the existing Open Browser alpha line.
 
-This is not a new browser project. It extends the existing WebView2 Bridge Browser with a hot-swappable conversation-trimmer module and host-side interception of ChatGPT conversation load responses.
+This is not a new browser project. It extends the existing WebView2 Open Browser with a hot-swappable conversation-trimmer module and host-side interception of ChatGPT conversation load responses.
 
 ## Goal
 
@@ -16,7 +16,7 @@ about 9.9 MB -> about 324 KB
 trimError for the target request: 0
 ```
 
-Bridge Browser target parameters:
+Open Browser target parameters:
 
 ```text
 keepRenderableMessages = 40
@@ -100,7 +100,7 @@ The BAT:
 1. copies the patch to `D:\temp\bridge-browser\releases\BridgeBrowserAlpha0`;
 2. copies hot-swappable modules to `D:\temp\bridge-browser\modules`;
 3. builds the .NET 8 WinForms/WebView2 project;
-4. starts Bridge Browser;
+4. starts Open Browser;
 5. waits until it is closed;
 6. writes full command output to:
 
@@ -110,7 +110,7 @@ D:\temp\bridge-browser\logs\patch_alpha11_trimmer_install_build_run.log
 
 ## Acceptance test
 
-1. Start Bridge Browser alpha.11.
+1. Start Open Browser alpha.11.
 2. Open a long ChatGPT conversation.
 3. Watch the diagnostics panel.
 4. Confirm that the trimmer reports:

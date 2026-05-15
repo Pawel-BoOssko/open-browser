@@ -17,7 +17,7 @@ Write-Host "ZipDir=$ZipDir"
 
 $folders = Get-ChildItem -Path $ExportDir -Directory | Sort-Object LastWriteTime -Descending
 if (-not $folders -or $folders.Count -eq 0) {
-  throw "No export folders found in $ExportDir. Click Export redacted in Bridge Browser before closing it."
+  throw "No export folders found in $ExportDir. Click Export redacted in Open Browser before closing it."
 }
 
 $latest = $folders[0]
@@ -63,9 +63,9 @@ if ((-not (Test-Path $redacted)) -or ((Get-Item $redacted).Length -eq 0)) {
 }
 
 $readmeLines = @(
-  "# Bridge Browser redacted export",
+  "# Open Browser redacted export",
   "",
-  "This folder is a GitHub-safe export package for a single Bridge Browser diagnostic run.",
+  "This folder is a GitHub-safe export package for a single Open Browser diagnostic run.",
   "",
   "Files:",
   "",
