@@ -1,8 +1,11 @@
+using System;
+using System.IO;
+
 namespace BridgeBrowserAlpha0;
 
 public static class AppPaths
 {
-    public const string Root = @"D:\temp\bridge-browser";
+    public static string Root { get; } = GetRoot();
     public static string Logs => Path.Combine(Root, "logs");
     public static string Extracted => Path.Combine(Root, "extracted");
     public static string Profile => Path.Combine(Root, "profile");
@@ -15,6 +18,22 @@ public static class AppPaths
     public static string ConversationTrimmerVersions => Path.Combine(ConversationTrimmerModuleRoot, "versions");
     public static string ConversationTrimmerCurrent => Path.Combine(ConversationTrimmerModuleRoot, "current");
     public static string ConversationTrimmerCurrentFile => Path.Combine(ConversationTrimmerCurrent, "conversation-trimmer.js");
+
+    private static string GetRoot()
+    {
+        var dir = AppContext.BaseDirectory;
+        while (!string.IsNullOrEmpty(dir))
+        {
+            if (Directory.Exists(Path.Combine(dir, "modules")) || Directory.Exists(Path.Combine(dir, "src")))
+            {
+                return dir;
+            }
+            var parent = Path.GetDirectoryName(dir);
+            if (parent == null || parent == dir) break;
+            dir = parent;
+        }
+        return Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
+    }
 
     public static void EnsureAll()
     {
