@@ -31,6 +31,7 @@ public sealed class MainForm : Form
     private readonly ResponseExtractor _extractor;
     private readonly BridgeBrowserModuleManager _moduleManager;
     private readonly WebViewMessageHandler _messageHandler;
+    private readonly DiagnosticsController _diagnosticsController;
     private BrowserTabRuntime? _tabRuntime;
     private bool _webHidden;
 
@@ -38,7 +39,8 @@ public sealed class MainForm : Form
     {
         _extractor = new ResponseExtractor(_log);
         _moduleManager = new BridgeBrowserModuleManager(_log);
-        _messageHandler = new WebViewMessageHandler(_log, _extractor, () => { _ = RefreshDiagnosticsAsync(false); });
+        _diagnosticsController = new DiagnosticsController(_log, _moduleManager, SetDiagnostics, () => _webView.CoreWebView2 != null);
+        _messageHandler = new WebViewMessageHandler(_log, _extractor, () => { _ = _diagnosticsController.RefreshAsync(false); });
         Text = "Bridge Browser v0.01.0-alpha.13";
         Width = 1500;
         Height = 950;
@@ -76,7 +78,7 @@ public sealed class MainForm : Form
         _promoteTrimmerButton.Click += async (_, _) => await PromoteTrimmerAsync();
         _trimmerStatusButton.Click += async (_, _) => await ShowTrimmerStatusAsync();
         _hideWebButton.Click += (_, _) => ToggleWebVisibility();
-        _diagnosticsTimer.Tick += async (_, _) => await RefreshDiagnosticsAsync(false);
+        _diagnosticsTimer.Tick += async (_, _) => await _diagnosticsController.RefreshAsync(false);
 
         Load += async (_, _) => await InitializeAsync();
         FormClosing += (_, _) =>
@@ -106,7 +108,7 @@ public sealed class MainForm : Form
                 _moduleManager,
                 _messageHandler,
                 SetStatus,
-                RefreshDiagnosticsAsync
+                (writeLog) => _diagnosticsController.RefreshAsync(writeLog)
             );
 
             await _tabRuntime.InitializeAsync();
@@ -127,7 +129,7 @@ public sealed class MainForm : Form
         {
             var version = await _moduleManager.LoadCurrentConversationTrimmerAsync();
             SetStatus("Loaded trimmer: " + version);
-            await RefreshDiagnosticsAsync(true);
+            await _diagnosticsController.RefreshAsync(true);
         }
         catch (Exception ex)
         {
@@ -142,7 +144,7 @@ public sealed class MainForm : Form
         {
             var version = await _moduleManager.PromoteLatestConversationTrimmerAsync();
             SetStatus("Promoted trimmer: " + version);
-            await RefreshDiagnosticsAsync(true);
+            await _diagnosticsController.RefreshAsync(true);
         }
         catch (Exception ex)
         {
@@ -155,25 +157,8 @@ public sealed class MainForm : Form
 
     private async Task ShowTrimmerStatusAsync()
     {
-        await RefreshDiagnosticsAsync(true);
+        await _diagnosticsController.RefreshAsync(true);
         MessageBox.Show(_diagnostics.Text, "Bridge Browser trimmer status", MessageBoxButtons.OK, MessageBoxIcon.Information);
-    }
-
-    private async Task RefreshDiagnosticsAsync(bool writeLog)
-    {
-        if (_webView.CoreWebView2 == null) return;
-        try
-        {
-            var statusJson = await _moduleManager.GetConversationTrimmerStatusJsonAsync();
-            if (writeLog)
-                _log.WriteRun("modules", "module_status", "ok", "Conversation trimmer status", JsonSerializer.Deserialize<object>(statusJson));
-
-            SetDiagnostics(statusJson);
-        }
-        catch (Exception ex)
-        {
-            SetDiagnostics("trimmer status error: " + ex.Message);
-        }
     }
 
     private void ExportRedactedRun()
