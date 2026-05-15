@@ -10,17 +10,20 @@ public sealed class DiagnosticsController
     private readonly BridgeBrowserModuleManager _moduleManager;
     private readonly Action<string> _setDiagnostics;
     private readonly Func<bool> _isWebViewReady;
+    private readonly BrowserTabRuntimeState _state;
 
     public DiagnosticsController(
         LogWriter log,
         BridgeBrowserModuleManager moduleManager,
         Action<string> setDiagnostics,
-        Func<bool> isWebViewReady)
+        Func<bool> isWebViewReady,
+        BrowserTabRuntimeState state)
     {
         _log = log;
         _moduleManager = moduleManager;
         _setDiagnostics = setDiagnostics;
         _isWebViewReady = isWebViewReady;
+        _state = state;
     }
 
     public async Task RefreshAsync(bool writeLog)
@@ -35,7 +38,8 @@ public sealed class DiagnosticsController
                 _log.WriteRun("modules", "module_status", "ok", "Conversation trimmer status", JsonSerializer.Deserialize<object>(statusJson));
             }
 
-            _setDiagnostics(statusJson);
+            var stateJson = JsonSerializer.Serialize(_state, new JsonSerializerOptions { WriteIndented = true });
+            _setDiagnostics(statusJson + "\n\nRuntime State:\n" + stateJson);
         }
         catch (Exception ex)
         {

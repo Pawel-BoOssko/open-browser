@@ -32,6 +32,7 @@ public sealed class MainForm : Form
     private readonly BridgeBrowserModuleManager _moduleManager;
     private readonly WebViewMessageHandler _messageHandler;
     private readonly DiagnosticsController _diagnosticsController;
+    private readonly BrowserTabRuntimeState _tabState = new();
     private BrowserTabRuntime? _tabRuntime;
     private bool _webHidden;
 
@@ -39,8 +40,8 @@ public sealed class MainForm : Form
     {
         _extractor = new ResponseExtractor(_log);
         _moduleManager = new BridgeBrowserModuleManager(_log);
-        _diagnosticsController = new DiagnosticsController(_log, _moduleManager, SetDiagnostics, () => _webView.CoreWebView2 != null);
-        _messageHandler = new WebViewMessageHandler(_log, _extractor, () => { _ = _diagnosticsController.RefreshAsync(false); });
+        _diagnosticsController = new DiagnosticsController(_log, _moduleManager, SetDiagnostics, () => _webView.CoreWebView2 != null, _tabState);
+        _messageHandler = new WebViewMessageHandler(_log, _extractor, () => { _ = _diagnosticsController.RefreshAsync(false); }, _tabState);
         Text = "Bridge Browser v0.01.0-alpha.13";
         Width = 1500;
         Height = 950;
@@ -108,7 +109,8 @@ public sealed class MainForm : Form
                 _moduleManager,
                 _messageHandler,
                 SetStatus,
-                (writeLog) => _diagnosticsController.RefreshAsync(writeLog)
+                (writeLog) => _diagnosticsController.RefreshAsync(writeLog),
+                _tabState
             );
 
             await _tabRuntime.InitializeAsync();
