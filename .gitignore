@@ -1,0 +1,14 @@
+bin/
+obj/
+logs/
+profile/
+diagnostics/
+extracted/
+github_export/
+github_export_zips/
+*.log
+*.user
+*.suo
+.vs/
+TestResults/
+*.cache
