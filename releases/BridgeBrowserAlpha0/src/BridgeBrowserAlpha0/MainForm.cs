@@ -30,6 +30,7 @@ public sealed class MainForm : Form
     private readonly LogWriter _log = new();
     private readonly ResponseExtractor _extractor;
     private readonly BridgeBrowserModuleManager _moduleManager;
+    private readonly WebViewMessageHandler _messageHandler;
     private NetworkLogger? _networkLogger;
     private bool _webHidden;
 
@@ -37,6 +38,7 @@ public sealed class MainForm : Form
     {
         _extractor = new ResponseExtractor(_log);
         _moduleManager = new BridgeBrowserModuleManager(_log);
+        _messageHandler = new WebViewMessageHandler(_log, _extractor, () => { _ = RefreshDiagnosticsAsync(false); });
         Text = "Bridge Browser v0.01.0-alpha.13";
         Width = 1500;
         Height = 950;
@@ -117,7 +119,7 @@ public sealed class MainForm : Form
                 _log.WriteRun("webview", "error", "error", "WebView process failed", new { e.ProcessFailedKind, e.Reason, e.ExitCode });
                 SetStatus("WebView process failed: " + e.ProcessFailedKind);
             };
-            _webView.CoreWebView2.WebMessageReceived += (_, e) => OnPageMessage(e);
+            _webView.CoreWebView2.WebMessageReceived += (_, e) => _messageHandler.HandleWebMessage(e);
 
             await _webView.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(PageTap.Script);
             await _moduleManager.InitializeAsync(_webView.CoreWebView2);
@@ -150,41 +152,6 @@ public sealed class MainForm : Form
         {
             _log.WriteApp("app", "error", "error", "Cannot start new run", new { ex.Message });
             SetStatus("Cannot start new run: " + ex.Message);
-        }
-    }
-
-    private void OnPageMessage(CoreWebView2WebMessageReceivedEventArgs e)
-    {
-        try
-        {
-            var json = e.WebMessageAsJson;
-            using var doc = JsonDocument.Parse(json);
-            var root = doc.RootElement;
-            var eventType = root.TryGetProperty("eventType", out var et) ? et.GetString() ?? "page_message" : "page_message";
-            var status = root.TryGetProperty("status", out var st) ? st.GetString() : "ok";
-            object? data = root.TryGetProperty("data", out var d) ? JsonSerializer.Deserialize<object>(d.GetRawText()) : JsonSerializer.Deserialize<object>(json);
-            _log.WriteRun("page_tap", eventType, status, null, data);
-
-
-            if (root.TryGetProperty("data", out var dataEl))
-            {
-                if (dataEl.TryGetProperty("chunk", out var chunk) && chunk.ValueKind == JsonValueKind.String)
-                    _extractor.AddRaw("page_tap", eventType, chunk.GetString() ?? "");
-                else if (dataEl.TryGetProperty("responseText", out var responseText) && responseText.ValueKind == JsonValueKind.String)
-                    _extractor.AddRaw("page_tap", eventType, responseText.GetString() ?? "");
-                else if (dataEl.TryGetProperty("data", out var wsData) && wsData.ValueKind == JsonValueKind.String)
-                    _extractor.AddRaw("page_tap", eventType, wsData.GetString() ?? "");
-            }
-
-            if (eventType is "page_fetch_done" or "page_xhr_done" or "page_eventsource_error")
-                _extractor.Finish();
-
-            if (eventType.StartsWith("loaded_turns_monitor", StringComparison.OrdinalIgnoreCase))
-                _ = RefreshDiagnosticsAsync(false);
-        }
-        catch (Exception ex)
-        {
-            _log.WriteRun("page_tap", "error", "error", "Failed to handle page message", new { ex.Message, raw = e.WebMessageAsJson });
         }
     }
 
