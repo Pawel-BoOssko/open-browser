@@ -74,40 +74,7 @@ Closed Alpha Transport Spike.
 
 ## v0.01.0-alpha.12
 
-Alpha.12 adds the minimal Local Helper as a separate .NET 8 console app.
-
-Scope:
-
-- `READ_FILE`
-- `READ_LATEST_LOG`
-- `WRITE_FILE`
-- `LIST_DIR`
-- `RUN_ALLOWED_BAT`
-- `RUN_DOTNET_BUILD`
-- `ZIP_DIR`
-
-Every helper command writes a command envelope log from the first version:
-
-```text
-command_id
-command
-requested_path
-resolved_path
-allowed
-started_at
-finished_at
-exit_code
-stdout_len
-stderr_len
-```
-
-Command envelope log:
-
-```text
-D:\temp\bridge-browser\helper\logs\helper_commands.ndjson
-```
-
-This version does not yet implement the Browser ↔ helper command bus. It provides the narrow, logged local execution layer needed for the next step.
+[REMOVED IN LATER ALPHA] Local Helper scope.
 
 
 ## v0.01.0-alpha.12-fix1
@@ -134,35 +101,4 @@ No browser logic changes. No trimmer changes.
 
 ## v0.01.0-alpha.13
 
-Alpha.13 adds the first Browser ↔ Local Helper command bus.
-
-Implemented:
-
-1. Page-side JS bridge:
-   ```javascript
-   window.__BRIDGE_BROWSER_HELPER__.run({
-     command: "LIST_DIR",
-     path: "D:\\temp\\bridge-browser"
-   })
-   ```
-
-2. Host-side command bus:
-   - receives `helper_command` via WebView2 `WebMessageReceived`;
-   - writes runtime request JSON to `D:\temp\bridge-browser\helper\requests_runtime`;
-   - executes `BridgeBrowserHelper.exe --request <file>`;
-   - captures stdout/stderr/exit code;
-   - writes response JSON;
-   - returns result to the page promise;
-   - logs `helper_command_received`, `helper_command_completed`, `helper_command_failed`.
-
-3. UI smoke button:
-   ```text
-   Helper smoke
-   ```
-
-4. Helper command envelope log remains the source of truth:
-   ```text
-   D:\temp\bridge-browser\helper\logs\helper_commands.ndjson
-   ```
-
-This version does not yet parse commands from the ChatGPT conversation text. It establishes the technical command bus needed for the next step.
+[REMOVED IN LATER ALPHA] Browser ↔ Local Helper command bus.

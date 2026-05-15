@@ -51,7 +51,7 @@ echo === target listing after copy ===
 echo.>>"%LOG%"
 echo === target listing after copy ===>>"%LOG%"
 dir "%TARGET%" >> "%LOG%" 2>&1
-if exist "%TARGET%\helper\BridgeBrowserHelper" dir "%TARGET%\helper\BridgeBrowserHelper" >> "%LOG%" 2>&1
+
 
 echo.
 echo === build browser ===
@@ -65,37 +65,7 @@ popd >> "%LOG%" 2>&1
 echo BROWSER_BUILD_EXIT=!BROWSER_BUILD_EXIT!
 echo BROWSER_BUILD_EXIT=!BROWSER_BUILD_EXIT!>>"%LOG%"
 
-echo.
-echo === build helper ===
-echo.>>"%LOG%"
-echo === build helper ===>>"%LOG%"
-pushd "%TARGET%\helper\BridgeBrowserHelper" >> "%LOG%" 2>&1
-dotnet restore >> "%LOG%" 2>&1
-dotnet build -c Release --no-restore >> "%LOG%" 2>&1
-set "HELPER_BUILD_EXIT=!ERRORLEVEL!"
-popd >> "%LOG%" 2>&1
-echo HELPER_BUILD_EXIT=!HELPER_BUILD_EXIT!
-echo HELPER_BUILD_EXIT=!HELPER_BUILD_EXIT!>>"%LOG%"
 
-echo.
-echo === helper smoke test LIST_DIR ===
-echo.>>"%LOG%"
-echo === helper smoke test LIST_DIR ===>>"%LOG%"
-if exist "%TARGET%\helper\BridgeBrowserHelper\bin\Release\net8.0\BridgeBrowserHelper.exe" (
-  "%TARGET%\helper\BridgeBrowserHelper\bin\Release\net8.0\BridgeBrowserHelper.exe" --request "%TARGET%\helper\requests\list_root.json" >> "%LOG%" 2>&1
-) else (
-  echo Helper exe missing >> "%LOG%"
-)
-
-echo.
-echo === helper command envelope log ===
-echo.>>"%LOG%"
-echo === helper command envelope log ===>>"%LOG%"
-if exist "%ROOT%\helper\logs\helper_commands.ndjson" (
-  type "%ROOT%\helper\logs\helper_commands.ndjson" >> "%LOG%" 2>&1
-) else (
-  echo helper_commands.ndjson missing >> "%LOG%"
-)
 
 echo.
 echo === browser start skipped ===
