@@ -8,21 +8,16 @@ public sealed class WebViewMessageHandler
     private readonly LogWriter _log;
     private readonly ResponseExtractor _extractor;
     private readonly Action _requestDiagnosticsRefresh;
-    private readonly BrowserTabRuntimeState _state;
 
-    public WebViewMessageHandler(LogWriter log, ResponseExtractor extractor, Action requestDiagnosticsRefresh, BrowserTabRuntimeState state)
+    public WebViewMessageHandler(LogWriter log, ResponseExtractor extractor, Action requestDiagnosticsRefresh)
     {
         _log = log;
         _extractor = extractor;
         _requestDiagnosticsRefresh = requestDiagnosticsRefresh;
-        _state = state;
     }
 
     public void HandleWebMessage(CoreWebView2WebMessageReceivedEventArgs e)
     {
-        _state.LastWebMessageAtUtc = DateTime.UtcNow;
-        _state.MarkStateChanged();
-
         try
         {
             var json = e.WebMessageAsJson;
