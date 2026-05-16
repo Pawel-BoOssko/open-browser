@@ -2,7 +2,7 @@ using System.Diagnostics;
 
 namespace BridgeBrowserAlpha0.OpenBridgeHost.ClaudeCode;
 
-public class ClaudeCodeExecutor
+public class ClaudeCodeExecutor : IClaudeCodeExecutor
 {
     public virtual Task<HostCommandResult> ExecuteAsync(HostCommandRequest request, CancellationToken ct = default)
     {

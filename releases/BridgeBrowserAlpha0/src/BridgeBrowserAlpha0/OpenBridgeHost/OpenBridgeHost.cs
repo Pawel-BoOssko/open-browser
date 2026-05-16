@@ -5,11 +5,11 @@ namespace BridgeBrowserAlpha0.OpenBridgeHost;
 public class OpenBridgeHost
 {
     private readonly string _allowedRoot;
-    private readonly ClaudeCode.ClaudeCodeExecutor _ccExecutor;
+    private readonly ClaudeCode.IClaudeCodeExecutor _ccExecutor;
     private readonly object _operationGate = new();
     private bool _busy;
 
-    public OpenBridgeHost(string allowedRoot, ClaudeCode.ClaudeCodeExecutor? executor = null)
+    public OpenBridgeHost(string allowedRoot, ClaudeCode.IClaudeCodeExecutor? executor = null)
     {
         _allowedRoot = Path.GetFullPath(allowedRoot).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
         _ccExecutor = executor ?? new ClaudeCode.ClaudeCodeExecutor();
