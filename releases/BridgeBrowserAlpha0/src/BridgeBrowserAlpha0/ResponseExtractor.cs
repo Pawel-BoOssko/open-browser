@@ -106,12 +106,16 @@ public sealed class ResponseExtractor
                                    || eventType.Contains("websocket", StringComparison.OrdinalIgnoreCase)
                                    || eventType.Contains("eventsource", StringComparison.OrdinalIgnoreCase));
 
+            var isCdpConversationBody = source.Equals("cdp", StringComparison.OrdinalIgnoreCase)
+                                        && eventType == "cdp_response_body"
+                                        && raw.Contains("conversation", StringComparison.OrdinalIgnoreCase);
+
             if (isPageStream)
             {
                 _sawPageStream = true;
                 _pageStreamEvents++;
             }
-            if (!isPageStream && _sawPageStream) return;
+            if (!isPageStream && !isCdpConversationBody && _sawPageStream) return;
 
             var before = GetCurrentAnswerText();
             ProcessRaw(raw, flushTail: false);
@@ -185,11 +189,11 @@ public sealed class ResponseExtractor
 
     private void ProcessRaw(string raw, bool flushTail)
     {
-        var cdpBody = TryExtractCdpBody(raw);
-        if (cdpBody != null)
+        for (int depth = 0; depth < 5; depth++)
         {
-            ProcessRaw(cdpBody, flushTail);
-            return;
+            var cdpBody = TryExtractCdpBody(raw);
+            if (cdpBody == null) break;
+            raw = cdpBody;
         }
 
         var looksLikeSse = raw.Contains("data:", StringComparison.OrdinalIgnoreCase)
