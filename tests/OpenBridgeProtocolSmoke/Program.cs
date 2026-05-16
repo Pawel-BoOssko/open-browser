@@ -78,6 +78,42 @@ class Program
         var r11 = OpenBridgeEnvelopeParser.Parse(t11);
         Assert(r11.Error == OpenBridgeEnvelopeParseError.NONE && r11.Envelope?.UnknownFields.Count == 1 && r11.Envelope.UnknownFields[0] == "someField", "Unknown fields captured");
 
+        // 12. Whitespace before closing >>> in BEGIN marker is accepted
+        string t12 = "<<<OPENBRIDGE:EXEC:BEGIN >>>\n{\"version\":\"001\", \"command\":\"HST_HELP\"}\n<<<OPENBRIDGE:EXEC:END>>>";
+        var r12 = OpenBridgeEnvelopeParser.Parse(t12);
+        Assert(r12.HasEnvelope && r12.Error == OpenBridgeEnvelopeParseError.NONE && r12.Envelope?.Command == "HST_HELP", "Space before BEGIN >>> is accepted");
+
+        // 13. Whitespace before closing >>> in END marker is accepted
+        string t13 = "<<<OPENBRIDGE:EXEC:BEGIN>>>\n{\"version\":\"001\", \"command\":\"CC\"}\n<<<OPENBRIDGE:EXEC:END >>>";
+        var r13 = OpenBridgeEnvelopeParser.Parse(t13);
+        Assert(r13.HasEnvelope && r13.Error == OpenBridgeEnvelopeParseError.NONE && r13.Envelope?.Command == "CC", "Space before END >>> is accepted");
+
+        // 14. Tab before closing >>> is accepted
+        string t14 = "<<<OPENBRIDGE:EXEC:BEGIN\t>>>\n{\"version\":\"001\", \"command\":\"CC\"}\n<<<OPENBRIDGE:EXEC:END\t>>>";
+        var r14 = OpenBridgeEnvelopeParser.Parse(t14);
+        Assert(r14.HasEnvelope && r14.Error == OpenBridgeEnvelopeParseError.NONE && r14.Envelope?.Command == "CC", "Tab before >>> is accepted");
+
+        // 15. Multiple spaces before closing >>> are accepted
+        string t15 = "<<<OPENBRIDGE:EXEC:BEGIN   >>>\n{\"version\":\"001\", \"command\":\"CC\"}\n<<<OPENBRIDGE:EXEC:END   >>>";
+        var r15 = OpenBridgeEnvelopeParser.Parse(t15);
+        Assert(r15.HasEnvelope && r15.Error == OpenBridgeEnvelopeParseError.NONE && r15.Envelope?.Command == "CC", "Multiple spaces before >>> accepted");
+
+        // 16. Exact marker still works unchanged
+        string t16 = "<<<OPENBRIDGE:EXEC:BEGIN>>>\n{\"version\":\"001\", \"command\":\"FS\"}\n<<<OPENBRIDGE:EXEC:END>>>";
+        var r16 = OpenBridgeEnvelopeParser.Parse(t16);
+        Assert(r16.HasEnvelope && r16.Error == OpenBridgeEnvelopeParseError.NONE && r16.Envelope?.Command == "FS", "Exact markers still work");
+
+        // 17. Typo in marker name still fails (regression check)
+        string t17 = "<<<OPENBRIDGE:EXEC:BOGUS>>>\n{\"version\":\"001\", \"command\":\"CC\"}\n<<<OPENBRIDGE:EXEC:END>>>";
+        var r17 = OpenBridgeEnvelopeParser.Parse(t17);
+        Assert(!r17.HasEnvelope || r17.Error != OpenBridgeEnvelopeParseError.NONE,
+            "Typo in marker is not accepted (no envelope or parse error)");
+
+        // 18. RAW marker whitespace is also normalized
+        string t18 = "<<<OPENBRIDGE:EXEC:BEGIN>>>\n{\"version\":\"001\", \"command\":\"FS\", \"payload64\": <<<OPENBRIDGE:RAW_PAYLOAD:BEGIN >>>Hello<<<OPENBRIDGE:RAW_PAYLOAD:END>>>}\n<<<OPENBRIDGE:EXEC:END>>>";
+        var r18 = OpenBridgeEnvelopeParser.Parse(t18);
+        Assert(r18.HasEnvelope && r18.Error == OpenBridgeEnvelopeParseError.NONE, "Whitespace before RAW >>> accepted");
+
         Console.WriteLine("--- Running OpenBridgeEnvelopeObserver Smoke Tests ---");
         var observer = new OpenBridgeEnvelopeObserver(null);
 
