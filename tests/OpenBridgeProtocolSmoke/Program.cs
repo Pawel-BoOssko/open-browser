@@ -78,6 +78,24 @@ class Program
         var r11 = OpenBridgeEnvelopeParser.Parse(t11);
         Assert(r11.Error == OpenBridgeEnvelopeParseError.NONE && r11.Envelope?.UnknownFields.Count == 1 && r11.Envelope.UnknownFields[0] == "someField", "Unknown fields captured");
 
+        Console.WriteLine("--- Running OpenBridgeEnvelopeObserver Smoke Tests ---");
+        var observer = new OpenBridgeEnvelopeObserver(null);
+
+        // 12. observer no envelope
+        var o1 = observer.Observe("No envelope here");
+        Assert(o1?.HasEnvelope == false, "Observer: no envelope");
+
+        // 13. observer valid envelope
+        var o2 = observer.Observe("<<<OPENBRIDGE:EXEC:BEGIN>>>\n{\"version\":\"001\", \"command\":\"FS\"}\n<<<OPENBRIDGE:EXEC:END>>>");
+        Assert(o2 != null && o2.HasEnvelope && o2.Error == OpenBridgeEnvelopeParseError.NONE && o2.Envelope?.Command == "FS", "Observer: valid envelope");
+
+        // 14. observer invalid envelope
+        var o3 = observer.Observe("<<<OPENBRIDGE:EXEC:BEGIN>>>\n{invalid}\n<<<OPENBRIDGE:EXEC:END>>>");
+        Assert(o3 != null && o3.HasEnvelope && o3.Error == OpenBridgeEnvelopeParseError.JSON_PARSE_ERROR, "Observer: JSON error");
+
+        // 15. observer returns no execution actions, pure passive ParseResult
+        Assert(o2 != null && o2.GetType().Name == "OpenBridgeEnvelopeParseResult", "Observer: passive result, no execution");
+
         if (_failures > 0)
         {
             Console.WriteLine("Total Failures: " + _failures);

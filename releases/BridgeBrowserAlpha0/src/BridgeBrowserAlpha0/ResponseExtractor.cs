@@ -27,6 +27,7 @@ public sealed class ResponseExtractor
     private readonly StringBuilder _sseBuffer = new();
     private readonly List<AssistantMessageFrame> _frames = new();
     private readonly Dictionary<string, AssistantMessageFrame> _framesById = new(StringComparer.Ordinal);
+    private readonly BridgeBrowserAlpha0.OpenBridgeProtocol.OpenBridgeEnvelopeObserver _observer;
     private StreamWriter? _rawWriter;
     private string? _answerPath;
     private string? _rawPath;
@@ -48,6 +49,7 @@ public sealed class ResponseExtractor
     public ResponseExtractor(LogWriter log)
     {
         _log = log;
+        _observer = new BridgeBrowserAlpha0.OpenBridgeProtocol.OpenBridgeEnvelopeObserver(log);
     }
 
     public void StartRun()
@@ -136,6 +138,9 @@ public sealed class ResponseExtractor
             CloseOpenFrames("page_fetch_done_or_finish");
 
             var answer = GetCurrentAnswerText();
+            
+            _observer.Observe(answer);
+
             var status = answer.Length > 0 ? "ok" : "extraction_failed";
             if (answer.Length > 0 && _answerPath != null)
                 File.WriteAllText(_answerPath, answer, new UTF8Encoding(false));
