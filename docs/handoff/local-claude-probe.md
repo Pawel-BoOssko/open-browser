@@ -106,3 +106,9 @@ Sending request to ClaudeCodeExecutor...
 ## WebView integration status
 
 No WebView integration exists for the executor result path. Host returns structured results. The probe prints them to console. Future work: design how Host results flow back through tab runtime to the LLM conversation.
+
+## Related documents
+
+- [CC Envelope End-to-End Proof](cc-envelope-e2e-proof.md) — documents the successful full-path probe result and defines runtime integration gates
+- [Claude Code Executor Design](../architecture/claude-code-executor-design.md)
+- [Claude Code Executor Decisions](../architecture/claude-code-executor-decisions.md)
