@@ -46,6 +46,7 @@ public sealed class ResponseExtractor
     private int _emptyDeltaValues;
     private string? _currentAssistantMessageId;
     private string _currentEventTsUtc = DateTime.UtcNow.ToString("O");
+    private volatile bool _shouldFinish;
 
     public ResponseExtractor(LogWriter log)
     {
@@ -132,6 +133,11 @@ public sealed class ResponseExtractor
                     answerPath = _answerPath
                 });
             }
+        }
+        if (_shouldFinish)
+        {
+            _shouldFinish = false;
+            Finish();
         }
     }
 
@@ -477,6 +483,8 @@ public sealed class ResponseExtractor
         frame.EndedAtUtc = _currentEventTsUtc;
         if (string.Equals(_currentAssistantMessageId, messageId, StringComparison.Ordinal))
             _currentAssistantMessageId = null;
+        if (reason == "last_token" && frame.Text.Length > 0)
+            _shouldFinish = true;
     }
 
     private void CloseOpenFrames(string reason)
