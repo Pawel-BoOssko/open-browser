@@ -5,27 +5,8 @@ using Microsoft.Web.WebView2.WinForms;
 
 namespace BridgeBrowserAlpha0;
 
-public sealed class MainForm : Form
+public sealed partial class MainForm : Form
 {
-    private readonly WebView2 _webView = new();
-    private readonly Button _newLogButton = new() { Text = "New log", Width = 110 };
-    private readonly Button _openLogsButton = new() { Text = "Open logs", Width = 105 };
-    private readonly Button _openExtractedButton = new() { Text = "Extracted", Width = 105 };
-    private readonly Button _exportRedactedButton = new() { Text = "Export", Width = 95 };
-    private readonly Button _loadTrimmerButton = new() { Text = "Load trim", Width = 100 };
-    private readonly Button _promoteTrimmerButton = new() { Text = "Promote trim", Width = 120 };
-    private readonly Button _trimmerStatusButton = new() { Text = "Trim status", Width = 110 };
-    private readonly Button _hideWebButton = new() { Text = "Hide web", Width = 110 };
-    private readonly Label _status = new() { AutoSize = true, Text = "Starting..." };
-    private readonly TextBox _diagnostics = new()
-    {
-        Dock = DockStyle.Bottom,
-        Height = 120,
-        Multiline = true,
-        ReadOnly = true,
-        ScrollBars = ScrollBars.Vertical,
-        Font = new Font(FontFamily.GenericMonospace, 9)
-    };
     private readonly System.Windows.Forms.Timer _diagnosticsTimer = new() { Interval = 5000 };
     private readonly LogWriter _log = new();
     private readonly ResponseExtractor _extractor;
@@ -33,7 +14,6 @@ public sealed class MainForm : Form
     private readonly WebViewMessageHandler _messageHandler;
     private readonly DiagnosticsController _diagnosticsController;
     private BrowserTabRuntime? _tabRuntime;
-    private bool _webHidden;
 
     public MainForm()
     {
@@ -41,34 +21,8 @@ public sealed class MainForm : Form
         _moduleManager = new BridgeBrowserModuleManager(_log);
         _diagnosticsController = new DiagnosticsController(_log, _moduleManager, SetDiagnostics, () => _webView.CoreWebView2 != null);
         _messageHandler = new WebViewMessageHandler(_log, _extractor, () => { _ = _diagnosticsController.RefreshAsync(false); });
-        Text = "Open Browser v0.01.0-alpha.13";
-        Width = 1500;
-        Height = 950;
-        StartPosition = FormStartPosition.CenterScreen;
-
-        var panel = new FlowLayoutPanel
-        {
-            Dock = DockStyle.Top,
-            Height = 92,
-            Padding = new Padding(8),
-            FlowDirection = FlowDirection.LeftToRight,
-            WrapContents = true,
-            AutoScroll = true
-        };
-        panel.Controls.Add(_newLogButton);
-        panel.Controls.Add(_openLogsButton);
-        panel.Controls.Add(_openExtractedButton);
-        panel.Controls.Add(_exportRedactedButton);
-        panel.Controls.Add(_loadTrimmerButton);
-        panel.Controls.Add(_promoteTrimmerButton);
-        panel.Controls.Add(_trimmerStatusButton);
-        panel.Controls.Add(_hideWebButton);
-        panel.Controls.Add(_status);
-
-        _webView.Dock = DockStyle.Fill;
-        Controls.Add(_webView);
-        Controls.Add(_diagnostics);
-        Controls.Add(panel);
+        
+        InitializeUi();
 
         _newLogButton.Click += (_, _) => _tabRuntime?.StartNewRun();
         _openLogsButton.Click += (_, _) => OpenFolder(AppPaths.Logs);
@@ -95,7 +49,7 @@ public sealed class MainForm : Form
         try
         {
             AppPaths.EnsureAll();
-            _log.WriteApp("app", "app_start", "ok", "Open Browser alpha started", new { root = AppPaths.Root, version = "v0.01.0-alpha.13" });
+            _log.WriteApp("app", "app_start", "ok", $"{AppConstants.AppTitle} alpha started", new { root = AppPaths.Root, version = AppConstants.AppVersion });
             SetStatus("Creating WebView2 environment...");
 
             var env = await CoreWebView2Environment.CreateAsync(null, AppPaths.Profile);
@@ -118,7 +72,7 @@ public sealed class MainForm : Form
         catch (Exception ex)
         {
             _log.WriteApp("app", "error", "error", "Startup failed", new { ex.Message, ex.StackTrace });
-            MessageBox.Show("Open Browser startup failed:\n" + ex.Message, "Open Browser", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            MessageBox.Show($"{AppConstants.AppTitle} startup failed:\n" + ex.Message, AppConstants.AppTitle, MessageBoxButtons.OK, MessageBoxIcon.Error);
             SetStatus("Startup failed: " + ex.Message);
         }
     }
@@ -153,12 +107,10 @@ public sealed class MainForm : Form
         }
     }
 
-
-
     private async Task ShowTrimmerStatusAsync()
     {
         await _diagnosticsController.RefreshAsync(true);
-        MessageBox.Show(_diagnostics.Text, "Open Browser trimmer status", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        MessageBox.Show(_diagnostics.Text, $"{AppConstants.AppTitle} trimmer status", MessageBoxButtons.OK, MessageBoxIcon.Information);
     }
 
     private void ExportRedactedRun()
@@ -175,41 +127,7 @@ public sealed class MainForm : Form
         {
             _log.WriteRun("export", "redacted_export", "error", "Redacted export failed", new { ex.Message });
             SetStatus("Redacted export failed: " + ex.Message);
-            MessageBox.Show("Redacted export failed:\n" + ex.Message, "Open Browser", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            MessageBox.Show("Redacted export failed:\n" + ex.Message, AppConstants.AppTitle, MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
-    }
-
-    private void ToggleWebVisibility()
-    {
-        _webHidden = !_webHidden;
-        _webView.Visible = !_webHidden;
-        _hideWebButton.Text = _webHidden ? "Show web" : "Hide web";
-        _log.WriteRun("app", "web_visibility", "ok", _webHidden ? "WebView hidden" : "WebView visible");
-    }
-
-    private static void OpenFolder(string path)
-    {
-        Directory.CreateDirectory(path);
-        Process.Start(new ProcessStartInfo("explorer.exe", path) { UseShellExecute = true });
-    }
-
-    private void SetStatus(string text)
-    {
-        if (InvokeRequired)
-        {
-            BeginInvoke(new Action(() => SetStatus(text)));
-            return;
-        }
-        _status.Text = text;
-    }
-
-    private void SetDiagnostics(string text)
-    {
-        if (InvokeRequired)
-        {
-            BeginInvoke(new Action(() => SetDiagnostics(text)));
-            return;
-        }
-        _diagnostics.Text = text;
     }
 }
