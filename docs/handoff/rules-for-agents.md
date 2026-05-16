@@ -1,0 +1,18 @@
+# Zasady Pracy dla Przyszłych Modeli / Agentów (Rules for Agents)
+
+Jesteś nowym modelem AI przejmującym środowisko. Musisz stosować się do restrykcyjnych procedur zachowania sterylności projektu. Zignorowanie ich doprowadzi do odrzucenia twoich rozwiązań (Rollback).
+
+1. **Pracuj tylko w wyznaczonym katalogu**: `D:\projects\open-browser`. Jakiekolwiek odchylenia od tej ścieżki i powroty do starych repozytoriów (`D:\temp\bridge-browser`) są surowo zabronione na etapie kodu C#.
+2. Zawsze zaczynaj sesję lub ciąg operacji od **`git status --short`**.
+3. **Nie pracuj na brudnym repo**: Jeśli stan plików wykazuje niestackowane modyfikacje, powiedz o tym użytkownikowi. Nie wykonuj commitów nie swojego kodu bez weryfikacji.
+4. **Zawsze weryfikuj build**: Uruchamiaj `dotnet build` po jakiejkolwiek iteracji modyfikującej w `.cs`. W projekcie istnieje ostrzeżenie związane z `WindowsBase` (MSB3277) – ignoruj je, póki kompilacja kończy się wynikiem "sukces" lub "0 błędów" w samym kodzie źródłowym.
+5. **Testuj parser**: Po każdej iteracji dotykającej `OpenBridgeProtocol` uruchamiaj natychmiast `dotnet run --project tests/OpenBridgeProtocolSmoke/OpenBridgeProtocolSmoke.csproj -c Release`.
+6. **Wykonuj Runtime Smoke Test**: Po modyfikacji ścieżek, logów, `PageTap.js`, `ResponseExtractor` czy `WebView` uruchom na 25 sekund instancję docelową (`BridgeBrowserAlpha0.exe`), zamknij ją (np. poleceniem `CloseMainWindow()` lub zabij proces) i sprawdź zawartość nowo wygenerowanego `run_*.ndjson` pod kątem eventów i rozmiaru (nie może produkować ogromnych zrzutów payloadów z WebView).
+7. **Brak git push**: Nigdy, pod żadnym pozorem nie wysyłaj kodu na serwer zdalny ani nie pytaj użytkownika, czy masz to zrobić.
+8. **Nie instaluj paczek**: Żadne `dotnet add package` nie mogą wystąpić bez dedykowanego zlecenia zatwierdzonego architektonicznie przez użytkownika.
+9. **Nie przywracaj helpera**: `BridgeBrowserHelper` został usunięty. Jeśli zauważysz stary "martwy kod", który rzekomo "nawołuje" helpera - usuń wywołania, nie odbudowuj błędu!
+10. **Nie projektuj pod niezatwierdzone przyszłe mechanizmy**: Architektura nie ma Hosta, registry, watchdogów ani potężnej pętli state machine, dopóki użytkownik nie zażyczy ich w jasnym tasku lub dokumencie projektowym. 
+11. **Nie dodawaj** wymienionych wyżej elementów (Hosta, executorów) bez **osobnego zatwierdzenia**.
+12. **Utrzymuj małe commity**: Iteruj i zatwierdzaj pojedyncze pakiety logiczne, na wypadek łatwego rollbacku w Git.
+13. **Nie zmieniaj semantyki**: Silnik zbierający dane (`PageTap`, `ResponseExtractor`, `conversation-trimmer`) oparty jest o delikatne pętle czasowe. Nie ruszaj ich logiki biznesowej, chyba że zadanie dobitnie się do nich odnosi.
+14. Zawsze: **jeśli potrzeba decyzji architektonicznej – zatrzymaj się**. Zaprezentuj opcje i poczekaj na ruch użytkownika. Nigdy nie podejmuj decyzji frameworkowych i strukturalnych w pełni samoistnie.
