@@ -16,7 +16,7 @@ This document converts the 10 open design questions from `claude-code-executor-d
 
 | # | Topic | Decision | Reason | Implementation consequence |
 |---|---|---|---|---|
-| 1 | **Invocation method** | Dedicated .NET Process-based executor wrapper (Option C from design doc). | Full .NET control over process lifecycle, clean stdout/stderr separation via `ProcessStartInfo`, no shell interpretation of prompt content. Safer long-term than calling CLI directly from scattered call sites. | A `ClaudeCodeExecutor` class wraps `System.Diagnostics.Process`. It owns process start, timeout enforcement, stdout/stderr capture, and exit code handling. No raw `Process.Start` calls outside this class. |
+| 1 | **Invocation method** | Dedicated .NET Process-based executor wrapper (Option C from design doc). Dry-run is the default mode. Process mode is implemented but disabled by default. | Full .NET control over process lifecycle, clean stdout/stderr separation via `ProcessStartInfo`, no shell interpretation of prompt content. Safer long-term than calling CLI directly from scattered call sites. | `ClaudeCodeExecutor` supports two modes via `ClaudeCodeExecutorOptions.Mode`: `DryRun` (default) and `Process`. Process mode uses `System.Diagnostics.Process` with redirected stdout/stderr, timeout via `CancellationToken`, and exit code capture. Real Claude Code is not configured as the default executable. |
 | 2 | **First backend** | CLI invocation first. API-based DeepSeek/OpenRouter invocation deferred. | The CLI is already installed and tested in this environment (see `start_deepseek_open_browser.bat` pattern). API integration adds credential management and HTTP client complexity that can be a separate executor or backend later. | Executor calls `claude` (or configured command) via `Process.Start`. No HTTP client, no API key handling in the executor itself. |
 | 3 | **Command source** | Exact command and flags read from one local configuration point. Not hardcoded in multiple classes. | Prevents drift between call sites. Allows switching between Claude Code, Cloud Code, or other backends by changing one config entry. | In the future: a small config class or settings file (e.g., `openbridge.local.json`, git-ignored) holds the command path and default flags. The executor reads from that single source. First milestone may use a simple constant or environment variable as placeholder. |
 | 4 | **Interactive approvals** | Non-interactive only. If the tool asks for approval or blocks waiting for input, the executor times out and returns a controlled error. No permanent `--dangerously-skip-permissions` scripts in repo. | The coding agent must not block the Open Browser process waiting for human input. Non-interactive flags (`--print`, `-p`) are the contract. If the tool ignores them, timeout is the safety net. Permanent permission-bypass scripts were already deleted from the repo. | Executor passes `--print` or equivalent non-interactive flag. If the process is still running when timeout fires, Host kills it and returns `status: "timeout"` with a message indicating possible interactive block. |
@@ -33,16 +33,20 @@ This document converts the 10 open design questions from `claude-code-executor-d
 
 ## 3. First implementation boundary
 
-The first code milestone may include exactly:
+The first code milestone achieved:
 
-- **Minimal Host stub** — a class that receives a parsed `OpenBridgeEnvelopeParseResult`, validates `command == "CC"`, assigns `operation_id`, validates working directory, calls the executor, enforces timeout, and logs the result. Only enough Host to prove the flow.
-- **`ClaudeCodeExecutor` interface/class** — wraps `System.Diagnostics.Process`. Owns process start, stdout/stderr capture, exit code handling, and output truncation. Initially an echo/dry-run implementation.
-- **Echo mode first** — the executor does not call `claude` in the first iteration. It echoes the received prompt back in the structured result format, with a configurable simulated duration. This proves the command flow without depending on an external tool.
-- **NDJSON log verification** — operation start, success, and error events appear in the run log. Log entries include `operation_id`, `command`, `status`, `duration_ms`, and truncated output preview.
-- **Smoke test** — a test that creates a synthetic `CC` envelope parse result, feeds it through Host → executor, and asserts the log contains expected events.
+- **Minimal Host stub** — validates `command == "CC"`, assigns `operation_id`, validates working directory, calls executor, enforces timeout.
+- **`IClaudeCodeExecutor` + `ClaudeCodeExecutor`** — hot-swappable executor behind a one-method interface. Two modes exist:
+  - **DryRun** (default) — echoes the prompt, no process launched.
+  - **Process** — launches a configurable local process via `System.Diagnostics.Process`, captures stdout/stderr/exit code, enforces output truncation.
+- **`ClaudeCodeExecutorOptions`** — single config point for `Mode`, `ExecutablePath`, `ArgumentsTemplate`, default timeout, and max output chars. Dry-run is the default mode. No real Claude Code executable is configured.
+- **Smoke tests** — cover dry-run, process mode with harmless local commands (`cmd.exe /c echo`), process timeout, stderr capture, invalid executable, and output truncation.
 
 **Explicitly allowed but not required in the first milestone**:
 - A real `claude` CLI call behind a feature flag or config toggle, if the echo mode works and the environment is verified.
+- Process mode exists for this purpose but the executable path is not hardcoded — it must come from one local config point in the future.
+
+**Current state**: Process mode is implemented and tested with harmless local commands. Real Claude Code invocation is not configured and not enabled by default.
 
 ---
 

@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using BridgeBrowserAlpha0.OpenBridgeHost;
+using BridgeBrowserAlpha0.OpenBridgeHost.ClaudeCode;
 
 namespace OpenBridgeHostSmoke;
 
@@ -25,7 +26,7 @@ class Program
         var allowedRoot = @"D:\projects\open-browser";
         var host = new OpenBridgeHost(allowedRoot);
 
-        Console.WriteLine("--- Running OpenBridgeHost Smoke Tests ---");
+        Console.WriteLine("--- Dry-Run Tests ---");
 
         // 1. Valid dry-run command returns ok
         var r1 = await host.ExecuteAsync(new HostCommandRequest
@@ -119,7 +120,7 @@ class Program
         Assert(r7.Status == HostExecutionStatus.Error, "Non-CC command returns error");
         Assert(r7.ErrorCode == HostErrorCodes.CommandNotRecognized, "Error code is COMMAND_NOT_RECOGNIZED");
 
-        // 8. Max output truncation works
+        // 8. Max output truncation works (dry-run)
         var longPrompt = new string('X', 200);
         var r8 = await host.ExecuteAsync(new HostCommandRequest
         {
@@ -152,7 +153,139 @@ class Program
         });
         Assert(r10.DurationMs >= 0, "Duration is non-negative");
 
-        // 11. Concurrency: busy state rejects second operation
+        // ======== Process Mode Tests ========
+        Console.WriteLine("--- Process Mode Tests ---");
+
+        // 11. Process mode captures stdout
+        var processOpts = new ClaudeCodeExecutorOptions
+        {
+            Mode = ClaudeCodeExecutorMode.Process,
+            ExecutablePath = "cmd.exe",
+            ArgumentsTemplate = "/c echo OPENBRIDGE_PROCESS_TEST: {prompt}"
+        };
+        var processExecutor = new ClaudeCodeExecutor(processOpts);
+        var processHost = new OpenBridgeHost(allowedRoot, processExecutor);
+
+        var r11 = await processHost.ExecuteAsync(new HostCommandRequest
+        {
+            Command = "CC",
+            WorkingDirectory = allowedRoot,
+            Prompt = "hello_from_process"
+        });
+        Assert(r11.Status == HostExecutionStatus.Ok, "Process mode captures stdout");
+        Assert(r11.ExitCode == 0, "Process exit code is 0");
+        Assert(r11.StdoutPreview != null && r11.StdoutPreview.Contains("OPENBRIDGE_PROCESS_TEST"), "Stdout contains test marker");
+        Assert(r11.StdoutPreview!.Contains("hello_from_process"), "Stdout contains prompt");
+        Assert(r11.Message != null && r11.Message.Contains("completed"), "Message confirms process completed");
+
+        // 12. Process mode captures non-zero exit code as error
+        var errorProcessOpts = new ClaudeCodeExecutorOptions
+        {
+            Mode = ClaudeCodeExecutorMode.Process,
+            ExecutablePath = "cmd.exe",
+            ArgumentsTemplate = "/c \"echo failing operation && exit 42\""
+        };
+        var errorProcessHost = new OpenBridgeHost(allowedRoot, new ClaudeCodeExecutor(errorProcessOpts));
+
+        var r12 = await errorProcessHost.ExecuteAsync(new HostCommandRequest
+        {
+            Command = "CC",
+            WorkingDirectory = allowedRoot,
+            Prompt = "should_fail"
+        });
+        Assert(r12.Status == HostExecutionStatus.Error, "Non-zero exit returns error status");
+        Assert(r12.ExitCode == 42, "Exit code captured");
+        Assert(r12.ErrorCode == "EXIT_CODE_42", "Error code reflects exit code");
+        Assert(r12.StdoutPreview != null && r12.StdoutPreview.Contains("failing operation"), "Stdout captured despite error exit");
+
+        // 13. Process mode captures stderr
+        var stderrProcessOpts = new ClaudeCodeExecutorOptions
+        {
+            Mode = ClaudeCodeExecutorMode.Process,
+            ExecutablePath = "cmd.exe",
+            ArgumentsTemplate = "/c \"echo to_stderr_test >&2\""
+        };
+        var stderrProcessHost = new OpenBridgeHost(allowedRoot, new ClaudeCodeExecutor(stderrProcessOpts));
+
+        var r13 = await stderrProcessHost.ExecuteAsync(new HostCommandRequest
+        {
+            Command = "CC",
+            WorkingDirectory = allowedRoot,
+            Prompt = "stderr_test"
+        });
+        Assert(r13.Status == HostExecutionStatus.Ok, "Stderr capture returns ok (exit 0)");
+        Assert(r13.StderrPreview != null && r13.StderrPreview.Contains("to_stderr_test"), "Stderr was captured");
+
+        // 14. Process timeout returns timeout
+        var timeoutProcessOpts = new ClaudeCodeExecutorOptions
+        {
+            Mode = ClaudeCodeExecutorMode.Process,
+            ExecutablePath = "powershell.exe",
+            ArgumentsTemplate = "-Command \"Start-Sleep -Seconds 30\""
+        };
+        var timeoutProcessHost = new OpenBridgeHost(allowedRoot, new ClaudeCodeExecutor(timeoutProcessOpts));
+
+        var r14 = await timeoutProcessHost.ExecuteAsync(new HostCommandRequest
+        {
+            Command = "CC",
+            WorkingDirectory = allowedRoot,
+            Prompt = "timeout_test",
+            TimeoutMs = 500
+        });
+        Assert(r14.Status == HostExecutionStatus.Timeout, "Process timeout returns timeout status");
+        Assert(r14.ErrorCode == HostErrorCodes.Timeout, "Error code is TIMEOUT");
+
+        // 15. Invalid executable returns controlled error
+        var badExeOpts = new ClaudeCodeExecutorOptions
+        {
+            Mode = ClaudeCodeExecutorMode.Process,
+            ExecutablePath = "nonexistent_executable_xyz_12345"
+        };
+        var badExeHost = new OpenBridgeHost(allowedRoot, new ClaudeCodeExecutor(badExeOpts));
+
+        var r15 = await badExeHost.ExecuteAsync(new HostCommandRequest
+        {
+            Command = "CC",
+            WorkingDirectory = allowedRoot,
+            Prompt = "should_error"
+        });
+        Assert(r15.Status == HostExecutionStatus.Error, "Invalid executable returns error");
+        Assert(r15.ErrorCode == HostErrorCodes.ExecutorError, "Error code is EXECUTOR_ERROR");
+        Assert(r15.Message != null && r15.Message.Contains("not found"), "Message mentions executable not found");
+
+        // 16. Process mode output truncation works
+        var truncProcessOpts = new ClaudeCodeExecutorOptions
+        {
+            Mode = ClaudeCodeExecutorMode.Process,
+            ExecutablePath = "cmd.exe",
+            ArgumentsTemplate = "/c echo {prompt}"
+        };
+        var truncProcessHost = new OpenBridgeHost(allowedRoot, new ClaudeCodeExecutor(truncProcessOpts));
+        var longEchoText = new string('Y', 200);
+
+        var r16 = await truncProcessHost.ExecuteAsync(new HostCommandRequest
+        {
+            Command = "CC",
+            WorkingDirectory = allowedRoot,
+            Prompt = longEchoText,
+            MaxOutputChars = 50
+        });
+        Assert(r16.Status == HostExecutionStatus.Ok, "Process truncation returns ok");
+        Assert(r16.StdoutFullTruncated, "Stdout was truncated");
+        Assert(r16.StdoutPreview!.Length <= 50, "Stdout preview is within max chars");
+
+        // 17. Dry-run is still the default when no options given
+        var defaultHost = new OpenBridgeHost(allowedRoot);
+        var r17 = await defaultHost.ExecuteAsync(new HostCommandRequest
+        {
+            Command = "CC",
+            WorkingDirectory = allowedRoot,
+            Prompt = "default mode check"
+        });
+        Assert(r17.Status == HostExecutionStatus.Ok, "Default executor still works");
+        Assert(r17.StdoutPreview != null && r17.StdoutPreview.Contains("[DRY-RUN"), "Default mode is still dry-run");
+
+        // ======== Concurrency & Timeout Tests ========
         Console.WriteLine("--- Testing concurrency lock ---");
         var delayedExecutor = new DelayedClaudeCodeExecutor(2000);
         var concurrentHost = new OpenBridgeHost(allowedRoot, delayedExecutor);
@@ -166,39 +299,39 @@ class Program
 
         await Task.Delay(50);
 
-        var r11 = await concurrentHost.ExecuteAsync(new HostCommandRequest
+        var r18 = await concurrentHost.ExecuteAsync(new HostCommandRequest
         {
             Command = "CC",
             WorkingDirectory = allowedRoot,
             Prompt = "Second operation (should be rejected)"
         });
-        Assert(r11.Status == HostExecutionStatus.Error, "Concurrent operation rejected");
-        Assert(r11.ErrorCode == HostErrorCodes.ExecutorBusy, "Error code is EXECUTOR_BUSY");
+        Assert(r18.Status == HostExecutionStatus.Error, "Concurrent operation rejected");
+        Assert(r18.ErrorCode == HostErrorCodes.ExecutorBusy, "Error code is EXECUTOR_BUSY");
 
         var firstResult = await firstTask;
         Assert(firstResult.Status == HostExecutionStatus.Ok, "First operation completed after second was rejected");
 
-        // 12. After first completes, next operation succeeds (lock released)
-        var r12 = await concurrentHost.ExecuteAsync(new HostCommandRequest
+        // After first completes, next operation succeeds
+        var r19 = await concurrentHost.ExecuteAsync(new HostCommandRequest
         {
             Command = "CC",
             WorkingDirectory = allowedRoot,
             Prompt = "After lock released"
         });
-        Assert(r12.Status == HostExecutionStatus.Ok, "Operation succeeds after previous completes");
+        Assert(r19.Status == HostExecutionStatus.Ok, "Operation succeeds after previous completes");
 
-        // 13. Timeout fires for slow executor
+        // Timeout fires for slow executor
         var slowExecutor = new DelayedClaudeCodeExecutor(5000);
         var timeoutHost = new OpenBridgeHost(allowedRoot, slowExecutor);
-        var r13 = await timeoutHost.ExecuteAsync(new HostCommandRequest
+        var r20 = await timeoutHost.ExecuteAsync(new HostCommandRequest
         {
             Command = "CC",
             WorkingDirectory = allowedRoot,
             Prompt = "Timeout test",
             TimeoutMs = 200
         });
-        Assert(r13.Status == HostExecutionStatus.Timeout, "Timeout returns timeout status");
-        Assert(r13.ErrorCode == HostErrorCodes.Timeout, "Error code is TIMEOUT");
+        Assert(r20.Status == HostExecutionStatus.Timeout, "Timeout returns timeout status");
+        Assert(r20.ErrorCode == HostErrorCodes.Timeout, "Error code is TIMEOUT");
 
         if (_failures > 0)
         {
@@ -212,11 +345,11 @@ class Program
         }
     }
 
-    private sealed class DelayedClaudeCodeExecutor : BridgeBrowserAlpha0.OpenBridgeHost.ClaudeCode.ClaudeCodeExecutor
+    private sealed class DelayedClaudeCodeExecutor : ClaudeCodeExecutor
     {
         private readonly int _delayMs;
 
-        public DelayedClaudeCodeExecutor(int delayMs)
+        public DelayedClaudeCodeExecutor(int delayMs) : base(new ClaudeCodeExecutorOptions())
         {
             _delayMs = delayMs;
         }
@@ -227,7 +360,8 @@ class Program
 
             if (string.IsNullOrWhiteSpace(request.Prompt))
             {
-                return ErrorResult(request, startedAt);
+                return ErrorResult(request.OperationId ?? "", startedAt,
+                    HostErrorCodes.PromptEmpty, "Prompt must not be empty.");
             }
 
             try
@@ -258,15 +392,15 @@ class Program
             };
         }
 
-        private static HostCommandResult ErrorResult(HostCommandRequest request, long startedAt)
+        private static HostCommandResult ErrorResult(string operationId, long startedAt, string errorCode, string message)
         {
             return new HostCommandResult
             {
                 Status = HostExecutionStatus.Error,
-                OperationId = request.OperationId ?? "",
+                OperationId = operationId,
                 DurationMs = ElapsedMs(startedAt),
-                ErrorCode = HostErrorCodes.PromptEmpty,
-                Message = "Prompt must not be empty."
+                ErrorCode = errorCode,
+                Message = message
             };
         }
     }
