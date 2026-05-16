@@ -3,6 +3,9 @@ obj/
 logs/
 profile/
 diagnostics/
+!diagnostics/pipeline-output/EXPORT_PIPELINE_OUTPUT.bat
+diagnostics/pipeline-output/*.txt
+diagnostics/pipeline-output/*.zip
 extracted/
 github_export/
 github_export_zips/

@@ -45,6 +45,7 @@ public class OpenBridgeRuntimeApproval
 
             PendingCommand = request!;
             error = null;
+            BridgeBrowserAlpha0.PipelineRawDump.Write("08_OpenBridgeRuntimeApproval.txt", PendingCommand.Prompt);
 
             var processAvail = CheckProcessAvailable();
             _log?.WriteRun("runtime_approval", "pending_created", "ok",

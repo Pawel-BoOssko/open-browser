@@ -32,6 +32,7 @@ public static class OpenBridgeHostCommandMapper
             TimeoutMs = defaultTimeoutMs,
             MaxOutputChars = defaultMaxOutputChars
         };
+        BridgeBrowserAlpha0.PipelineRawDump.Write("07_OpenBridgeHostCommandMapper.txt", prompt);
         return true;
     }
 

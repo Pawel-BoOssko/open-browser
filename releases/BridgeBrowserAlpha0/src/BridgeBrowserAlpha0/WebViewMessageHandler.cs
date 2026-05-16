@@ -21,6 +21,7 @@ public sealed class WebViewMessageHandler
         try
         {
             var json = e.WebMessageAsJson;
+            PipelineRawDump.Write("02_WebViewMessageHandler.txt", json);
             using var doc = JsonDocument.Parse(json);
             var root = doc.RootElement;
             var eventType = root.TryGetProperty("eventType", out var et) ? et.GetString() ?? "page_message" : "page_message";

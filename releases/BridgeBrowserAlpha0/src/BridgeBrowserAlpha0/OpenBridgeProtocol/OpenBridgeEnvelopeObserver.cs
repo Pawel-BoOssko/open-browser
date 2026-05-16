@@ -14,6 +14,7 @@ public sealed class OpenBridgeEnvelopeObserver
 
     public OpenBridgeEnvelopeParseResult? Observe(string responseText)
     {
+        BridgeBrowserAlpha0.PipelineRawDump.Write("05_OpenBridgeEnvelopeObserver.txt", responseText);
         if (string.IsNullOrWhiteSpace(responseText)) return null;
 
         var result = OpenBridgeEnvelopeParser.Parse(responseText);

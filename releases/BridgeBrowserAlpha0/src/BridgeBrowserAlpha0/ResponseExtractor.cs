@@ -122,6 +122,7 @@ public sealed class ResponseExtractor
             var after = GetCurrentAnswerText();
             if (!string.Equals(before, after, StringComparison.Ordinal) && _answerPath != null)
             {
+                PipelineRawDump.Write("03_ResponseExtractor.txt", after);
                 File.WriteAllText(_answerPath, after, new UTF8Encoding(false));
                 _log.WriteRun("extractor", "extraction_update", "partial", "Assistant message frames updated", new
                 {
@@ -143,7 +144,8 @@ public sealed class ResponseExtractor
             CloseOpenFrames("page_fetch_done_or_finish");
 
             var answer = GetCurrentAnswerText();
-            
+            PipelineRawDump.Write("04_ResponseExtractor_Finish.txt", answer);
+
             var parseResult = _observer.Observe(answer);
             if (parseResult?.HasEnvelope == true)
             {

@@ -227,6 +227,7 @@ public sealed partial class MainForm
             BeginInvoke(new Action(() => ShowApprovalResult(text)));
             return;
         }
+        PipelineRawDump.Write("09_MainFormUi.txt", text);
         _approvalResult.Text = text;
         _approveDryRunButton.Enabled = false;
         _approveProcessButton.Enabled = false;

@@ -153,6 +153,7 @@ public static class OpenBridgeEnvelopeParser
             }
 
             result.Envelope = env;
+            BridgeBrowserAlpha0.PipelineRawDump.Write("06_OpenBridgeEnvelopeParser.txt", env.Payload ?? env.Payload64 ?? env.Command);
             return result;
         }
         catch (JsonException ex)
