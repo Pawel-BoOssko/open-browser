@@ -30,7 +30,9 @@ public sealed partial class MainForm : Form
             var ok = _runtimeApproval.TrySetPending(parseResult, out var error);
             if (ok)
             {
-                ShowPendingCommand(_runtimeApproval.PendingSummary());
+                var processAvail = _runtimeApproval.IsProcessAvailable();
+                var processMsg = _runtimeApproval.ProcessAvailableMessage();
+                ShowPendingCommand(_runtimeApproval.PendingSummary(), processAvail, processMsg);
             }
             else
             {
@@ -50,7 +52,8 @@ public sealed partial class MainForm : Form
         _promoteTrimmerButton.Click += async (_, _) => await PromoteTrimmerAsync();
         _trimmerStatusButton.Click += async (_, _) => await ShowTrimmerStatusAsync();
         _hideWebButton.Click += (_, _) => ToggleWebVisibility();
-        _approveButton.Click += async (_, _) => await ApproveRuntimeCommandAsync();
+        _approveDryRunButton.Click += async (_, _) => await ApproveDryRunAsync();
+        _approveProcessButton.Click += async (_, _) => await ApproveProcessAsync();
         _rejectButton.Click += (_, _) => RejectRuntimeCommand();
         _copyDetailsButton.Click += (_, _) => CopyApprovalDetails();
         _copyResultButton.Click += (_, _) => CopyApprovalResult();
@@ -135,21 +138,40 @@ public sealed partial class MainForm : Form
         MessageBox.Show(_diagnostics.Text, $"{AppConstants.AppTitle} trimmer status", MessageBoxButtons.OK, MessageBoxIcon.Information);
     }
 
-    private async Task ApproveRuntimeCommandAsync()
+    private async Task ApproveDryRunAsync()
     {
         try
         {
             SetStatus("Executing CC command (DryRun)...");
-            ShowApprovalResult("Executing...");
-            var result = await _runtimeApproval.ApproveAsync();
+            ShowApprovalResult("Executing DryRun...");
+            var result = await _runtimeApproval.ApproveDryRunAsync();
             var text = _runtimeApproval.ResultSummary();
             ShowApprovalResult(text);
-            SetStatus(result.Status == HostExecutionStatus.Ok ? "CC command OK" : "CC command failed: " + result.ErrorCode);
+            SetStatus(result.Status == HostExecutionStatus.Ok ? "CC DryRun OK" : "CC DryRun failed: " + result.ErrorCode);
         }
         catch (Exception ex)
         {
             ShowApprovalResult("Execution error: " + ex.Message);
-            SetStatus("CC command error: " + ex.Message);
+            SetStatus("CC execution error: " + ex.Message);
+            _log.WriteRun("runtime_approval", "host_execution_failed", "error", ex.Message);
+        }
+    }
+
+    private async Task ApproveProcessAsync()
+    {
+        try
+        {
+            SetStatus("Executing CC command (Process)...");
+            ShowApprovalResult("Executing Process...");
+            var result = await _runtimeApproval.ApproveProcessAsync();
+            var text = _runtimeApproval.ResultSummary();
+            ShowApprovalResult(text);
+            SetStatus(result.Status == HostExecutionStatus.Ok ? "CC Process OK" : "CC Process failed: " + result.ErrorCode);
+        }
+        catch (Exception ex)
+        {
+            ShowApprovalResult("Execution error: " + ex.Message);
+            SetStatus("CC execution error: " + ex.Message);
             _log.WriteRun("runtime_approval", "host_execution_failed", "error", ex.Message);
         }
     }

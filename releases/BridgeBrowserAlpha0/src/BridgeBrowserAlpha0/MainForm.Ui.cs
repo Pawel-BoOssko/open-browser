@@ -99,7 +99,7 @@ public sealed partial class MainForm
     private readonly Panel _approvalPanel = new()
     {
         Dock = DockStyle.Bottom,
-        Height = 200,
+        Height = 230,
         Visible = false,
         BorderStyle = BorderStyle.FixedSingle
     };
@@ -116,47 +116,55 @@ public sealed partial class MainForm
         Location = new Point(8, 26),
         MaximumSize = new Size(1200, 52)
     };
-    private readonly Label _approvalWarning = new()
+    private readonly Label _approvalProcessStatus = new()
     {
-        Text = "DryRun only. No Claude Code process will be launched from runtime.",
+        Text = "",
         AutoSize = true,
-        ForeColor = Color.DarkOrange,
+        ForeColor = Color.DarkGreen,
         Location = new Point(8, 84)
     };
-    private readonly Button _approveButton = new()
+    private readonly Button _approveDryRunButton = new()
     {
-        Text = "Approve (DryRun)",
+        Text = "Approve DryRun",
         Width = 140,
         Location = new Point(8, 110),
         BackColor = Color.LightGreen,
+        Enabled = false
+    };
+    private readonly Button _approveProcessButton = new()
+    {
+        Text = "Approve Process",
+        Width = 140,
+        Location = new Point(156, 110),
+        BackColor = Color.LightSalmon,
         Enabled = false
     };
     private readonly Button _rejectButton = new()
     {
         Text = "Reject",
         Width = 100,
-        Location = new Point(156, 110),
+        Location = new Point(304, 110),
         Enabled = false
     };
     private readonly Button _copyDetailsButton = new()
     {
         Text = "Copy details",
         Width = 110,
-        Location = new Point(264, 110),
+        Location = new Point(412, 110),
         Enabled = false
     };
     private readonly Label _approvalResult = new()
     {
         AutoSize = true,
         Location = new Point(8, 142),
-        MaximumSize = new Size(1200, 30),
+        MaximumSize = new Size(1200, 52),
         ForeColor = Color.DarkBlue
     };
     private readonly Button _copyResultButton = new()
     {
         Text = "Copy result",
         Width = 110,
-        Location = new Point(8, 170),
+        Location = new Point(8, 198),
         Enabled = false,
         Visible = false
     };
@@ -165,8 +173,9 @@ public sealed partial class MainForm
     {
         _approvalPanel.Controls.Add(_approvalTitle);
         _approvalPanel.Controls.Add(_approvalDetails);
-        _approvalPanel.Controls.Add(_approvalWarning);
-        _approvalPanel.Controls.Add(_approveButton);
+        _approvalPanel.Controls.Add(_approvalProcessStatus);
+        _approvalPanel.Controls.Add(_approveDryRunButton);
+        _approvalPanel.Controls.Add(_approveProcessButton);
         _approvalPanel.Controls.Add(_rejectButton);
         _approvalPanel.Controls.Add(_copyDetailsButton);
         _approvalPanel.Controls.Add(_approvalResult);
@@ -174,16 +183,19 @@ public sealed partial class MainForm
         Controls.Add(_approvalPanel);
     }
 
-    public void ShowPendingCommand(string summary)
+    public void ShowPendingCommand(string summary, bool processAvailable, string? processMessage)
     {
         if (InvokeRequired)
         {
-            BeginInvoke(new Action(() => ShowPendingCommand(summary)));
+            BeginInvoke(new Action(() => ShowPendingCommand(summary, processAvailable, processMessage)));
             return;
         }
         _approvalDetails.Text = summary;
         _approvalResult.Text = "";
-        _approveButton.Enabled = true;
+        _approveDryRunButton.Enabled = true;
+        _approveProcessButton.Enabled = processAvailable;
+        _approvalProcessStatus.Text = processMessage ?? "";
+        _approvalProcessStatus.ForeColor = processAvailable ? Color.DarkGreen : Color.DarkOrange;
         _rejectButton.Enabled = true;
         _copyDetailsButton.Enabled = true;
         _copyResultButton.Visible = false;
@@ -198,12 +210,14 @@ public sealed partial class MainForm
             return;
         }
         _approvalPanel.Visible = false;
-        _approveButton.Enabled = false;
+        _approveDryRunButton.Enabled = false;
+        _approveProcessButton.Enabled = false;
         _rejectButton.Enabled = false;
         _copyDetailsButton.Enabled = false;
         _copyResultButton.Visible = false;
         _approvalDetails.Text = "";
         _approvalResult.Text = "";
+        _approvalProcessStatus.Text = "";
     }
 
     public void ShowApprovalResult(string text)
@@ -214,7 +228,8 @@ public sealed partial class MainForm
             return;
         }
         _approvalResult.Text = text;
-        _approveButton.Enabled = false;
+        _approveDryRunButton.Enabled = false;
+        _approveProcessButton.Enabled = false;
         _rejectButton.Enabled = false;
         _copyResultButton.Visible = true;
         _copyResultButton.Enabled = true;

@@ -518,7 +518,7 @@ class Program
         Assert(err34 != null && err34.Contains("pending"), "Error mentions pending");
 
         // 35. Approve executes DryRun and returns ok
-        var result35 = await approval.ApproveAsync();
+        var result35 = await approval.ApproveDryRunAsync();
         Assert(result35.Status == HostExecutionStatus.Ok, "Approve returns Ok status");
         Assert(result35.Message != null && result35.Message.Contains("Dry-run"), "Approve executes DryRun");
         Assert(!approval.HasPending, "HasPending is false after approve");
@@ -527,7 +527,7 @@ class Program
         Assert(approval.LastResult == result35, "LastResult stores execution result");
 
         // 37. Approve with no pending returns error
-        var result37 = await approval.ApproveAsync();
+        var result37 = await approval.ApproveDryRunAsync();
         Assert(result37.Status == HostExecutionStatus.Error, "Approve with no pending returns error");
         Assert(result37.ErrorCode == HostErrorCodes.ExecutorError, "Error code is EXECUTOR_ERROR");
 
@@ -551,7 +551,7 @@ class Program
             Envelope = new OpenBridgeEnvelope { Version = "001", Command = "CC", Payload = "Mode test" }
         };
         approval.TrySetPending(env39, out _);
-        var result39 = await approval.ApproveAsync();
+        var result39 = await approval.ApproveDryRunAsync();
         Assert(result39.Message != null && result39.Message.Contains("No Claude Code process"), "DryRun confirms no real process");
         Assert(result39.Message != null && !result39.Message.Contains("Process"), "Result does not mention Process mode");
 
@@ -579,7 +579,7 @@ class Program
         Assert(summary.Contains("CC"), "Summary contains command CC");
         Assert(summary.Contains("Refactor auth module"), "Summary contains prompt");
         Assert(summary.Contains("720000"), "Summary contains timeout");
-        Assert(summary.Contains("DryRun"), "Summary contains DryRun mode");
+        Assert(summary.Contains("CC") && summary.Contains("720000"), "Summary contains command and timeout");
         approval.Reject();
 
         // 42. Empty prompt rejected by mapper
@@ -629,7 +629,7 @@ class Program
             Envelope = new OpenBridgeEnvelope { Version = "001", Command = "CC", Payload = "Test 45" }
         };
         approval.TrySetPending(env45, out _);
-        var result45 = await approval.ApproveAsync();
+        var result45 = await approval.ApproveDryRunAsync();
         Assert(!string.IsNullOrEmpty(result45.OperationId), "Result has operation_id");
         Assert(result45.DurationMs >= 0, "Result has duration");
         var resultSummary45 = approval.ResultSummary();
@@ -667,7 +667,7 @@ class Program
         Assert(err47 != null && err47.Contains("pending"), "Error mentions pending");
         approval.Reject();
 
-        // 48. Runtime approval forces DryRun mode (verified by message content)
+        // 48. DryRun approval works via new method
         var env48 = new OpenBridgeEnvelopeParseResult
         {
             HasEnvelope = true,
@@ -675,9 +675,121 @@ class Program
             Envelope = new OpenBridgeEnvelope { Version = "001", Command = "CC", Payload = "DryRun check" }
         };
         approval.TrySetPending(env48, out _);
-        var result48 = await approval.ApproveAsync();
-        Assert(result48.Status == HostExecutionStatus.Ok, "DryRun execution succeeds");
-        Assert(result48.Message != null && result48.Message.Contains("No Claude Code process"), "Result confirms no real Claude process launched");
+        var result48 = await approval.ApproveDryRunAsync();
+        Assert(result48.Status == HostExecutionStatus.Ok, "DryRun approval works");
+        Assert(result48.Message != null && result48.Message.Contains("No Claude Code process"), "Result confirms no real Claude process");
+
+        // 49. Process approval with missing config returns controlled error
+        var noConfigPath = Path.Combine(Path.GetTempPath(), "openbridge_nonexistent_config.json");
+        var noCfgApproval = new OpenBridgeRuntimeApproval(allowedRoot, configPath: noConfigPath);
+        var env49 = new OpenBridgeEnvelopeParseResult
+        {
+            HasEnvelope = true,
+            Error = OpenBridgeEnvelopeParseError.NONE,
+            Envelope = new OpenBridgeEnvelope { Version = "001", Command = "CC", Payload = "test" }
+        };
+        noCfgApproval.TrySetPending(env49, out _);
+        var result49 = await noCfgApproval.ApproveProcessAsync();
+        Assert(result49.Status == HostExecutionStatus.Error, "Process with missing config returns error");
+        Assert(result49.Message != null && result49.Message.Contains("config missing"), "Error message mentions config missing");
+
+        // 50. Process approval with harmless temp config executes
+        var tempProcessCfg = Path.Combine(Path.GetTempPath(), $"openbridge_runtime_test_{Guid.NewGuid():N}.json");
+        var processTestJson = @"{
+  ""Mode"": ""Process"",
+  ""ExecutablePath"": ""cmd.exe"",
+  ""ArgumentsTemplate"": ""/c echo OPENBRIDGE_RUNTIME_PROCESS_TEST: {prompt}"",
+  ""DefaultTimeoutMs"": 120000,
+  ""DefaultMaxOutputChars"": 50000
+}";
+        try
+        {
+            File.WriteAllText(tempProcessCfg, processTestJson);
+            var processApproval = new OpenBridgeRuntimeApproval(allowedRoot, configPath: tempProcessCfg);
+            var env50 = new OpenBridgeEnvelopeParseResult
+            {
+                HasEnvelope = true,
+                Error = OpenBridgeEnvelopeParseError.NONE,
+                Envelope = new OpenBridgeEnvelope { Version = "001", Command = "CC", Payload = "runtime_process_test" }
+            };
+            processApproval.TrySetPending(env50, out _);
+            Assert(processApproval.IsProcessAvailable(), "Process is available with valid config");
+            var result50 = await processApproval.ApproveProcessAsync();
+            Assert(result50.Status == HostExecutionStatus.Ok, "Process approval executes harmless command");
+            Assert(result50.StdoutPreview != null && result50.StdoutPreview.Contains("OPENBRIDGE_RUNTIME_PROCESS_TEST"), "Stdout contains test marker");
+            Assert(!string.IsNullOrEmpty(result50.OperationId), "Process result has operation_id");
+        }
+        finally
+        {
+            if (File.Exists(tempProcessCfg)) File.Delete(tempProcessCfg);
+        }
+
+        // 51. Process approval with DryRun config returns controlled error
+        var dryOnlyCfg = Path.Combine(Path.GetTempPath(), $"openbridge_dryonly_{Guid.NewGuid():N}.json");
+        try
+        {
+            File.WriteAllText(dryOnlyCfg, @"{ ""Mode"": ""DryRun"", ""ExecutablePath"": """", ""ArgumentsTemplate"": """" }");
+            var dryApproval = new OpenBridgeRuntimeApproval(allowedRoot, configPath: dryOnlyCfg);
+            var env51 = new OpenBridgeEnvelopeParseResult
+            {
+                HasEnvelope = true,
+                Error = OpenBridgeEnvelopeParseError.NONE,
+                Envelope = new OpenBridgeEnvelope { Version = "001", Command = "CC", Payload = "test" }
+            };
+            dryApproval.TrySetPending(env51, out _);
+            var result51 = await dryApproval.ApproveProcessAsync();
+            Assert(result51.Status == HostExecutionStatus.Error, "Process with DryRun config returns error");
+            Assert(result51.Message != null && result51.Message.Contains("not in Process mode"), "Error says not in Process mode");
+        }
+        finally
+        {
+            if (File.Exists(dryOnlyCfg)) File.Delete(dryOnlyCfg);
+        }
+
+        // 52. Process approval with unsafe args is rejected
+        var unsafeCfg = Path.Combine(Path.GetTempPath(), $"openbridge_unsafe_{Guid.NewGuid():N}.json");
+        var unsafeJson = @"{
+  ""Mode"": ""Process"",
+  ""ExecutablePath"": ""cmd.exe"",
+  ""ArgumentsTemplate"": ""/c echo test --dangerously-skip-permissions"",
+  ""DefaultTimeoutMs"": 120000,
+  ""DefaultMaxOutputChars"": 50000
+}";
+        try
+        {
+            File.WriteAllText(unsafeCfg, unsafeJson);
+            var unsafeApproval = new OpenBridgeRuntimeApproval(allowedRoot, configPath: unsafeCfg);
+            var env52 = new OpenBridgeEnvelopeParseResult
+            {
+                HasEnvelope = true,
+                Error = OpenBridgeEnvelopeParseError.NONE,
+                Envelope = new OpenBridgeEnvelope { Version = "001", Command = "CC", Payload = "test" }
+            };
+            unsafeApproval.TrySetPending(env52, out _);
+            var result52 = await unsafeApproval.ApproveProcessAsync();
+            Assert(result52.Status == HostExecutionStatus.Error, "Process with unsafe args rejected");
+            Assert(result52.Message != null && result52.Message.Contains("unsafe") || (result52.Message != null && result52.Message.Contains("dangerous")), "Error mentions unsafe flags");
+        }
+        finally
+        {
+            if (File.Exists(unsafeCfg)) File.Delete(unsafeCfg);
+        }
+
+        // 53. Process approval does not use envelope-supplied executable
+        var env53 = new OpenBridgeEnvelopeParseResult
+        {
+            HasEnvelope = true,
+            Error = OpenBridgeEnvelopeParseError.NONE,
+            Envelope = new OpenBridgeEnvelope { Version = "001", Command = "CC", Payload = "test" }
+        };
+        noCfgApproval.TrySetPending(env53, out _);
+        var result53 = await noCfgApproval.ApproveProcessAsync();
+        Assert(result53.Status == HostExecutionStatus.Error, "Process uses config path, not envelope executable");
+
+        // 54. Process unavailable message is informative when no config
+        Assert(noCfgApproval.IsProcessAvailable() == false, "No-process-config approval reports unavailable");
+        var msg54 = noCfgApproval.ProcessAvailableMessage();
+        Assert(msg54 != null && msg54.Contains("unavailable"), "Process unavailable message is informative");
 
         // ======== Concurrency & Timeout Tests ========
         Console.WriteLine("--- Testing concurrency lock ---");

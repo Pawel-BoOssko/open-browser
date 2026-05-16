@@ -12,7 +12,7 @@
 - ClaudeCodeExecutorOptionsLoader (Local JSON config loading for executor options)
 - OpenBridgeHostCommandMapper (Envelope-to-HostCommandRequest mapping for CC path)
 - Local CC envelope E2E probe (Manual probe proving the full isolated path with real Claude Code)
-- Runtime command approval UI (Operator-controlled approve/reject panel with copy details/result, DryRun only)
+- Runtime command approval UI (Operator-controlled panel with separate DryRun and Process approve buttons, copy details/result)
 
 ## Planned
 - Runtime-to-Host Process mode execution (requires separate approval)
