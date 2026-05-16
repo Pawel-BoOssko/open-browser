@@ -7,6 +7,7 @@ extracted/
 github_export/
 github_export_zips/
 config/local/*.local.json
+tools/local/
 *.log
 *.user
 *.suo
