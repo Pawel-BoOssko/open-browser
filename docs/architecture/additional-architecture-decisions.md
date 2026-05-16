@@ -101,7 +101,7 @@ Use HST_HELP, HST_STATUS and HST_CAPABILITIES to discover the environment.
 
 To use them write a JSON in response:
 {
-  "version": 001,
+  "version": "001",
   "command": "HST_HELP"
 }
 ```
@@ -267,17 +267,17 @@ disabled
 
 ```json
 {
-  "version": 001,
+  "version": "001",
   "command": "..."
 }
 ```
 
-8h. `version` is a three-digit format version number.
+8h. `version` is a three-character string representing the format version.
 
 8i. A breaking compatibility change increases the version, for example:
 
 ```text
-001 → 002
+"001" → "002"
 ```
 
 8j. `command` is the routing address.
@@ -324,7 +324,7 @@ payload64  = large auxiliary content
 
 ```json
 {
-  "version": 001,
+  "version": "001",
   "command": "FS",
   "payload": "write docs/example.md",
   "payload64": "..."
@@ -453,7 +453,7 @@ message
 
 ```json
 {
-  "version": 001,
+  "version": "001",
   "command": "FS",
   "status": "error",
   "layer": "executor",
