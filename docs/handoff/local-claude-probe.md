@@ -5,15 +5,18 @@ Created: 2026-05-16
 
 ## Purpose
 
-A local-only manual probe that invokes real Claude Code through the existing `OpenBridgeHost` and `ClaudeCodeExecutor`, using the git-ignored local configuration. This proves the full executor path end-to-end without connecting to the WebView runtime.
+Local-only manual probes that verify the Host/executor path end-to-end without connecting to the WebView runtime. Two probes exist: one for direct executor invocation, one for the full CC envelope path.
 
 ## What this is
 
-- A standalone console project in `tools/local/ClaudeExecutorProbe/`
-- A PowerShell wrapper script in `tools/local/RunClaudeExecutorProbe.ps1`
-- Both are git-ignored — they exist only on the local machine
-- The probe sends a single short prompt and prints the structured result
-- The probe uses `System.Diagnostics.Process` through the existing `ClaudeCodeExecutor` in Process mode
+### Probe 1: Direct Executor Probe (`tools/local/ClaudeExecutorProbe/`)
+- Invokes ClaudeCodeExecutor directly via OpenBridgeHost
+- Sends a short prompt, prints the structured result
+
+### Probe 2: CC Envelope End-to-End Probe (`tools/local/CcEnvelopeEndToEndProbe/`)
+- Exercises the full path: EXEC envelope text → OpenBridgeEnvelopeParser → OpenBridgeHostCommandMapper → OpenBridgeHost → ClaudeCodeExecutor → Claude Code
+- Supports `--dry-run` flag to test without real Claude invocation
+- All files are git-ignored — they exist only on the local machine
 
 ## What this is NOT
 
@@ -44,15 +47,23 @@ A local-only manual probe that invokes real Claude Code through the existing `Op
 
 ## How to run
 
-### Option 1: PowerShell wrapper (simplest)
+### CC Envelope End-to-End Probe (full path)
+
+Dry-run (no real Claude, tests parser → mapper → Host → dry-run executor):
+
+```
+dotnet run --project tools/local/CcEnvelopeEndToEndProbe/CcEnvelopeEndToEndProbe.csproj -c Release -- --dry-run
+```
+
+Real invocation (requires local config with Process mode):
+
+```
+dotnet run --project tools/local/CcEnvelopeEndToEndProbe/CcEnvelopeEndToEndProbe.csproj -c Release
+```
+
+### Direct Executor Probe (host → executor only)
 
 From the project root:
-
-```
-pwsh -File tools/local/RunClaudeExecutorProbe.ps1
-```
-
-### Option 2: dotnet run directly
 
 ```
 dotnet run --project tools/local/ClaudeExecutorProbe/ClaudeExecutorProbe.csproj -c Release
