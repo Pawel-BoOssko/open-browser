@@ -99,7 +99,7 @@ public sealed partial class MainForm
     private readonly Panel _approvalPanel = new()
     {
         Dock = DockStyle.Bottom,
-        Height = 160,
+        Height = 200,
         Visible = false,
         BorderStyle = BorderStyle.FixedSingle
     };
@@ -113,21 +113,21 @@ public sealed partial class MainForm
     private readonly Label _approvalDetails = new()
     {
         AutoSize = true,
-        Location = new Point(8, 28),
-        MaximumSize = new Size(1200, 40)
+        Location = new Point(8, 26),
+        MaximumSize = new Size(1200, 52)
     };
     private readonly Label _approvalWarning = new()
     {
-        Text = "Runtime execution is DryRun only. No Claude Code process will be launched.",
+        Text = "DryRun only. No Claude Code process will be launched from runtime.",
         AutoSize = true,
         ForeColor = Color.DarkOrange,
-        Location = new Point(8, 72)
+        Location = new Point(8, 84)
     };
     private readonly Button _approveButton = new()
     {
         Text = "Approve (DryRun)",
         Width = 140,
-        Location = new Point(8, 98),
+        Location = new Point(8, 110),
         BackColor = Color.LightGreen,
         Enabled = false
     };
@@ -135,15 +135,30 @@ public sealed partial class MainForm
     {
         Text = "Reject",
         Width = 100,
-        Location = new Point(156, 98),
+        Location = new Point(156, 110),
+        Enabled = false
+    };
+    private readonly Button _copyDetailsButton = new()
+    {
+        Text = "Copy details",
+        Width = 110,
+        Location = new Point(264, 110),
         Enabled = false
     };
     private readonly Label _approvalResult = new()
     {
         AutoSize = true,
-        Location = new Point(8, 130),
+        Location = new Point(8, 142),
         MaximumSize = new Size(1200, 30),
         ForeColor = Color.DarkBlue
+    };
+    private readonly Button _copyResultButton = new()
+    {
+        Text = "Copy result",
+        Width = 110,
+        Location = new Point(8, 170),
+        Enabled = false,
+        Visible = false
     };
 
     private void BuildApprovalPanel()
@@ -153,7 +168,9 @@ public sealed partial class MainForm
         _approvalPanel.Controls.Add(_approvalWarning);
         _approvalPanel.Controls.Add(_approveButton);
         _approvalPanel.Controls.Add(_rejectButton);
+        _approvalPanel.Controls.Add(_copyDetailsButton);
         _approvalPanel.Controls.Add(_approvalResult);
+        _approvalPanel.Controls.Add(_copyResultButton);
         Controls.Add(_approvalPanel);
     }
 
@@ -168,6 +185,8 @@ public sealed partial class MainForm
         _approvalResult.Text = "";
         _approveButton.Enabled = true;
         _rejectButton.Enabled = true;
+        _copyDetailsButton.Enabled = true;
+        _copyResultButton.Visible = false;
         _approvalPanel.Visible = true;
     }
 
@@ -181,7 +200,10 @@ public sealed partial class MainForm
         _approvalPanel.Visible = false;
         _approveButton.Enabled = false;
         _rejectButton.Enabled = false;
+        _copyDetailsButton.Enabled = false;
+        _copyResultButton.Visible = false;
         _approvalDetails.Text = "";
+        _approvalResult.Text = "";
     }
 
     public void ShowApprovalResult(string text)
@@ -194,5 +216,7 @@ public sealed partial class MainForm
         _approvalResult.Text = text;
         _approveButton.Enabled = false;
         _rejectButton.Enabled = false;
+        _copyResultButton.Visible = true;
+        _copyResultButton.Enabled = true;
     }
 }

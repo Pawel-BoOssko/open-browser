@@ -592,6 +592,93 @@ class Program
         var ok42 = approval.TrySetPending(env42, out _);
         Assert(!ok42, "Empty prompt rejected");
 
+        // 43. Pending summary truncates long prompt at 1000 chars
+        var veryLongPrompt = new string('A', 1500);
+        var env43 = new OpenBridgeEnvelopeParseResult
+        {
+            HasEnvelope = true,
+            Error = OpenBridgeEnvelopeParseError.NONE,
+            Envelope = new OpenBridgeEnvelope { Version = "001", Command = "CC", Payload = veryLongPrompt }
+        };
+        approval.TrySetPending(env43, out _);
+        var summary43 = approval.PendingSummary();
+        Assert(summary43.Contains("AAAA"), "Summary contains truncated prompt");
+        Assert(!summary43.Contains(new string('A', 1500)), "Summary does not contain full 1500-char prompt");
+        Assert(summary43.Contains("1500 chars"), "Summary shows original prompt length");
+        approval.Reject();
+
+        // 44. PendingCommandDetails does not include full payload64
+        var secretPayload64 = Convert.ToBase64String(Encoding.UTF8.GetBytes("secret_operation_code"));
+        var env44 = new OpenBridgeEnvelopeParseResult
+        {
+            HasEnvelope = true,
+            Error = OpenBridgeEnvelopeParseError.NONE,
+            Envelope = new OpenBridgeEnvelope { Version = "001", Command = "CC", Payload = "Normal prompt", Payload64 = secretPayload64 }
+        };
+        approval.TrySetPending(env44, out _);
+        var details = approval.PendingCommandDetails();
+        Assert(!details.Contains("secret_operation_code"), "Pending details do not expose decoded payload64 content");
+        Assert(!details.Contains(secretPayload64), "Pending details do not expose raw payload64");
+        approval.Reject();
+
+        // 45. Approve result has operation_id and duration
+        var env45 = new OpenBridgeEnvelopeParseResult
+        {
+            HasEnvelope = true,
+            Error = OpenBridgeEnvelopeParseError.NONE,
+            Envelope = new OpenBridgeEnvelope { Version = "001", Command = "CC", Payload = "Test 45" }
+        };
+        approval.TrySetPending(env45, out _);
+        var result45 = await approval.ApproveAsync();
+        Assert(!string.IsNullOrEmpty(result45.OperationId), "Result has operation_id");
+        Assert(result45.DurationMs >= 0, "Result has duration");
+        var resultSummary45 = approval.ResultSummary();
+        Assert(resultSummary45.Contains(result45.OperationId), "Result summary includes operation_id");
+        Assert(resultSummary45.Contains(result45.DurationMs.ToString()), "Result summary includes duration");
+
+        // 46. Reject clears pending and no result remains from previous approve
+        var env46 = new OpenBridgeEnvelopeParseResult
+        {
+            HasEnvelope = true,
+            Error = OpenBridgeEnvelopeParseError.NONE,
+            Envelope = new OpenBridgeEnvelope { Version = "001", Command = "CC", Payload = "Reject test" }
+        };
+        approval.TrySetPending(env46, out _);
+        approval.Reject();
+        Assert(!approval.HasPending, "Reject clears pending");
+        Assert(approval.ResultSummary() == "", "Reject clears result summary (no new result)");
+
+        // 47. Second pending while first exists is rejected
+        var env47a = new OpenBridgeEnvelopeParseResult
+        {
+            HasEnvelope = true,
+            Error = OpenBridgeEnvelopeParseError.NONE,
+            Envelope = new OpenBridgeEnvelope { Version = "001", Command = "CC", Payload = "First" }
+        };
+        approval.TrySetPending(env47a, out _);
+        var env47b = new OpenBridgeEnvelopeParseResult
+        {
+            HasEnvelope = true,
+            Error = OpenBridgeEnvelopeParseError.NONE,
+            Envelope = new OpenBridgeEnvelope { Version = "001", Command = "CC", Payload = "Second" }
+        };
+        var ok47 = approval.TrySetPending(env47b, out var err47);
+        Assert(!ok47, "Second pending rejected while first exists");
+        Assert(err47 != null && err47.Contains("pending"), "Error mentions pending");
+        approval.Reject();
+
+        // 48. Runtime approval forces DryRun mode (verified by message content)
+        var env48 = new OpenBridgeEnvelopeParseResult
+        {
+            HasEnvelope = true,
+            Error = OpenBridgeEnvelopeParseError.NONE,
+            Envelope = new OpenBridgeEnvelope { Version = "001", Command = "CC", Payload = "DryRun check" }
+        };
+        approval.TrySetPending(env48, out _);
+        var result48 = await approval.ApproveAsync();
+        Assert(result48.Status == HostExecutionStatus.Ok, "DryRun execution succeeds");
+        Assert(result48.Message != null && result48.Message.Contains("No Claude Code process"), "Result confirms no real Claude process launched");
+
         // ======== Concurrency & Timeout Tests ========
         Console.WriteLine("--- Testing concurrency lock ---");
         var delayedExecutor = new DelayedClaudeCodeExecutor(2000);

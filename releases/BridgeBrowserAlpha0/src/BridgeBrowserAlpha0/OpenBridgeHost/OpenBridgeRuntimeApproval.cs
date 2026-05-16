@@ -72,6 +72,10 @@ public class OpenBridgeRuntimeApproval
             "Operator approved CC command — executing DryRun only",
             new { command = request.Command, promptLength = request.Prompt?.Length ?? 0 });
 
+        _log?.WriteRun("runtime_approval", "host_execution_started", "ok",
+            "Starting DryRun execution via Host",
+            new { command = request.Command, mode = "DryRun", timeoutMs = 720_000 });
+
         var executor = new ClaudeCode.ClaudeCodeExecutor(new ClaudeCode.ClaudeCodeExecutorOptions
         {
             Mode = ClaudeCode.ClaudeCodeExecutorMode.DryRun,
@@ -118,8 +122,31 @@ public class OpenBridgeRuntimeApproval
         {
             if (PendingCommand == null) return "No pending command.";
             var prompt = PendingCommand.Prompt ?? "";
-            var preview = prompt.Length > 200 ? prompt[..200] + "..." : prompt;
-            return $"Command: CC | Prompt: {preview} | Timeout: 720000ms | Mode: DryRun";
+            var promptLen = prompt.Length;
+            var preview = promptLen > 1000 ? prompt[..1000] + "..." : prompt;
+            return $"Command: CC | Prompt ({promptLen} chars): {preview} | Timeout: 720000ms | Mode: DryRun";
+        }
+    }
+
+    public string PendingCommandDetails()
+    {
+        lock (_gate)
+        {
+            if (PendingCommand == null) return "";
+            return $"Command: CC\nVersion: 001\nTimeout: 720000ms\nMaxOutput: 50000 chars\nMode: DryRun\n" +
+                   $"WorkingDir: {PendingCommand.WorkingDirectory}\n" +
+                   $"PromptLength: {PendingCommand.Prompt?.Length ?? 0} chars";
+        }
+    }
+
+    public string ResultSummary()
+    {
+        lock (_gate)
+        {
+            if (LastResult == null) return "";
+            return $"OperationId: {LastResult.OperationId}  Status: {LastResult.Status}  " +
+                   $"Duration: {LastResult.DurationMs}ms  ExitCode: {LastResult.ExitCode}  " +
+                   $"Message: {LastResult.Message}";
         }
     }
 }

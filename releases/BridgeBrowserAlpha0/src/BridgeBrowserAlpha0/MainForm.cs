@@ -52,6 +52,8 @@ public sealed partial class MainForm : Form
         _hideWebButton.Click += (_, _) => ToggleWebVisibility();
         _approveButton.Click += async (_, _) => await ApproveRuntimeCommandAsync();
         _rejectButton.Click += (_, _) => RejectRuntimeCommand();
+        _copyDetailsButton.Click += (_, _) => CopyApprovalDetails();
+        _copyResultButton.Click += (_, _) => CopyApprovalResult();
         _diagnosticsTimer.Tick += async (_, _) => await _diagnosticsController.RefreshAsync(false);
 
         Load += async (_, _) => await InitializeAsync();
@@ -140,11 +142,9 @@ public sealed partial class MainForm : Form
             SetStatus("Executing CC command (DryRun)...");
             ShowApprovalResult("Executing...");
             var result = await _runtimeApproval.ApproveAsync();
-            var text = $"Status={result.Status}  Duration={result.DurationMs}ms  ExitCode={result.ExitCode}  Message={result.Message}";
+            var text = _runtimeApproval.ResultSummary();
             ShowApprovalResult(text);
             SetStatus(result.Status == HostExecutionStatus.Ok ? "CC command OK" : "CC command failed: " + result.ErrorCode);
-            await Task.Delay(5000);
-            HidePendingCommand();
         }
         catch (Exception ex)
         {
@@ -159,6 +159,26 @@ public sealed partial class MainForm : Form
         _runtimeApproval.Reject();
         SetStatus("CC command rejected.");
         HidePendingCommand();
+    }
+
+    private void CopyApprovalDetails()
+    {
+        var details = _runtimeApproval.PendingCommandDetails();
+        if (!string.IsNullOrEmpty(details))
+        {
+            Clipboard.SetText(details);
+            SetStatus("Approval details copied.");
+        }
+    }
+
+    private void CopyApprovalResult()
+    {
+        var result = _runtimeApproval.ResultSummary();
+        if (!string.IsNullOrEmpty(result))
+        {
+            Clipboard.SetText(result);
+            SetStatus("Approval result copied.");
+        }
     }
 
     private void ExportRedactedRun()
