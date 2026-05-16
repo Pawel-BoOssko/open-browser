@@ -773,6 +773,28 @@ watchdog
 
 ---
 
+## 26. Runtime command approval
+
+26a. OpenBridge envelopes detected in runtime must not execute automatically.
+
+26b. A valid envelope detection creates a pending command candidate, not an execution order.
+
+26c. Operator approval is mandatory before Host execution.
+
+26d. First runtime execution integration must use DryRun only. Process mode from runtime requires a later explicit decision.
+
+26e. Result delivery to the LLM conversation is not approved yet. The first runtime milestone stops at operator-visible result.
+
+26f. Automatic WebView result injection is not approved yet.
+
+26g. Every Process-mode CC operation requires individual operator approval. No batch approval. No "remember this choice."
+
+26h. Envelopes inside code blocks, with parse errors, or in multiple-envelope responses must not execute.
+
+26i. The observer remains passive. Execution is triggered by the runtime approval layer, not by the observer.
+
+---
+
 # Open decisions
 
 1. Exact timeout configuration model in layer/executor definitions.
