@@ -41,6 +41,14 @@ public sealed class WebViewMessageHandler
 
             if (eventType is "page_fetch_done" or "page_xhr_done" or "page_eventsource_error")
                 _extractor.Finish();
+            else if (eventType == "page_websocket_message" && root.TryGetProperty("data", out var wsDataEl))
+            {
+                var rawWs = wsDataEl.TryGetProperty("data", out var rawText) && rawText.ValueKind == JsonValueKind.String
+                    ? rawText.GetString() ?? "" : "";
+                if (rawWs.Contains("\"status\":\"finished_successfully\"", StringComparison.Ordinal) &&
+                    rawWs.Contains("\"role\":\"assistant\"", StringComparison.Ordinal))
+                    _extractor.Finish();
+            }
 
             if (eventType.StartsWith("loaded_turns_monitor", StringComparison.OrdinalIgnoreCase))
                 _requestDiagnosticsRefresh();

@@ -33,35 +33,35 @@ Paste these into a ChatGPT message and send them. After the response completes (
 ### Valid CC envelope (should trigger approval panel)
 
 ```
-<<<OPENBRIDGE:EXEC:BEGIN>>>
+@@OPENBRIDGE_EXEC_BEGIN@@
 {
   "version": "001",
   "command": "CC",
   "payload": "Say hello from the OpenBridge runtime approval panel. Return one short sentence."
 }
-<<<OPENBRIDGE:EXEC:END>>>
+@@OPENBRIDGE_EXEC_END@@
 ```
 
 ### Unsupported command envelope (should NOT trigger approval)
 
 ```
-<<<OPENBRIDGE:EXEC:BEGIN>>>
+@@OPENBRIDGE_EXEC_BEGIN@@
 {
   "version": "001",
   "command": "FS",
   "payload": "read README.md"
 }
-<<<OPENBRIDGE:EXEC:END>>>
+@@OPENBRIDGE_EXEC_END@@
 ```
 
 ### Invalid envelope (should NOT trigger approval)
 
 ```
-<<<OPENBRIDGE:EXEC:BEGIN>>>
+@@OPENBRIDGE_EXEC_BEGIN@@
 {
   "version": "001"
 }
-<<<OPENBRIDGE:EXEC:END>>>
+@@OPENBRIDGE_EXEC_END@@
 ```
 
 ## Expected UI behavior

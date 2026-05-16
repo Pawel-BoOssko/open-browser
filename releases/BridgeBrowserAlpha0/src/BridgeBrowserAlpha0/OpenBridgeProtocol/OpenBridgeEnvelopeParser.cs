@@ -2,18 +2,15 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using System.Text.Json;
-using System.Text.RegularExpressions;
 
 namespace BridgeBrowserAlpha0.OpenBridgeProtocol;
 
 public static class OpenBridgeEnvelopeParser
 {
-    private const string ExecBegin = "<<<OPENBRIDGE:EXEC:BEGIN>>>";
-    private const string ExecEnd = "<<<OPENBRIDGE:EXEC:END>>>";
-    private const string RawBegin = "<<<OPENBRIDGE:RAW_PAYLOAD:BEGIN>>>";
-    private const string RawEnd = "<<<OPENBRIDGE:RAW_PAYLOAD:END>>>";
-
-    private static readonly Regex MarkerWhitespace = new(@"\s+>>>", RegexOptions.Compiled);
+    private const string ExecBegin = "@@OPENBRIDGE_EXEC_BEGIN@@";
+    private const string ExecEnd = "@@OPENBRIDGE_EXEC_END@@";
+    private const string RawBegin = "@@OPENBRIDGE_RAW_BEGIN@@";
+    private const string RawEnd = "@@OPENBRIDGE_RAW_END@@";
 
     public static OpenBridgeEnvelopeParseResult Parse(string text)
     {
@@ -24,8 +21,6 @@ public static class OpenBridgeEnvelopeParser
             result.HasEnvelope = false;
             return result;
         }
-
-        text = MarkerWhitespace.Replace(text, ">>>");
 
         int firstExecBegin = text.IndexOf(ExecBegin);
         if (firstExecBegin == -1)

@@ -252,9 +252,9 @@ disabled
 8c. Final envelope markers:
 
 ```text
-<<<OPENBRIDGE:EXEC:BEGIN>>>
+@@OPENBRIDGE_EXEC_BEGIN@@
 ...
-<<<OPENBRIDGE:EXEC:END>>>
+@@OPENBRIDGE_EXEC_END@@
 ```
 
 8d. One LLM response may contain one execution envelope.

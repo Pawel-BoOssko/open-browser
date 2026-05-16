@@ -9,15 +9,8 @@ class Program
 
     static void Assert(bool condition, string testName)
     {
-        if (condition)
-        {
-            Console.WriteLine("PASS: " + testName);
-        }
-        else
-        {
-            Console.WriteLine("FAIL: " + testName);
-            _failures++;
-        }
+        if (condition) Console.WriteLine("PASS: " + testName);
+        else { Console.WriteLine("FAIL: " + testName); _failures++; }
     }
 
     static void Main()
@@ -28,108 +21,77 @@ class Program
         var r1 = OpenBridgeEnvelopeParser.Parse("Just some text without markers");
         Assert(r1.HasEnvelope == false, "No envelope");
 
-        // 2. valid envelope with string version "001" and command HST_HELP
-        string t2 = "<<<OPENBRIDGE:EXEC:BEGIN>>>\n{\"version\":\"001\", \"command\":\"HST_HELP\"}\n<<<OPENBRIDGE:EXEC:END>>>";
+        // 2. valid envelope with string version and command HST_HELP
+        string t2 = "@@OPENBRIDGE_EXEC_BEGIN@@\n{\"version\":\"001\", \"command\":\"HST_HELP\"}\n@@OPENBRIDGE_EXEC_END@@";
         var r2 = OpenBridgeEnvelopeParser.Parse(t2);
         Assert(r2.HasEnvelope && r2.Error == OpenBridgeEnvelopeParseError.NONE && r2.Envelope?.Version == "001" && r2.Envelope?.Command == "HST_HELP", "Valid envelope with string version");
 
         // 3. valid envelope with numeric version 1 normalized to "001"
-        string t3 = "<<<OPENBRIDGE:EXEC:BEGIN>>>\n{\"version\":1, \"command\":\"FS\"}\n<<<OPENBRIDGE:EXEC:END>>>";
+        string t3 = "@@OPENBRIDGE_EXEC_BEGIN@@\n{\"version\":1, \"command\":\"FS\"}\n@@OPENBRIDGE_EXEC_END@@";
         var r3 = OpenBridgeEnvelopeParser.Parse(t3);
         Assert(r3.HasEnvelope && r3.Error == OpenBridgeEnvelopeParseError.NONE && r3.Envelope?.Version == "001", "Numeric version normalization");
 
         // 4. valid envelope with payload
-        string t4 = "<<<OPENBRIDGE:EXEC:BEGIN>>>\n{\"version\":\"001\", \"command\":\"SH\", \"payload\":\"dir\"}\n<<<OPENBRIDGE:EXEC:END>>>";
+        string t4 = "@@OPENBRIDGE_EXEC_BEGIN@@\n{\"version\":\"001\", \"command\":\"SH\", \"payload\":\"dir\"}\n@@OPENBRIDGE_EXEC_END@@";
         var r4 = OpenBridgeEnvelopeParser.Parse(t4);
         Assert(r4.Error == OpenBridgeEnvelopeParseError.NONE && r4.Envelope?.Payload == "dir", "Valid envelope with payload");
 
         // 5. valid envelope with RAW block converted to payload64
-        string t5 = "<<<OPENBRIDGE:EXEC:BEGIN>>>\n{\"version\":\"001\", \"command\":\"FS\", \"payload64\": <<<OPENBRIDGE:RAW_PAYLOAD:BEGIN>>>HelloWorld<<<OPENBRIDGE:RAW_PAYLOAD:END>>>}\n<<<OPENBRIDGE:EXEC:END>>>";
+        string t5 = "@@OPENBRIDGE_EXEC_BEGIN@@\n{\"version\":\"001\", \"command\":\"FS\", \"payload64\": @@OPENBRIDGE_RAW_BEGIN@@HelloWorld@@OPENBRIDGE_RAW_END@@}\n@@OPENBRIDGE_EXEC_END@@";
         var r5 = OpenBridgeEnvelopeParser.Parse(t5);
         Assert(r5.Error == OpenBridgeEnvelopeParseError.NONE && r5.Envelope?.Payload64 == "SGVsbG9Xb3JsZA==", "RAW block to base64 payload64");
 
         // 6. multiple envelopes -> error
-        string t6 = "<<<OPENBRIDGE:EXEC:BEGIN>>>\n{}\n<<<OPENBRIDGE:EXEC:END>>>\n<<<OPENBRIDGE:EXEC:BEGIN>>>{}<<<OPENBRIDGE:EXEC:END>>>";
+        string t6 = "@@OPENBRIDGE_EXEC_BEGIN@@\n{}\n@@OPENBRIDGE_EXEC_END@@\n@@OPENBRIDGE_EXEC_BEGIN@@{}@@OPENBRIDGE_EXEC_END@@";
         var r6 = OpenBridgeEnvelopeParser.Parse(t6);
         Assert(r6.Error == OpenBridgeEnvelopeParseError.MULTIPLE_ENVELOPES, "Multiple envelopes error");
 
         // 7. missing EXEC END -> error
-        string t7 = "<<<OPENBRIDGE:EXEC:BEGIN>>>\n{\"version\":\"001\"}";
+        string t7 = "@@OPENBRIDGE_EXEC_BEGIN@@\n{\"version\":\"001\"}";
         var r7 = OpenBridgeEnvelopeParser.Parse(t7);
         Assert(r7.Error == OpenBridgeEnvelopeParseError.EXEC_END_MISSING, "Missing EXEC END error");
 
         // 8. missing RAW END -> error
-        string t8 = "<<<OPENBRIDGE:EXEC:BEGIN>>>\n{\"version\":\"001\", \"command\":\"FS\", \"payload64\": <<<OPENBRIDGE:RAW_PAYLOAD:BEGIN>>>Hello}\n<<<OPENBRIDGE:EXEC:END>>>";
+        string t8 = "@@OPENBRIDGE_EXEC_BEGIN@@\n{\"version\":\"001\", \"command\":\"FS\", \"payload64\": @@OPENBRIDGE_RAW_BEGIN@@Hello}\n@@OPENBRIDGE_EXEC_END@@";
         var r8 = OpenBridgeEnvelopeParser.Parse(t8);
         Assert(r8.Error == OpenBridgeEnvelopeParseError.RAW_END_MISSING, "Missing RAW END error");
 
         // 9. invalid JSON -> JSON_PARSE_ERROR
-        string t9 = "<<<OPENBRIDGE:EXEC:BEGIN>>>\n{invalid}\n<<<OPENBRIDGE:EXEC:END>>>";
+        string t9 = "@@OPENBRIDGE_EXEC_BEGIN@@\n{invalid}\n@@OPENBRIDGE_EXEC_END@@";
         var r9 = OpenBridgeEnvelopeParser.Parse(t9);
         Assert(r9.Error == OpenBridgeEnvelopeParseError.JSON_PARSE_ERROR, "Invalid JSON error");
 
         // 10. missing command -> COMMAND_MISSING
-        string t10 = "<<<OPENBRIDGE:EXEC:BEGIN>>>\n{\"version\":\"001\"}\n<<<OPENBRIDGE:EXEC:END>>>";
+        string t10 = "@@OPENBRIDGE_EXEC_BEGIN@@\n{\"version\":\"001\"}\n@@OPENBRIDGE_EXEC_END@@";
         var r10 = OpenBridgeEnvelopeParser.Parse(t10);
         Assert(r10.Error == OpenBridgeEnvelopeParseError.COMMAND_MISSING, "Missing command error");
 
         // 11. unknown field -> warning
-        string t11 = "<<<OPENBRIDGE:EXEC:BEGIN>>>\n{\"version\":\"001\", \"command\":\"FS\", \"someField\":123}\n<<<OPENBRIDGE:EXEC:END>>>";
+        string t11 = "@@OPENBRIDGE_EXEC_BEGIN@@\n{\"version\":\"001\", \"command\":\"FS\", \"someField\":123}\n@@OPENBRIDGE_EXEC_END@@";
         var r11 = OpenBridgeEnvelopeParser.Parse(t11);
         Assert(r11.Error == OpenBridgeEnvelopeParseError.NONE && r11.Envelope?.UnknownFields.Count == 1 && r11.Envelope.UnknownFields[0] == "someField", "Unknown fields captured");
 
-        // 12. Whitespace before closing >>> in BEGIN marker is accepted
-        string t12 = "<<<OPENBRIDGE:EXEC:BEGIN >>>\n{\"version\":\"001\", \"command\":\"HST_HELP\"}\n<<<OPENBRIDGE:EXEC:END>>>";
+        // 12. Old angle-bracket marker format has no meaning
+        string t12 = "<<<OPENBRIDGE:EXEC:BEGIN>>>\n{\"version\":\"001\", \"command\":\"CC\"}\n<<<OPENBRIDGE:EXEC:END>>>";
         var r12 = OpenBridgeEnvelopeParser.Parse(t12);
-        Assert(r12.HasEnvelope && r12.Error == OpenBridgeEnvelopeParseError.NONE && r12.Envelope?.Command == "HST_HELP", "Space before BEGIN >>> is accepted");
-
-        // 13. Whitespace before closing >>> in END marker is accepted
-        string t13 = "<<<OPENBRIDGE:EXEC:BEGIN>>>\n{\"version\":\"001\", \"command\":\"CC\"}\n<<<OPENBRIDGE:EXEC:END >>>";
-        var r13 = OpenBridgeEnvelopeParser.Parse(t13);
-        Assert(r13.HasEnvelope && r13.Error == OpenBridgeEnvelopeParseError.NONE && r13.Envelope?.Command == "CC", "Space before END >>> is accepted");
-
-        // 14. Tab before closing >>> is accepted
-        string t14 = "<<<OPENBRIDGE:EXEC:BEGIN\t>>>\n{\"version\":\"001\", \"command\":\"CC\"}\n<<<OPENBRIDGE:EXEC:END\t>>>";
-        var r14 = OpenBridgeEnvelopeParser.Parse(t14);
-        Assert(r14.HasEnvelope && r14.Error == OpenBridgeEnvelopeParseError.NONE && r14.Envelope?.Command == "CC", "Tab before >>> is accepted");
-
-        // 15. Multiple spaces before closing >>> are accepted
-        string t15 = "<<<OPENBRIDGE:EXEC:BEGIN   >>>\n{\"version\":\"001\", \"command\":\"CC\"}\n<<<OPENBRIDGE:EXEC:END   >>>";
-        var r15 = OpenBridgeEnvelopeParser.Parse(t15);
-        Assert(r15.HasEnvelope && r15.Error == OpenBridgeEnvelopeParseError.NONE && r15.Envelope?.Command == "CC", "Multiple spaces before >>> accepted");
-
-        // 16. Exact marker still works unchanged
-        string t16 = "<<<OPENBRIDGE:EXEC:BEGIN>>>\n{\"version\":\"001\", \"command\":\"FS\"}\n<<<OPENBRIDGE:EXEC:END>>>";
-        var r16 = OpenBridgeEnvelopeParser.Parse(t16);
-        Assert(r16.HasEnvelope && r16.Error == OpenBridgeEnvelopeParseError.NONE && r16.Envelope?.Command == "FS", "Exact markers still work");
-
-        // 17. Typo in marker name still fails (regression check)
-        string t17 = "<<<OPENBRIDGE:EXEC:BOGUS>>>\n{\"version\":\"001\", \"command\":\"CC\"}\n<<<OPENBRIDGE:EXEC:END>>>";
-        var r17 = OpenBridgeEnvelopeParser.Parse(t17);
-        Assert(!r17.HasEnvelope || r17.Error != OpenBridgeEnvelopeParseError.NONE,
-            "Typo in marker is not accepted (no envelope or parse error)");
-
-        // 18. RAW marker whitespace is also normalized
-        string t18 = "<<<OPENBRIDGE:EXEC:BEGIN>>>\n{\"version\":\"001\", \"command\":\"FS\", \"payload64\": <<<OPENBRIDGE:RAW_PAYLOAD:BEGIN >>>Hello<<<OPENBRIDGE:RAW_PAYLOAD:END>>>}\n<<<OPENBRIDGE:EXEC:END>>>";
-        var r18 = OpenBridgeEnvelopeParser.Parse(t18);
-        Assert(r18.HasEnvelope && r18.Error == OpenBridgeEnvelopeParseError.NONE, "Whitespace before RAW >>> accepted");
+        Assert(!r12.HasEnvelope, "Old angle-bracket markers are ignored");
 
         Console.WriteLine("--- Running OpenBridgeEnvelopeObserver Smoke Tests ---");
         var observer = new OpenBridgeEnvelopeObserver(null);
 
-        // 12. observer no envelope
+        // 13. observer no envelope (plain text)
         var o1 = observer.Observe("No envelope here");
         Assert(o1?.HasEnvelope == false, "Observer: no envelope");
 
-        // 13. observer valid envelope
-        var o2 = observer.Observe("<<<OPENBRIDGE:EXEC:BEGIN>>>\n{\"version\":\"001\", \"command\":\"FS\"}\n<<<OPENBRIDGE:EXEC:END>>>");
-        Assert(o2 != null && o2.HasEnvelope && o2.Error == OpenBridgeEnvelopeParseError.NONE && o2.Envelope?.Command == "FS", "Observer: valid envelope");
+        // 14. observer valid envelope with new markers
+        var o2 = observer.Observe("@@OPENBRIDGE_EXEC_BEGIN@@\n{\"version\":\"001\", \"command\":\"FS\"}\n@@OPENBRIDGE_EXEC_END@@");
+        Assert(o2 != null && o2.HasEnvelope && o2.Error == OpenBridgeEnvelopeParseError.NONE && o2.Envelope?.Command == "FS", "Observer: valid envelope with new markers");
 
-        // 14. observer invalid envelope
-        var o3 = observer.Observe("<<<OPENBRIDGE:EXEC:BEGIN>>>\n{invalid}\n<<<OPENBRIDGE:EXEC:END>>>");
+        // 15. observer invalid envelope
+        var o3 = observer.Observe("@@OPENBRIDGE_EXEC_BEGIN@@\n{invalid}\n@@OPENBRIDGE_EXEC_END@@");
         Assert(o3 != null && o3.HasEnvelope && o3.Error == OpenBridgeEnvelopeParseError.JSON_PARSE_ERROR, "Observer: JSON error");
 
-        // 15. observer returns no execution actions, pure passive ParseResult
+        // 16. observer returns passive parse result, no execution
         Assert(o2 != null && o2.GetType().Name == "OpenBridgeEnvelopeParseResult", "Observer: passive result, no execution");
 
         if (_failures > 0)
