@@ -44,11 +44,7 @@ public sealed class LogWriter : IDisposable
         {
             if (value.Length > _maxLength)
             {
-                writer.WriteStartObject();
-                writer.WriteString("truncated_value", value.Substring(0, _maxLength) + "...");
-                writer.WriteBoolean("truncated", true);
-                writer.WriteNumber("originalLength", value.Length);
-                writer.WriteEndObject();
+                writer.WriteStringValue(value.Substring(0, _maxLength) + $"... [TRUNCATED originalLength={value.Length}]");
             }
             else
             {
