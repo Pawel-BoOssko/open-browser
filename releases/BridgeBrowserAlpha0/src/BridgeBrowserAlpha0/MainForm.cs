@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text.Json;
+using BridgeBrowserAlpha0.OpenBridgeHost;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
 
@@ -13,6 +14,7 @@ public sealed partial class MainForm : Form
     private readonly BridgeBrowserModuleManager _moduleManager;
     private readonly WebViewMessageHandler _messageHandler;
     private readonly DiagnosticsController _diagnosticsController;
+    private readonly OpenBridgeHost.OpenBridgeRuntimeApproval _runtimeApproval;
     private BrowserTabRuntime? _tabRuntime;
 
     public MainForm()
@@ -21,7 +23,23 @@ public sealed partial class MainForm : Form
         _moduleManager = new BridgeBrowserModuleManager(_log);
         _diagnosticsController = new DiagnosticsController(_log, _moduleManager, SetDiagnostics, () => _webView.CoreWebView2 != null);
         _messageHandler = new WebViewMessageHandler(_log, _extractor, () => { _ = _diagnosticsController.RefreshAsync(false); });
-        
+        _runtimeApproval = new OpenBridgeHost.OpenBridgeRuntimeApproval(@"D:\projects\open-browser", _log);
+
+        _extractor.OnEnvelopeDetected = parseResult =>
+        {
+            var ok = _runtimeApproval.TrySetPending(parseResult, out var error);
+            if (ok)
+            {
+                ShowPendingCommand(_runtimeApproval.PendingSummary());
+            }
+            else
+            {
+                _log.WriteRun("runtime_approval", "envelope_rejected", "warning",
+                    "Envelope detection not promoted to pending",
+                    new { error });
+            }
+        };
+
         InitializeUi();
 
         _newLogButton.Click += (_, _) => _tabRuntime?.StartNewRun();
@@ -32,6 +50,8 @@ public sealed partial class MainForm : Form
         _promoteTrimmerButton.Click += async (_, _) => await PromoteTrimmerAsync();
         _trimmerStatusButton.Click += async (_, _) => await ShowTrimmerStatusAsync();
         _hideWebButton.Click += (_, _) => ToggleWebVisibility();
+        _approveButton.Click += async (_, _) => await ApproveRuntimeCommandAsync();
+        _rejectButton.Click += (_, _) => RejectRuntimeCommand();
         _diagnosticsTimer.Tick += async (_, _) => await _diagnosticsController.RefreshAsync(false);
 
         Load += async (_, _) => await InitializeAsync();
@@ -111,6 +131,34 @@ public sealed partial class MainForm : Form
     {
         await _diagnosticsController.RefreshAsync(true);
         MessageBox.Show(_diagnostics.Text, $"{AppConstants.AppTitle} trimmer status", MessageBoxButtons.OK, MessageBoxIcon.Information);
+    }
+
+    private async Task ApproveRuntimeCommandAsync()
+    {
+        try
+        {
+            SetStatus("Executing CC command (DryRun)...");
+            ShowApprovalResult("Executing...");
+            var result = await _runtimeApproval.ApproveAsync();
+            var text = $"Status={result.Status}  Duration={result.DurationMs}ms  ExitCode={result.ExitCode}  Message={result.Message}";
+            ShowApprovalResult(text);
+            SetStatus(result.Status == HostExecutionStatus.Ok ? "CC command OK" : "CC command failed: " + result.ErrorCode);
+            await Task.Delay(5000);
+            HidePendingCommand();
+        }
+        catch (Exception ex)
+        {
+            ShowApprovalResult("Execution error: " + ex.Message);
+            SetStatus("CC command error: " + ex.Message);
+            _log.WriteRun("runtime_approval", "host_execution_failed", "error", ex.Message);
+        }
+    }
+
+    private void RejectRuntimeCommand()
+    {
+        _runtimeApproval.Reject();
+        SetStatus("CC command rejected.");
+        HidePendingCommand();
     }
 
     private void ExportRedactedRun()

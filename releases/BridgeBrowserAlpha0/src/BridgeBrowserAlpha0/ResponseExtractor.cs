@@ -28,6 +28,7 @@ public sealed class ResponseExtractor
     private readonly List<AssistantMessageFrame> _frames = new();
     private readonly Dictionary<string, AssistantMessageFrame> _framesById = new(StringComparer.Ordinal);
     private readonly BridgeBrowserAlpha0.OpenBridgeProtocol.OpenBridgeEnvelopeObserver _observer;
+    public Action<BridgeBrowserAlpha0.OpenBridgeProtocol.OpenBridgeEnvelopeParseResult>? OnEnvelopeDetected;
     private StreamWriter? _rawWriter;
     private string? _answerPath;
     private string? _rawPath;
@@ -139,7 +140,11 @@ public sealed class ResponseExtractor
 
             var answer = GetCurrentAnswerText();
             
-            _observer.Observe(answer);
+            var parseResult = _observer.Observe(answer);
+            if (parseResult?.HasEnvelope == true)
+            {
+                OnEnvelopeDetected?.Invoke(parseResult);
+            }
 
             var status = answer.Length > 0 ? "ok" : "extraction_failed";
             if (answer.Length > 0 && _answerPath != null)

@@ -1,7 +1,7 @@
 # Runtime Command Approval Design
 
-Status: design document — not implemented
-Date: 2026-05-16
+Status: design + DryRun-only implementation
+Date: 2026-05-16 (design), 2026-05-16 (DryRun implementation)
 
 ---
 

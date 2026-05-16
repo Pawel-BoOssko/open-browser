@@ -57,6 +57,7 @@ public sealed partial class MainForm
         Controls.Add(_webView);
         Controls.Add(_diagnostics);
         Controls.Add(panel);
+        BuildApprovalPanel();
     }
 
     private void ToggleWebVisibility()
@@ -91,5 +92,107 @@ public sealed partial class MainForm
             return;
         }
         _diagnostics.Text = text;
+    }
+
+    // ---- Runtime approval panel ----
+
+    private readonly Panel _approvalPanel = new()
+    {
+        Dock = DockStyle.Bottom,
+        Height = 160,
+        Visible = false,
+        BorderStyle = BorderStyle.FixedSingle
+    };
+    private readonly Label _approvalTitle = new()
+    {
+        Text = "Pending CC Command — Operator Approval Required",
+        AutoSize = true,
+        Font = new Font(FontFamily.GenericSansSerif, 10, FontStyle.Bold),
+        Location = new Point(8, 4)
+    };
+    private readonly Label _approvalDetails = new()
+    {
+        AutoSize = true,
+        Location = new Point(8, 28),
+        MaximumSize = new Size(1200, 40)
+    };
+    private readonly Label _approvalWarning = new()
+    {
+        Text = "Runtime execution is DryRun only. No Claude Code process will be launched.",
+        AutoSize = true,
+        ForeColor = Color.DarkOrange,
+        Location = new Point(8, 72)
+    };
+    private readonly Button _approveButton = new()
+    {
+        Text = "Approve (DryRun)",
+        Width = 140,
+        Location = new Point(8, 98),
+        BackColor = Color.LightGreen,
+        Enabled = false
+    };
+    private readonly Button _rejectButton = new()
+    {
+        Text = "Reject",
+        Width = 100,
+        Location = new Point(156, 98),
+        Enabled = false
+    };
+    private readonly Label _approvalResult = new()
+    {
+        AutoSize = true,
+        Location = new Point(8, 130),
+        MaximumSize = new Size(1200, 30),
+        ForeColor = Color.DarkBlue
+    };
+
+    private void BuildApprovalPanel()
+    {
+        _approvalPanel.Controls.Add(_approvalTitle);
+        _approvalPanel.Controls.Add(_approvalDetails);
+        _approvalPanel.Controls.Add(_approvalWarning);
+        _approvalPanel.Controls.Add(_approveButton);
+        _approvalPanel.Controls.Add(_rejectButton);
+        _approvalPanel.Controls.Add(_approvalResult);
+        Controls.Add(_approvalPanel);
+    }
+
+    public void ShowPendingCommand(string summary)
+    {
+        if (InvokeRequired)
+        {
+            BeginInvoke(new Action(() => ShowPendingCommand(summary)));
+            return;
+        }
+        _approvalDetails.Text = summary;
+        _approvalResult.Text = "";
+        _approveButton.Enabled = true;
+        _rejectButton.Enabled = true;
+        _approvalPanel.Visible = true;
+    }
+
+    public void HidePendingCommand()
+    {
+        if (InvokeRequired)
+        {
+            BeginInvoke(new Action(HidePendingCommand));
+            return;
+        }
+        _approvalPanel.Visible = false;
+        _approveButton.Enabled = false;
+        _rejectButton.Enabled = false;
+        _approvalDetails.Text = "";
+    }
+
+    public void ShowApprovalResult(string text)
+    {
+        if (InvokeRequired)
+        {
+            BeginInvoke(new Action(() => ShowApprovalResult(text)));
+            return;
+        }
+        _approvalResult.Text = text;
+        _approveButton.Enabled = false;
+        _rejectButton.Enabled = false;
     }
 }

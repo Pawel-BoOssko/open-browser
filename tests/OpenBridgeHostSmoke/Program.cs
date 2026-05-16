@@ -489,6 +489,109 @@ class Program
         // Verify the request was NOT sent to any host — it's just a data object
         Assert(string.IsNullOrEmpty(req32!.OperationId), "OperationId is empty (not executed, Host assigns it)");
 
+        // ======== Runtime Approval Tests ========
+        Console.WriteLine("--- Runtime Approval Tests ---");
+
+        var approval = new OpenBridgeRuntimeApproval(allowedRoot);
+
+        // 33. Valid CC envelope creates pending command
+        var env33 = new OpenBridgeEnvelopeParseResult
+        {
+            HasEnvelope = true,
+            Error = OpenBridgeEnvelopeParseError.NONE,
+            Envelope = new OpenBridgeEnvelope { Version = "001", Command = "CC", Payload = "Fix the auth bug" }
+        };
+        var ok33 = approval.TrySetPending(env33, out var err33);
+        Assert(ok33, "Valid CC envelope creates pending command");
+        Assert(err33 == null, "No error for valid envelope");
+        Assert(approval.HasPending, "HasPending is true after set");
+
+        // 34. Second pending is rejected while first exists
+        var env34 = new OpenBridgeEnvelopeParseResult
+        {
+            HasEnvelope = true,
+            Error = OpenBridgeEnvelopeParseError.NONE,
+            Envelope = new OpenBridgeEnvelope { Version = "001", Command = "CC", Payload = "Another command" }
+        };
+        var ok34 = approval.TrySetPending(env34, out var err34);
+        Assert(!ok34, "Second candidate is rejected while first pending");
+        Assert(err34 != null && err34.Contains("pending"), "Error mentions pending");
+
+        // 35. Approve executes DryRun and returns ok
+        var result35 = await approval.ApproveAsync();
+        Assert(result35.Status == HostExecutionStatus.Ok, "Approve returns Ok status");
+        Assert(result35.Message != null && result35.Message.Contains("Dry-run"), "Approve executes DryRun");
+        Assert(!approval.HasPending, "HasPending is false after approve");
+
+        // 36. Result is stored in LastResult
+        Assert(approval.LastResult == result35, "LastResult stores execution result");
+
+        // 37. Approve with no pending returns error
+        var result37 = await approval.ApproveAsync();
+        Assert(result37.Status == HostExecutionStatus.Error, "Approve with no pending returns error");
+        Assert(result37.ErrorCode == HostErrorCodes.ExecutorError, "Error code is EXECUTOR_ERROR");
+
+        // 38. Reject clears pending
+        var env38 = new OpenBridgeEnvelopeParseResult
+        {
+            HasEnvelope = true,
+            Error = OpenBridgeEnvelopeParseError.NONE,
+            Envelope = new OpenBridgeEnvelope { Version = "001", Command = "CC", Payload = "Fix tests" }
+        };
+        approval.TrySetPending(env38, out _);
+        Assert(approval.HasPending, "HasPending is true");
+        approval.Reject();
+        Assert(!approval.HasPending, "HasPending is false after reject");
+
+        // 39. Runtime approval uses DryRun mode (never Process)
+        var env39 = new OpenBridgeEnvelopeParseResult
+        {
+            HasEnvelope = true,
+            Error = OpenBridgeEnvelopeParseError.NONE,
+            Envelope = new OpenBridgeEnvelope { Version = "001", Command = "CC", Payload = "Mode test" }
+        };
+        approval.TrySetPending(env39, out _);
+        var result39 = await approval.ApproveAsync();
+        Assert(result39.Message != null && result39.Message.Contains("No Claude Code process"), "DryRun confirms no real process");
+        Assert(result39.Message != null && !result39.Message.Contains("Process"), "Result does not mention Process mode");
+
+        // 40. Unsupported command rejected by mapper
+        var env40 = new OpenBridgeEnvelopeParseResult
+        {
+            HasEnvelope = true,
+            Error = OpenBridgeEnvelopeParseError.NONE,
+            Envelope = new OpenBridgeEnvelope { Version = "001", Command = "SH", Payload = "dir" }
+        };
+        approval.Reject(); // clear any pending
+        var ok40 = approval.TrySetPending(env40, out var err40);
+        Assert(!ok40, "Unsupported command rejected");
+        Assert(err40 != null && err40.Contains("CC"), "Error mentions only CC accepted");
+
+        // 41. PendingSummary includes key fields
+        var env41 = new OpenBridgeEnvelopeParseResult
+        {
+            HasEnvelope = true,
+            Error = OpenBridgeEnvelopeParseError.NONE,
+            Envelope = new OpenBridgeEnvelope { Version = "001", Command = "CC", Payload = "Refactor auth module" }
+        };
+        approval.TrySetPending(env41, out _);
+        var summary = approval.PendingSummary();
+        Assert(summary.Contains("CC"), "Summary contains command CC");
+        Assert(summary.Contains("Refactor auth module"), "Summary contains prompt");
+        Assert(summary.Contains("720000"), "Summary contains timeout");
+        Assert(summary.Contains("DryRun"), "Summary contains DryRun mode");
+        approval.Reject();
+
+        // 42. Empty prompt rejected by mapper
+        var env42 = new OpenBridgeEnvelopeParseResult
+        {
+            HasEnvelope = true,
+            Error = OpenBridgeEnvelopeParseError.NONE,
+            Envelope = new OpenBridgeEnvelope { Version = "001", Command = "CC" }
+        };
+        var ok42 = approval.TrySetPending(env42, out _);
+        Assert(!ok42, "Empty prompt rejected");
+
         // ======== Concurrency & Timeout Tests ========
         Console.WriteLine("--- Testing concurrency lock ---");
         var delayedExecutor = new DelayedClaudeCodeExecutor(2000);

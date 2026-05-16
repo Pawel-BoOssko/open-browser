@@ -12,10 +12,11 @@
 - ClaudeCodeExecutorOptionsLoader (Local JSON config loading for executor options)
 - OpenBridgeHostCommandMapper (Envelope-to-HostCommandRequest mapping for CC path)
 - Local CC envelope E2E probe (Manual probe proving the full isolated path with real Claude Code)
+- Runtime command approval UI (Operator-controlled approve/reject panel for detected CC envelopes — DryRun only)
 
 ## Planned
-- Runtime command approval UI (Operator-controlled approve/reject for detected CC envelopes)
-- Runtime-to-Host DryRun execution (First integration with DryRun only, no real Process mode from runtime)
+- Runtime-to-Host Process mode execution (requires separate approval)
+- Result delivery to LLM conversation (not designed)
 - HST_STATUS / HST_CAPABILITIES (Host self-discovery protocol)
 - HST_HELP (Host manual)
 - Result delivery design (How Host results reach the LLM conversation)
