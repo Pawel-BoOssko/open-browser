@@ -65,7 +65,7 @@ Loading config: .../config/local/claude-code-executor.local.json
 Mode: Process
 Executable: claude
 Args template: -p "{prompt}"
-Timeout: 300000ms
+Timeout: 720000ms
 Max output: 50000 chars
 
 Sending request to ClaudeCodeExecutor...
@@ -89,7 +89,7 @@ Sending request to ClaudeCodeExecutor...
 - The probe does not run `git push`
 - The probe does not install packages
 - The probe works only within `D:\projects\open-browser`
-- Timeout is enforced at 300 seconds by default
+- Timeout is enforced at 720000 ms (12 minutes) by default for coding-agent work
 - Output is truncated at 50,000 characters
 
 ## WebView integration status

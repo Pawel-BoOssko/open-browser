@@ -1,6 +1,8 @@
 using System.Diagnostics;
+using System.Text;
 using BridgeBrowserAlpha0.OpenBridgeHost;
 using BridgeBrowserAlpha0.OpenBridgeHost.ClaudeCode;
+using BridgeBrowserAlpha0.OpenBridgeProtocol;
 
 namespace OpenBridgeHostSmoke;
 
@@ -299,7 +301,7 @@ class Program
         {
             var rCfg2 = ClaudeCodeExecutorOptionsLoader.LoadOrThrow(examplePath);
             Assert(rCfg2.Mode == ClaudeCodeExecutorMode.DryRun, "Example config mode is DryRun");
-            Assert(rCfg2.DefaultTimeoutMs == 300_000, "Example config has default timeout");
+            Assert(rCfg2.DefaultTimeoutMs == 720_000, "Example config has default timeout");
             Assert(rCfg2.DefaultMaxOutputChars == 50_000, "Example config has default max output");
         }
         else
@@ -404,6 +406,88 @@ class Program
         {
             if (File.Exists(camelConfigPath)) File.Delete(camelConfigPath);
         }
+
+        // ======== Default Timeout Tests ========
+        Console.WriteLine("--- Default Timeout Tests ---");
+
+        // 24. Default timeout is 720000 (12 minutes)
+        var defaultOpts = new ClaudeCodeExecutorOptions();
+        Assert(defaultOpts.DefaultTimeoutMs == 720_000, "Default timeout is 720000ms (12 min)");
+
+        // 25. Example config timeout is 720000
+        var exampleCfgPath = Path.GetFullPath(Path.Combine(allowedRoot, "config", "examples", "claude-code-executor.example.json"));
+        if (File.Exists(exampleCfgPath))
+        {
+            var r25 = ClaudeCodeExecutorOptionsLoader.LoadOrThrow(exampleCfgPath);
+            Assert(r25.DefaultTimeoutMs == 720_000, "Example config timeout is 720000");
+        }
+        else
+        {
+            Console.WriteLine("SKIP: Example config not found");
+        }
+
+        // 26. Short timeout tests still override to small values explicitly
+        var shortOpts = new ClaudeCodeExecutorOptions { DefaultTimeoutMs = 500 };
+        var shortExecutor = new ClaudeCodeExecutor(shortOpts);
+        var shortHost = new OpenBridgeHost(allowedRoot, shortExecutor);
+        var r26 = await shortHost.ExecuteAsync(new HostCommandRequest
+        {
+            Command = "CC",
+            WorkingDirectory = allowedRoot,
+            Prompt = "Short timeout test"
+        });
+        Assert(r26.Status == HostExecutionStatus.Ok, "Short explicit timeout works (dry-run)");
+        // The timeout value from the request itself takes precedence in Host logic
+
+        // ======== Envelope-to-Host Mapper Tests ========
+        Console.WriteLine("--- Mapper Tests ---");
+
+        // 27. CC envelope with payload maps to HostCommandRequest
+        var env = new OpenBridgeEnvelope { Command = "CC", Payload = "Fix the auth bug" };
+        var ok27 = OpenBridgeHostCommandMapper.TryMap(env, allowedRoot, 720_000, 50_000, out var req27, out var err27);
+        Assert(ok27, "CC envelope with payload maps successfully");
+        Assert(err27 == null, "No error for valid CC envelope");
+        Assert(req27 != null && req27.Command == "CC", "Mapped command is CC");
+        Assert(req27!.Prompt == "Fix the auth bug", "Mapped prompt comes from payload");
+        Assert(req27.WorkingDirectory == allowedRoot, "Mapped working directory is default");
+        Assert(req27.TimeoutMs == 720_000, "Mapped timeout is default");
+        Assert(req27.MaxOutputChars == 50_000, "Mapped max output is default");
+
+        // 28. CC envelope with payload64 maps to decoded prompt
+        var payload64 = Convert.ToBase64String(Encoding.UTF8.GetBytes("Implement health check"));
+        var env28 = new OpenBridgeEnvelope { Command = "CC", Payload64 = payload64 };
+        var ok28 = OpenBridgeHostCommandMapper.TryMap(env28, allowedRoot, 720_000, 50_000, out var req28, out var err28);
+        Assert(ok28, "CC envelope with payload64 maps successfully");
+        Assert(req28!.Prompt == "Implement health check", "Mapped prompt decoded from payload64");
+
+        // 29. CC envelope with payload and payload64 combines both
+        var p64 = Convert.ToBase64String(Encoding.UTF8.GetBytes("Write a function that returns health status"));
+        var env29 = new OpenBridgeEnvelope { Command = "CC", Payload = "Implement health endpoint", Payload64 = p64 };
+        var ok29 = OpenBridgeHostCommandMapper.TryMap(env29, allowedRoot, 720_000, 50_000, out var req29, out var err29);
+        Assert(ok29, "CC envelope with both payloads maps");
+        Assert(req29!.Prompt!.Contains("Implement health endpoint"), "Prompt contains payload prefix");
+        Assert(req29.Prompt.Contains("Write a function"), "Prompt contains decoded payload64");
+
+        // 30. Unsupported command is rejected
+        var env30 = new OpenBridgeEnvelope { Command = "SH", Payload = "dir" };
+        var ok30 = OpenBridgeHostCommandMapper.TryMap(env30, allowedRoot, 720_000, 50_000, out var req30, out var err30);
+        Assert(!ok30, "Unsupported command is rejected");
+        Assert(req30 == null, "No request for unsupported command");
+        Assert(err30 != null && err30.Contains("CC"), "Error mentions only CC is accepted");
+
+        // 31. Empty/missing prompt is rejected by mapper
+        var env31 = new OpenBridgeEnvelope { Command = "CC" };
+        var ok31 = OpenBridgeHostCommandMapper.TryMap(env31, allowedRoot, 720_000, 50_000, out var req31, out var err31);
+        Assert(!ok31, "Missing prompt is rejected by mapper");
+        Assert(err31 != null && err31.Contains("empty"), "Error mentions empty prompt");
+
+        // 32. Mapper does not execute commands — it only produces a request object
+        var env32 = new OpenBridgeEnvelope { Command = "CC", Payload = "Read file" };
+        var ok32 = OpenBridgeHostCommandMapper.TryMap(env32, allowedRoot, 720_000, 50_000, out var req32, out var err32);
+        Assert(ok32, "Mapper returns request");
+        Assert(req32 is HostCommandRequest, "Result is HostCommandRequest, not an executed result");
+        // Verify the request was NOT sent to any host — it's just a data object
+        Assert(string.IsNullOrEmpty(req32!.OperationId), "OperationId is empty (not executed, Host assigns it)");
 
         // ======== Concurrency & Timeout Tests ========
         Console.WriteLine("--- Testing concurrency lock ---");
