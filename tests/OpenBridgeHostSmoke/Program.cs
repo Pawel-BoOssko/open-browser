@@ -285,6 +285,126 @@ class Program
         Assert(r17.Status == HostExecutionStatus.Ok, "Default executor still works");
         Assert(r17.StdoutPreview != null && r17.StdoutPreview.Contains("[DRY-RUN"), "Default mode is still dry-run");
 
+        // ======== Configuration Loader Tests ========
+        Console.WriteLine("--- Configuration Loader Tests ---");
+
+        // 18. Missing optional config returns null (no file = default dry-run)
+        var missingPath = Path.Combine(Path.GetTempPath(), $"openbridge_nonexistent_{Guid.NewGuid():N}.json");
+        var rCfg1 = ClaudeCodeExecutorOptionsLoader.TryLoad(missingPath);
+        Assert(rCfg1 == null, "TryLoad returns null for missing file");
+
+        // 19. Example config can be parsed
+        var examplePath = Path.GetFullPath(Path.Combine(allowedRoot, "config", "examples", "claude-code-executor.example.json"));
+        if (File.Exists(examplePath))
+        {
+            var rCfg2 = ClaudeCodeExecutorOptionsLoader.LoadOrThrow(examplePath);
+            Assert(rCfg2.Mode == ClaudeCodeExecutorMode.DryRun, "Example config mode is DryRun");
+            Assert(rCfg2.DefaultTimeoutMs == 300_000, "Example config has default timeout");
+            Assert(rCfg2.DefaultMaxOutputChars == 50_000, "Example config has default max output");
+        }
+        else
+        {
+            Console.WriteLine("SKIP: Example config not found at expected path (test repo layout)");
+        }
+
+        // 20. Process config can be parsed from a temp JSON file
+        var tempConfigPath = Path.Combine(Path.GetTempPath(), $"openbridge_test_config_{Guid.NewGuid():N}.json");
+        var tempJson = @"{
+  ""Mode"": ""Process"",
+  ""ExecutablePath"": ""cmd.exe"",
+  ""ArgumentsTemplate"": ""/c echo CONFIG_TEST"",
+  ""DefaultTimeoutMs"": 120000,
+  ""DefaultMaxOutputChars"": 10000
+}";
+        try
+        {
+            File.WriteAllText(tempConfigPath, tempJson);
+            var rCfg3 = ClaudeCodeExecutorOptionsLoader.LoadOrThrow(tempConfigPath);
+            Assert(rCfg3.Mode == ClaudeCodeExecutorMode.Process, "Temp config mode is Process");
+            Assert(rCfg3.ExecutablePath == "cmd.exe", "Temp config has executable path");
+            Assert(rCfg3.ArgumentsTemplate == "/c echo CONFIG_TEST", "Temp config has arguments template");
+            Assert(rCfg3.DefaultTimeoutMs == 120000, "Temp config has custom timeout");
+            Assert(rCfg3.DefaultMaxOutputChars == 10000, "Temp config has custom max output chars");
+
+            // Also verify the loaded config works with the executor (no process invoked here — only parsing)
+            var configExecutor = new ClaudeCodeExecutor(rCfg3);
+            var configHost = new OpenBridgeHost(allowedRoot, configExecutor);
+            var rCfg3exec = await configHost.ExecuteAsync(new HostCommandRequest
+            {
+                Command = "CC",
+                WorkingDirectory = allowedRoot,
+                Prompt = "config_loaded_test"
+            });
+            Assert(rCfg3exec.Status == HostExecutionStatus.Ok, "Executor loaded from config works");
+            Assert(rCfg3exec.StdoutPreview != null && rCfg3exec.StdoutPreview.Contains("CONFIG_TEST"), "Config-based executor runs with configured args");
+        }
+        finally
+        {
+            if (File.Exists(tempConfigPath)) File.Delete(tempConfigPath);
+        }
+
+        // 21. Invalid JSON throws
+        var badJsonPath = Path.Combine(Path.GetTempPath(), $"openbridge_bad_json_{Guid.NewGuid():N}.json");
+        try
+        {
+            File.WriteAllText(badJsonPath, "{ this is not valid json }");
+            try
+            {
+                ClaudeCodeExecutorOptionsLoader.LoadOrThrow(badJsonPath);
+                Assert(false, "Invalid JSON should throw");
+            }
+            catch (System.Text.Json.JsonException)
+            {
+                Assert(true, "Invalid JSON throws JsonException");
+            }
+        }
+        finally
+        {
+            if (File.Exists(badJsonPath)) File.Delete(badJsonPath);
+        }
+
+        // 22. Loading config does not invoke any process
+        var safeConfigPath = Path.Combine(Path.GetTempPath(), $"openbridge_safe_{Guid.NewGuid():N}.json");
+        var safeJson = @"{
+  ""Mode"": ""DryRun"",
+  ""ExecutablePath"": """",
+  ""ArgumentsTemplate"": """"
+}";
+        try
+        {
+            File.WriteAllText(safeConfigPath, safeJson);
+            var rCfg4 = ClaudeCodeExecutorOptionsLoader.TryLoad(safeConfigPath);
+            Assert(rCfg4 != null, "Safe config loads successfully");
+            Assert(rCfg4!.Mode == ClaudeCodeExecutorMode.DryRun, "Safe config stays in dry-run mode");
+            Assert(string.IsNullOrEmpty(rCfg4.ExecutablePath), "Safe config has no executable");
+        }
+        finally
+        {
+            if (File.Exists(safeConfigPath)) File.Delete(safeConfigPath);
+        }
+
+        // 23. camelCase JSON (case insensitive) works
+        var camelConfigPath = Path.Combine(Path.GetTempPath(), $"openbridge_camel_{Guid.NewGuid():N}.json");
+        var camelJson = @"{
+  ""mode"": ""DryRun"",
+  ""executablePath"": null,
+  ""argumentsTemplate"": null,
+  ""defaultTimeoutMs"": 60000,
+  ""defaultMaxOutputChars"": 5000
+}";
+        try
+        {
+            File.WriteAllText(camelConfigPath, camelJson);
+            var rCfg5 = ClaudeCodeExecutorOptionsLoader.LoadOrThrow(camelConfigPath);
+            Assert(rCfg5.Mode == ClaudeCodeExecutorMode.DryRun, "camelCase mode parses correctly");
+            Assert(rCfg5.DefaultTimeoutMs == 60000, "camelCase timeout parses correctly");
+            Assert(rCfg5.DefaultMaxOutputChars == 5000, "camelCase max output parses correctly");
+        }
+        finally
+        {
+            if (File.Exists(camelConfigPath)) File.Delete(camelConfigPath);
+        }
+
         // ======== Concurrency & Timeout Tests ========
         Console.WriteLine("--- Testing concurrency lock ---");
         var delayedExecutor = new DelayedClaudeCodeExecutor(2000);

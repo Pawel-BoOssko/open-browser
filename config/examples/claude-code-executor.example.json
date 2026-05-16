@@ -1,0 +1,7 @@
+{
+  "Mode": "DryRun",
+  "ExecutablePath": "",
+  "ArgumentsTemplate": "",
+  "DefaultTimeoutMs": 300000,
+  "DefaultMaxOutputChars": 50000
+}
