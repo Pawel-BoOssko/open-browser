@@ -1,7 +1,7 @@
 # Stage A Closure: UI Shell ↔ Tab Runtime Boundary
 
 Assessed: 2026-05-16
-Commit: a47fd7c
+Commit: 9393d55c9052f29098a21afe175d28b4699ea1e1
 
 ## Files Inspected
 
