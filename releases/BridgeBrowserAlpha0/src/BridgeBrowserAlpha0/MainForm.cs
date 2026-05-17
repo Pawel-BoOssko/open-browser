@@ -101,12 +101,9 @@ public sealed partial class MainForm : Form
                 var js = "(function(){" +
                     "var el=document.querySelector('[data-placeholder],#prompt-textarea,.ProseMirror,div[contenteditable=true]');" +
                     $"if(el){{el.focus();el.textContent={safeOutput};el.dispatchEvent(new Event('input',{{bubbles:true}}));" +
-                    "var tries=0;var intv=setInterval(function(){" +
-                    "var btn=document.querySelector('[data-testid=\\'send-button\\'],button[aria-label=\\'Send\\'],button svg.icon-2xl,button.absolute');" +
-                    "if(btn && btn.tagName!=='BUTTON')btn=btn.closest('button');" +
-                    "if(btn){btn.click();clearInterval(intv);}" +
-                    "if(++tries>10)clearInterval(intv);" +
-                    "},500);}" +
+                    "setTimeout(function(){" +
+                    "el.dispatchEvent(new KeyboardEvent('keydown',{{key:'Enter',code:'Enter',keyCode:13,which:13,bubbles:true}}));" +
+                    "},300);}" +
                     "else{console.log('OpenBridge: not found');}})()";
                 _log.WriteRun("runtime_approval", "webview_inject", "ok", "Injecting result into chat input", new { outputLength = output.Length });
                 await _webView.CoreWebView2.ExecuteScriptAsync(js);

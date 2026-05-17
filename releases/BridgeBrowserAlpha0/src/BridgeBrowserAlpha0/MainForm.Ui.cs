@@ -7,7 +7,8 @@ public sealed partial class MainForm
 {
     private readonly WebView2 _webView = new();
     private readonly Button _hideWebButton = new() { Text = "Hide web", Width = 110 };
-    private readonly Label _status = new() { AutoSize = true, Text = AppConstants.AppVersion };
+    private readonly Label _status = new() { AutoSize = true, Text = "..." };
+    private readonly Label _buildLabel = new() { AutoSize = true, Text = AppConstants.AppVersion, ForeColor = Color.Gray };
 
     private bool _webHidden;
 
@@ -29,6 +30,7 @@ public sealed partial class MainForm
         };
         panel.Controls.Add(_hideWebButton);
         panel.Controls.Add(_status);
+        panel.Controls.Add(_buildLabel);
 
         _webView.Dock = DockStyle.Fill;
         Controls.Add(_webView);
