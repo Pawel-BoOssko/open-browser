@@ -74,4 +74,17 @@ Your working directory is: `D:\projects\open-browser`
 - Only one command runs at a time. If a command is already running, new envelopes are rejected.
 - Only the `PS` command is available for execution. Other commands will be rejected with a message.
 
+## Running Tests
+
+To run the infrastructure test plan, read the file:
+```
+Get-Content D:\projects\open-browser\test-plan.md
+```
+Then execute all 10 tests in order, recording results after each test.
+
+After completing all tests, save the results to:
+```
+D:\projects\open-browser\test-results.md
+```
+
 Use `HST_HELP` if you need to re-discover this information.
