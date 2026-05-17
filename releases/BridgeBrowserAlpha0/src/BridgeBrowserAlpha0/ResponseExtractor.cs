@@ -47,6 +47,7 @@ public sealed class ResponseExtractor
     private string? _currentAssistantMessageId;
     private string _currentEventTsUtc = DateTime.UtcNow.ToString("O");
     private volatile bool _shouldFinish;
+    private readonly HashSet<string> _observedMessageIds = new(StringComparer.Ordinal);
 
     public ResponseExtractor(LogWriter log)
     {
@@ -152,10 +153,25 @@ public sealed class ResponseExtractor
             var answer = GetCurrentAnswerText();
             PipelineRawDump.Write("04_ResponseExtractor_Finish.txt", answer);
 
-            var parseResult = _observer.Observe(answer);
-            if (parseResult?.HasEnvelope == true)
+            var hasNewFrames = false;
+            var newFrames = new List<AssistantMessageFrame>();
+            foreach (var f in _frames)
             {
-                OnEnvelopeDetected?.Invoke(parseResult);
+                if (f.Text.Length > 0 && _observedMessageIds.Add(f.MessageId))
+                {
+                    hasNewFrames = true;
+                    newFrames.Add(f);
+                }
+            }
+
+            if (hasNewFrames)
+            {
+                var newAnswer = GetCurrentAnswerTextForFrames(newFrames);
+                var parseResult = _observer.Observe(newAnswer);
+                if (parseResult?.HasEnvelope == true)
+                {
+                    OnEnvelopeDetected?.Invoke(parseResult);
+                }
             }
 
             var status = answer.Length > 0 ? "ok" : "extraction_failed";
@@ -582,18 +598,34 @@ public sealed class ResponseExtractor
         foreach (var frame in _frames.Where(f => f.Text.Length > 0))
         {
             if (sb.Length > 0) sb.AppendLine().AppendLine();
-            sb.Append('[').Append(frame.StartedAtUtc).Append("] assistant message ").Append(frame.MessageId).AppendLine();
-            sb.AppendLine();
-            sb.Append(frame.Text);
-            if (!frame.Text.ToString().EndsWith("\n", StringComparison.Ordinal)) sb.AppendLine();
-            sb.AppendLine();
-            sb.Append("[END assistant message ").Append(frame.MessageId);
-            if (!string.IsNullOrWhiteSpace(frame.EndedAtUtc)) sb.Append(" at ").Append(frame.EndedAtUtc);
-            if (!string.IsNullOrWhiteSpace(frame.Status)) sb.Append(" status=").Append(frame.Status);
-            if (!string.IsNullOrWhiteSpace(frame.CloseReason)) sb.Append(" reason=").Append(frame.CloseReason);
-            sb.Append(']');
+            AppendFrameText(sb, frame);
         }
         return sb.ToString();
+    }
+
+    private static string GetCurrentAnswerTextForFrames(List<AssistantMessageFrame> frames)
+    {
+        var sb = new StringBuilder();
+        foreach (var frame in frames)
+        {
+            if (sb.Length > 0) sb.AppendLine().AppendLine();
+            AppendFrameText(sb, frame);
+        }
+        return sb.ToString();
+    }
+
+    private static void AppendFrameText(StringBuilder sb, AssistantMessageFrame frame)
+    {
+        sb.Append('[').Append(frame.StartedAtUtc).Append("] assistant message ").Append(frame.MessageId).AppendLine();
+        sb.AppendLine();
+        sb.Append(frame.Text);
+        if (!frame.Text.ToString().EndsWith("\n", StringComparison.Ordinal)) sb.AppendLine();
+        sb.AppendLine();
+        sb.Append("[END assistant message ").Append(frame.MessageId);
+        if (!string.IsNullOrWhiteSpace(frame.EndedAtUtc)) sb.Append(" at ").Append(frame.EndedAtUtc);
+        if (!string.IsNullOrWhiteSpace(frame.Status)) sb.Append(" status=").Append(frame.Status);
+        if (!string.IsNullOrWhiteSpace(frame.CloseReason)) sb.Append(" reason=").Append(frame.CloseReason);
+        sb.Append(']');
     }
 
     private static bool IsTextPartPath(string? path)

@@ -14,7 +14,6 @@ public sealed partial class MainForm : Form
     private readonly WebViewMessageHandler _messageHandler;
     private readonly OpenBridgeHost.OpenBridgeRuntimeApproval _runtimeApproval;
     private BrowserTabRuntime? _tabRuntime;
-    private DateTime _cooldownUntil = DateTime.MinValue;
 
     public MainForm()
     {
@@ -25,12 +24,6 @@ public sealed partial class MainForm : Form
 
         _extractor.OnEnvelopeDetected = parseResult =>
         {
-            if (DateTime.UtcNow < _cooldownUntil)
-            {
-                _log.WriteRun("runtime_approval", "cooldown_skip", "ok",
-                    "Skipping auto-execute — within cooldown window");
-                return;
-            }
             var ok = _runtimeApproval.TrySetPending(parseResult, out var error);
             if (ok)
             {
@@ -108,11 +101,15 @@ public sealed partial class MainForm : Form
                 var safeOutput = System.Text.Json.JsonSerializer.Serialize(output);
                 var js = "var el=document.querySelector('#prompt-textarea,.ProseMirror,[contenteditable=true]');" +
                     $"if(el){{el.focus();el.textContent={safeOutput};el.dispatchEvent(new Event('input',{{bubbles:true}}));" +
-                    "setTimeout(function(){el.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',code:'Enter',keyCode:13,which:13,bubbles:true}));},500);" +
+                    "setTimeout(function(){" +
+                    "var btn=document.querySelector('[data-testid=\\'send-button\\']')||document.querySelector('button[aria-label*=\\'Send\\'] i')||document.querySelector('button svg');" +
+                    "if(btn&&btn.tagName!=='svg'){btn.click();console.log('OpenBridge: send btn clicked');}" +
+                    "else if(btn&&btn.tagName==='svg'){btn.closest('button')?.click();console.log('OpenBridge: send svg->btn clicked');}" +
+                    "else{console.log('OpenBridge: no send btn, falling back');}" +
+                    "},500);" +
                     "console.log('OpenBridge: injected');}else{console.log('OpenBridge: no el');}";
                 _log.WriteRun("runtime_approval", "webview_inject", "ok", "Injecting result into chat input", new { outputLength = output.Length });
                 await _webView.CoreWebView2.ExecuteScriptAsync(js);
-                _cooldownUntil = DateTime.UtcNow.AddSeconds(15);
                 SetStatus(result.Status == HostExecutionStatus.Ok ? "OK" : "Failed: " + result.ErrorCode);
             }
             else
@@ -139,7 +136,13 @@ public sealed partial class MainForm : Form
                 "console.log('OpenBridge DIAG: injected. tag='+el.tagName+' id='+el.id+' class='+el.className);}" +
                 "else{console.log('OpenBridge DIAG: NO ELEMENT');" +
                 "document.querySelectorAll('*').forEach(function(n){if(n.contentEditable==='true'||n.contentEditable===''||n.contentEditable===true)console.log('CE: '+n.tagName+'#'+n.id+'.'+n.className);});" +
-                "}";
+                "}" +
+                "var sendBtn=document.querySelector('[data-testid=\\'send-button\\']');" +
+                "console.log('OpenBridge DIAG: send-btn data-testid:',sendBtn);" +
+                "var sendAria=document.querySelector('button[aria-label*=\\'Send\\']');" +
+                "console.log('OpenBridge DIAG: send-btn aria-label:',sendAria);" +
+                "var svgBtn=document.querySelector('button svg');" +
+                "console.log('OpenBridge DIAG: send-btn button svg parent:',svgBtn?svgBtn.closest('button'):null);";
             await _webView.CoreWebView2.ExecuteScriptAsync(js);
             SetStatus("Test inject done. Press F12 and check Console.");
         }
