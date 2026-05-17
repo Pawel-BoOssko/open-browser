@@ -72,7 +72,7 @@ public sealed partial class MainForm : Form
         try
         {
             AppPaths.EnsureAll();
-            _log.WriteApp("app", "app_start", "ok", $"{AppConstants.AppTitle} alpha started", new { root = AppPaths.Root, version = AppConstants.AppVersion });
+            _log.WriteApp("app", "app_start", "ok", $"{AppConstants.AppTitle} alpha started", new { root = AppPaths.Root, build = AppConstants.BuildInfo });
             SetStatus("Creating WebView2 environment...");
 
             var env = await CoreWebView2Environment.CreateAsync(null, AppPaths.Profile);
