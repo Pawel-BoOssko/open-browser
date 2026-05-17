@@ -98,11 +98,30 @@ public sealed partial class MainForm : Form
         }
     }
 
+    private static int ComputeHumanDelayMs()
+    {
+        const int baseDelayMs = 20_000;
+        // Box-Muller: truncated normal(mean=22000, std=11000, min=0, max=50000)
+        var rng = System.Security.Cryptography.RandomNumberGenerator.Create();
+        var bytes = new byte[8];
+        rng.GetBytes(bytes);
+        double u1 = BitConverter.ToUInt32(bytes, 0) / (double)uint.MaxValue;
+        double u2 = BitConverter.ToUInt32(bytes, 4) / (double)uint.MaxValue;
+        if (u1 <= 0) u1 = 0.0001;
+        double normal = Math.Sqrt(-2.0 * Math.Log(u1)) * Math.Cos(2.0 * Math.PI * u2);
+        double raw = 22_000 + normal * 11_000;
+        int extra = (int)Math.Clamp(raw, 0, 50_000);
+        return baseDelayMs + extra;
+    }
+
     private async Task SendTextToChatAsync(string text)
     {
         if (_webView.CoreWebView2 == null || string.IsNullOrWhiteSpace(text)) return;
         try
         {
+            var delayMs = ComputeHumanDelayMs();
+            _log.WriteRun("runtime_approval", "human_delay", "ok", $"Delaying {delayMs}ms before inject");
+            await Task.Delay(delayMs);
             var safeText = System.Text.Json.JsonSerializer.Serialize(text);
             var js = "var el=document.querySelector('#prompt-textarea,.ProseMirror,[contenteditable=true]');" +
                 $"if(el){{el.focus();el.textContent={safeText};el.dispatchEvent(new Event('input',{{bubbles:true}}));" +
