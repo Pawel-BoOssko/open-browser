@@ -42,6 +42,7 @@ public sealed partial class MainForm : Form
         InitializeUi();
 
         _hideWebButton.Click += (_, _) => ToggleWebVisibility();
+        _testInjectButton.Click += async (_, _) => await TestInjectAsync();
         _copyDetailsButton.Click += (_, _) => CopyApprovalPrompt();
         _copyResultButton.Click += (_, _) => CopyApprovalOutput();
 
@@ -120,6 +121,24 @@ public sealed partial class MainForm : Form
             SetStatus("Execution error: " + ex.Message);
             _log.WriteRun("runtime_approval", "host_execution_failed", "error", ex.Message);
         }
+    }
+
+    private async Task TestInjectAsync()
+    {
+        if (_webView.CoreWebView2 == null) { SetStatus("WebView not ready"); return; }
+        try
+        {
+            var js = "console.log('OpenBridge DIAG: running');" +
+                "var el=document.querySelector('[data-placeholder],#prompt-textarea,.ProseMirror,div[contenteditable=true],[contenteditable=true]');" +
+                "if(el){el.focus();el.textContent='TEST_INJECT';el.dispatchEvent(new Event('input',{bubbles:true}));" +
+                "console.log('OpenBridge DIAG: injected. tag='+el.tagName+' id='+el.id+' class='+el.className);}" +
+                "else{console.log('OpenBridge DIAG: NO ELEMENT');" +
+                "document.querySelectorAll('*').forEach(function(n){if(n.contentEditable==='true'||n.contentEditable===''||n.contentEditable===true)console.log('CE: '+n.tagName+'#'+n.id+'.'+n.className);});" +
+                "}";
+            await _webView.CoreWebView2.ExecuteScriptAsync(js);
+            SetStatus("Test inject done. Press F12 and check Console.");
+        }
+        catch (Exception ex) { SetStatus("Inject error: " + ex.Message); }
     }
 
     private void CopyApprovalPrompt()

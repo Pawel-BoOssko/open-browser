@@ -7,6 +7,7 @@ public sealed partial class MainForm
 {
     private readonly WebView2 _webView = new();
     private readonly Button _hideWebButton = new() { Text = "Hide web", Width = 110 };
+    private readonly Button _testInjectButton = new() { Text = "Test inject", Width = 110, BackColor = Color.LightYellow };
     private readonly Label _status = new() { AutoSize = true, Text = "..." };
     private readonly Label _buildLabel = new() { AutoSize = true, Text = AppConstants.AppVersion, ForeColor = Color.Gray };
 
@@ -29,6 +30,7 @@ public sealed partial class MainForm
             AutoScroll = true
         };
         panel.Controls.Add(_hideWebButton);
+        panel.Controls.Add(_testInjectButton);
         panel.Controls.Add(_status);
         panel.Controls.Add(_buildLabel);
 
