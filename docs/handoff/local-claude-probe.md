@@ -94,6 +94,30 @@ Sending request to ClaudeCodeExecutor...
 [Claude Code's response text here]
 ```
 
+## Cloud Code profile
+
+The OpenBridge executor local config should use the general Cloud Code profile from:
+`D:\projects\cloud-code-profiles\run-cloud-code-deepseek.ps1`
+
+Config template:
+```json
+{
+  "Mode": "Process",
+  "ExecutablePath": "powershell.exe",
+  "ArgumentsTemplate": "-NoProfile -ExecutionPolicy Bypass -File \"D:\\projects\\cloud-code-profiles\\run-cloud-code-deepseek.ps1\" -WorkingDirectory \"{workingDirectory}\" -Prompt \"{prompt}\"",
+  "DefaultTimeoutMs": 720000,
+  "DefaultMaxOutputChars": 50000
+}
+```
+
+The `{workingDirectory}` placeholder is replaced with the request's working directory.
+The `{prompt}` placeholder is replaced with the prompt.
+
+### Sandbox testing
+
+Test Cloud Code writes in the sandbox first, not in the Open Browser repo:
+`D:\projects\openbridge-cc-sandbox\`
+
 ## Safety constraints
 
 - The probe does not pass `--dangerously-skip-permissions`
