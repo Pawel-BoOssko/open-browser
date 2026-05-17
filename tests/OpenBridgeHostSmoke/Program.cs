@@ -791,6 +791,83 @@ class Program
         var msg54 = noCfgApproval.ProcessAvailableMessage();
         Assert(msg54 != null && msg54.Contains("unavailable"), "Process unavailable message is informative");
 
+        // ======== PowerShell Executor Tests ========
+        Console.WriteLine("--- PowerShell Executor Tests ---");
+
+        // 55. PS command: echo
+        var r55 = await host.ExecuteAsync(new HostCommandRequest
+        {
+            Command = "PS",
+            WorkingDirectory = allowedRoot,
+            Prompt = "Write-Output OK_FROM_POWERSHELL"
+        });
+        Assert(r55.Status == HostExecutionStatus.Ok, "PS echo returns ok");
+        Assert(r55.ExitCode == 0, "PS echo exit code 0");
+        Assert(r55.StdoutPreview != null && r55.StdoutPreview.Contains("OK_FROM_POWERSHELL"), "PS stdout contains expected text");
+
+        // 56. PS command: Get-Location
+        var r56 = await host.ExecuteAsync(new HostCommandRequest
+        {
+            Command = "PS",
+            WorkingDirectory = allowedRoot,
+            Prompt = "Get-Location"
+        });
+        Assert(r56.Status == HostExecutionStatus.Ok, "Get-Location returns ok");
+        Assert(r56.StdoutPreview != null && r56.StdoutPreview.Contains(allowedRoot), "Get-Location returns working directory");
+
+        // 57. PS command: non-zero exit
+        var r57 = await host.ExecuteAsync(new HostCommandRequest
+        {
+            Command = "PS",
+            WorkingDirectory = allowedRoot,
+            Prompt = "exit 42"
+        });
+        Assert(r57.Status == HostExecutionStatus.Error, "Non-zero exit returns error");
+        Assert(r57.ExitCode == 42, "Exit code 42 captured");
+        Assert(r57.ErrorCode != null && r57.ErrorCode.Contains("42"), "Error code reflects exit code");
+
+        // 58. PS command: stderr
+        var r58 = await host.ExecuteAsync(new HostCommandRequest
+        {
+            Command = "PS",
+            WorkingDirectory = allowedRoot,
+            Prompt = "[Console]::Error.WriteLine('STDERR_TEST')"
+        });
+        Assert(r58.Status == HostExecutionStatus.Ok, "Stderr command returns ok (exit 0)");
+        Assert(r58.StderrPreview != null && r58.StderrPreview.Contains("STDERR_TEST"), "Stderr captured");
+
+        // 59. PS command: timeout
+        var r59 = await host.ExecuteAsync(new HostCommandRequest
+        {
+            Command = "PS",
+            WorkingDirectory = allowedRoot,
+            Prompt = "Start-Sleep -Seconds 30",
+            TimeoutMs = 500
+        });
+        Assert(r59.Status == HostExecutionStatus.Timeout, "PS timeout returns timeout status");
+        Assert(r59.ErrorCode == HostErrorCodes.Timeout, "Error code is TIMEOUT");
+
+        // 60. PS command: working directory respected
+        var psSubDir = Path.Combine(allowedRoot, "releases");
+        var r60 = await host.ExecuteAsync(new HostCommandRequest
+        {
+            Command = "PS",
+            WorkingDirectory = psSubDir,
+            Prompt = "Get-Location"
+        });
+        Assert(r60.Status == HostExecutionStatus.Ok, "PS working directory respected");
+        Assert(r60.StdoutPreview != null && r60.StdoutPreview.Contains(psSubDir), "PS runs in specified directory");
+
+        // 61. PS command: operation_id assigned
+        var r61 = await host.ExecuteAsync(new HostCommandRequest
+        {
+            Command = "PS",
+            WorkingDirectory = allowedRoot,
+            Prompt = "Write-Output test"
+        });
+        Assert(!string.IsNullOrEmpty(r61.OperationId), "PS operation_id assigned");
+        Assert(r61.DurationMs >= 0, "PS duration recorded");
+
         // ======== Concurrency & Timeout Tests ========
         Console.WriteLine("--- Testing concurrency lock ---");
         var delayedExecutor = new DelayedClaudeCodeExecutor(2000);

@@ -20,11 +20,15 @@ public class OpenBridgeHost
         var startedAt = Stopwatch.GetTimestamp();
         request.OperationId ??= Guid.NewGuid().ToString("N")[..12];
 
-        if (!string.Equals(request.Command, "CC", StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(request.Command, "CC", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(request.Command, "PS", StringComparison.OrdinalIgnoreCase))
         {
             return ErrorResult(request.OperationId, startedAt, HostErrorCodes.CommandNotRecognized,
-                $"Command not recognized: {request.Command}. Only CC is supported.");
+                $"Command not recognized: {request.Command}. Supported: CC, PS.");
         }
+
+        var executor = string.Equals(request.Command, "PS", StringComparison.OrdinalIgnoreCase)
+            ? GetPsExecutor() : _ccExecutor;
 
         if (!IsAllowedDirectory(request.WorkingDirectory))
         {
@@ -48,7 +52,7 @@ public class OpenBridgeHost
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             cts.CancelAfter(timeoutMs);
 
-            var task = _ccExecutor.ExecuteAsync(request, cts.Token);
+            var task = executor.ExecuteAsync(request, cts.Token);
             var delay = Task.Delay(timeoutMs);
             var completed = await Task.WhenAny(task, delay);
 
@@ -73,6 +77,24 @@ public class OpenBridgeHost
         {
             lock (_operationGate) { _busy = false; }
         }
+    }
+
+    private ClaudeCode.IClaudeCodeExecutor? _psExecutor;
+
+    private ClaudeCode.IClaudeCodeExecutor GetPsExecutor()
+    {
+        if (_psExecutor == null)
+        {
+            _psExecutor = new ClaudeCode.ClaudeCodeExecutor(new ClaudeCode.ClaudeCodeExecutorOptions
+            {
+                Mode = ClaudeCode.ClaudeCodeExecutorMode.Process,
+                ExecutablePath = "powershell.exe",
+                ArgumentsTemplate = "-NoProfile -Command \"{prompt}\"",
+                DefaultTimeoutMs = 120_000,
+                DefaultMaxOutputChars = 50_000
+            });
+        }
+        return _psExecutor;
     }
 
     private bool IsAllowedDirectory(string path)
