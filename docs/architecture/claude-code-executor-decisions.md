@@ -68,6 +68,7 @@ These must NOT be implemented in the first milestone:
 - No executor auto-discovery or plugin system
 - No executor registry, plugin loader, service locator, factory hierarchy, or routing table
 - No future-proof abstractions, layers, services, managers, controllers, or validators unless explicitly approved
+- No dedicated Cloud Code Connector — Cloud Code is a CLI tool launched through the existing ClaudeCodeExecutor / Process mode, not a separate architectural component
 - No `BridgeBrowserHelper` or any reference to the old helper
 - No permanent `--dangerously-skip-permissions` scripts or `.bat` launchers
 - No package installation (`dotnet add package`)
