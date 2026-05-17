@@ -31,12 +31,6 @@ public static class OpenBridgeEnvelopeParser
 
         result.HasEnvelope = true;
 
-        if (text.IndexOf(ExecBegin, firstExecBegin + ExecBegin.Length) != -1)
-        {
-            result.Error = OpenBridgeEnvelopeParseError.MULTIPLE_ENVELOPES;
-            return result;
-        }
-
         int execEndIndex = text.IndexOf(ExecEnd);
         if (execEndIndex == -1)
         {
@@ -162,6 +156,21 @@ public static class OpenBridgeEnvelopeParser
             result.ErrorMessage = $"Line: {ex.LineNumber}, BytePosition: {ex.BytePositionInLine}, Path: {ex.Path}, Message: {ex.Message}";
             return result;
         }
+    }
+
+    public static string ErrorToUserMessage(OpenBridgeEnvelopeParseResult result)
+    {
+        return result.Error switch
+        {
+            OpenBridgeEnvelopeParseError.EXEC_END_MISSING => "[OpenBridge] Missing @@OPENBRIDGE_EXEC_END@@ marker.",
+            OpenBridgeEnvelopeParseError.MULTIPLE_RAW_BLOCKS => "[OpenBridge] Multiple raw blocks in envelope.",
+            OpenBridgeEnvelopeParseError.RAW_END_MISSING => "[OpenBridge] Missing @@OPENBRIDGE_RAW_END@@ marker.",
+            OpenBridgeEnvelopeParseError.JSON_PARSE_ERROR => $"[OpenBridge] Invalid JSON in envelope: {result.ErrorMessage}",
+            OpenBridgeEnvelopeParseError.VERSION_MISSING => "[OpenBridge] Missing version field in envelope.",
+            OpenBridgeEnvelopeParseError.COMMAND_MISSING => "[OpenBridge] Missing command field in envelope.",
+            OpenBridgeEnvelopeParseError.COMMAND_EMPTY => "[OpenBridge] Command field is empty.",
+            _ => "[OpenBridge] Unknown envelope error."
+        };
     }
 
     private static int CountSubstrings(string text, string sub)

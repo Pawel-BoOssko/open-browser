@@ -28,6 +28,14 @@ public sealed partial class MainForm : Form
 
         _extractor.OnEnvelopeDetected = parseResult =>
         {
+            if (parseResult.Envelope == null)
+            {
+                var msg = BridgeBrowserAlpha0.OpenBridgeProtocol.OpenBridgeEnvelopeParser.ErrorToUserMessage(parseResult);
+                _log.WriteRun("runtime_approval", "envelope_parse_error", "error", msg);
+                _ = SendTextToChatAsync(msg);
+                return;
+            }
+
             var ok = _runtimeApproval.TrySetPending(parseResult, out var error);
             if (ok)
             {
@@ -37,9 +45,9 @@ public sealed partial class MainForm : Form
             }
             else
             {
-                _log.WriteRun("runtime_approval", "envelope_rejected", "warning",
-                    "Envelope detection not promoted to pending",
-                    new { error });
+                var msg = $"[OpenBridge] {error}";
+                _log.WriteRun("runtime_approval", "envelope_rejected", "warning", msg);
+                _ = SendTextToChatAsync(msg);
             }
         };
 
@@ -90,6 +98,29 @@ public sealed partial class MainForm : Form
         }
     }
 
+    private async Task SendTextToChatAsync(string text)
+    {
+        if (_webView.CoreWebView2 == null || string.IsNullOrWhiteSpace(text)) return;
+        try
+        {
+            var safeText = System.Text.Json.JsonSerializer.Serialize(text);
+            var js = "var el=document.querySelector('#prompt-textarea,.ProseMirror,[contenteditable=true]');" +
+                $"if(el){{el.focus();el.textContent={safeText};el.dispatchEvent(new Event('input',{{bubbles:true}}));" +
+                "setTimeout(function(){" +
+                "var btn=document.querySelector('[data-testid=\\'send-button\\']')||document.querySelector('button[aria-label*=\\'Send\\'] i')||document.querySelector('button svg');" +
+                "if(btn&&btn.tagName!=='svg'){btn.click();console.log('OpenBridge: send btn clicked');}" +
+                "else if(btn&&btn.tagName==='svg'){btn.closest('button')?.click();console.log('OpenBridge: send svg->btn clicked');}" +
+                "else{console.log('OpenBridge: no send btn, falling back');}" +
+                "},500);" +
+                "console.log('OpenBridge: injected');}else{console.log('OpenBridge: no el');}";
+            await _webView.CoreWebView2.ExecuteScriptAsync(js);
+        }
+        catch (Exception ex)
+        {
+            _log.WriteRun("runtime_approval", "inject_error", "error", ex.Message);
+        }
+    }
+
     private async Task ExecuteAndInjectResultAsync()
     {
         try
@@ -100,20 +131,10 @@ public sealed partial class MainForm : Form
                 output = result.StderrPreview ?? "";
             ShowApprovalResult(output);
 
-            if (_webView.CoreWebView2 != null && !string.IsNullOrWhiteSpace(output))
+            if (!string.IsNullOrWhiteSpace(output))
             {
-                var safeOutput = System.Text.Json.JsonSerializer.Serialize(output);
-                var js = "var el=document.querySelector('#prompt-textarea,.ProseMirror,[contenteditable=true]');" +
-                    $"if(el){{el.focus();el.textContent={safeOutput};el.dispatchEvent(new Event('input',{{bubbles:true}}));" +
-                    "setTimeout(function(){" +
-                    "var btn=document.querySelector('[data-testid=\\'send-button\\']')||document.querySelector('button[aria-label*=\\'Send\\'] i')||document.querySelector('button svg');" +
-                    "if(btn&&btn.tagName!=='svg'){btn.click();console.log('OpenBridge: send btn clicked');}" +
-                    "else if(btn&&btn.tagName==='svg'){btn.closest('button')?.click();console.log('OpenBridge: send svg->btn clicked');}" +
-                    "else{console.log('OpenBridge: no send btn, falling back');}" +
-                    "},500);" +
-                    "console.log('OpenBridge: injected');}else{console.log('OpenBridge: no el');}";
                 _log.WriteRun("runtime_approval", "webview_inject", "ok", "Injecting result into chat input", new { outputLength = output.Length });
-                await _webView.CoreWebView2.ExecuteScriptAsync(js);
+                await SendTextToChatAsync(output);
                 SetStatus(result.Status == HostExecutionStatus.Ok ? "OK" : "Failed: " + result.ErrorCode);
             }
             else

@@ -41,10 +41,11 @@ class Program
         var r5 = OpenBridgeEnvelopeParser.Parse(t5);
         Assert(r5.Error == OpenBridgeEnvelopeParseError.NONE && r5.Envelope?.Payload64 == "SGVsbG9Xb3JsZA==", "RAW block to base64 payload64");
 
-        // 6. multiple envelopes -> error
-        string t6 = "@@OPENBRIDGE_EXEC_BEGIN@@\n{}\n@@OPENBRIDGE_EXEC_END@@\n@@OPENBRIDGE_EXEC_BEGIN@@{}@@OPENBRIDGE_EXEC_END@@";
+        // 6. multiple envelopes — only first is parsed, second is ignored
+        string t6 = "@@OPENBRIDGE_EXEC_BEGIN@@\n{\"version\":\"001\",\"command\":\"PS\",\"payload\":\"first\"}\n@@OPENBRIDGE_EXEC_END@@\n@@OPENBRIDGE_EXEC_BEGIN@@{\"version\":\"001\"}@@OPENBRIDGE_EXEC_END@@";
         var r6 = OpenBridgeEnvelopeParser.Parse(t6);
-        Assert(r6.Error == OpenBridgeEnvelopeParseError.MULTIPLE_ENVELOPES, "Multiple envelopes error");
+        Assert(r6.Error == OpenBridgeEnvelopeParseError.NONE, "Multiple envelopes: no error, first is taken");
+        Assert(r6.Envelope != null && r6.Envelope.Payload == "first", "Multiple envelopes: first envelope payload parsed");
 
         // 7. missing EXEC END -> error
         string t7 = "@@OPENBRIDGE_EXEC_BEGIN@@\n{\"version\":\"001\"}";
