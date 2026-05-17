@@ -1,21 +1,21 @@
 using System.Diagnostics;
 
-namespace BridgeBrowserAlpha0.OpenBridgeHost.ClaudeCode;
+namespace BridgeBrowserAlpha0.OpenBridgeHost.Commands;
 
-public class ClaudeCodeExecutor : IClaudeCodeExecutor
+public class CommandExecutor : IOpenBridgeCommandExecutor
 {
-    private readonly ClaudeCodeExecutorOptions _options;
+    private readonly CommandExecutorOptions _options;
 
-    public ClaudeCodeExecutor() : this(new ClaudeCodeExecutorOptions()) { }
+    public CommandExecutor() : this(new CommandExecutorOptions()) { }
 
-    public ClaudeCodeExecutor(ClaudeCodeExecutorOptions options)
+    public CommandExecutor(CommandExecutorOptions options)
     {
         _options = options;
     }
 
     public virtual Task<HostCommandResult> ExecuteAsync(HostCommandRequest request, CancellationToken ct = default)
     {
-        return _options.Mode == ClaudeCodeExecutorMode.Process
+        return _options.Mode == CommandExecutorMode.Process
             ? ExecuteProcessAsync(request, ct)
             : ExecuteDryRunAsync(request);
     }
@@ -37,7 +37,7 @@ public class ClaudeCodeExecutor : IClaudeCodeExecutor
                 HostErrorCodes.WorkingDirectoryNotAllowed, $"Working directory does not exist: {workingDir}"));
         }
 
-        var echo = $"[DRY-RUN ClaudeCodeExecutor] Working directory: {workingDir}\nPrompt: {request.Prompt}";
+        var echo = $"[DRY-RUN CommandExecutor] Working directory: {workingDir}\nPrompt: {request.Prompt}";
         var maxChars = request.MaxOutputChars > 0 ? request.MaxOutputChars : _options.DefaultMaxOutputChars;
         var truncated = echo.Length > maxChars;
         var preview = truncated ? echo[..maxChars] : echo;
@@ -50,7 +50,7 @@ public class ClaudeCodeExecutor : IClaudeCodeExecutor
             StdoutPreview = preview,
             StderrPreview = "",
             ExitCode = 0,
-            Message = "Dry-run completed. No Claude Code process was launched.",
+            Message = "Dry-run completed. No real process was launched.",
             StdoutFullTruncated = truncated,
             StderrFullTruncated = false
         });

@@ -1,8 +1,8 @@
-namespace BridgeBrowserAlpha0.OpenBridgeHost.ClaudeCode;
+namespace BridgeBrowserAlpha0.OpenBridgeHost.Commands;
 
-public class ClaudeCodeExecutorOptions
+public class CommandExecutorOptions
 {
-    public ClaudeCodeExecutorMode Mode { get; set; } = ClaudeCodeExecutorMode.DryRun;
+    public CommandExecutorMode Mode { get; set; } = CommandExecutorMode.DryRun;
     public string? ExecutablePath { get; set; }
     public string? ArgumentsTemplate { get; set; }
     public int DefaultTimeoutMs { get; set; } = 720_000;

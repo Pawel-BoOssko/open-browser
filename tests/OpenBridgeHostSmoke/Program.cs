@@ -1,7 +1,7 @@
 using System.Diagnostics;
 using System.Text;
 using BridgeBrowserAlpha0.OpenBridgeHost;
-using BridgeBrowserAlpha0.OpenBridgeHost.ClaudeCode;
+using BridgeBrowserAlpha0.OpenBridgeHost.Commands;
 using BridgeBrowserAlpha0.OpenBridgeHost.GeneralCommand;
 using BridgeBrowserAlpha0.OpenBridgeProtocol;
 
@@ -44,7 +44,7 @@ class Program
         Assert(r1.StdoutPreview!.Contains("Fix the null check"), "Stdout contains prompt");
         Assert(r1.StdoutPreview.Contains(allowedRoot), "Stdout contains working directory");
         Assert(r1.ExitCode == 0, "Exit code is 0");
-        Assert(r1.Message != null && r1.Message.Contains("No Claude Code process"), "Message confirms no real process");
+        Assert(r1.Message != null && r1.Message.Contains("No real process was launched"), "Message confirms dry-run");
 
         // 2. Operation ID is assigned when missing
         var r2 = await host.ExecuteAsync(new HostCommandRequest
@@ -130,13 +130,13 @@ class Program
         Console.WriteLine("--- Process Mode Tests ---");
 
         // 11. Process mode captures stdout
-        var processOpts = new ClaudeCodeExecutorOptions
+        var processOpts = new CommandExecutorOptions
         {
-            Mode = ClaudeCodeExecutorMode.Process,
+            Mode = CommandExecutorMode.Process,
             ExecutablePath = "cmd.exe",
             ArgumentsTemplate = "/c echo OPENBRIDGE_PROCESS_TEST: {prompt}"
         };
-        var processExecutor = new ClaudeCodeExecutor(processOpts);
+        var processExecutor = new CommandExecutor(processOpts);
         var processHost = new OpenBridgeHost(processExecutor);
 
         var r11 = await processHost.ExecuteAsync(new HostCommandRequest
@@ -152,13 +152,13 @@ class Program
         Assert(r11.Message != null && r11.Message.Contains("completed"), "Message confirms process completed");
 
         // 12. Process mode captures non-zero exit code as error
-        var errorProcessOpts = new ClaudeCodeExecutorOptions
+        var errorProcessOpts = new CommandExecutorOptions
         {
-            Mode = ClaudeCodeExecutorMode.Process,
+            Mode = CommandExecutorMode.Process,
             ExecutablePath = "cmd.exe",
             ArgumentsTemplate = "/c \"echo failing operation && exit 42\""
         };
-        var errorProcessHost = new OpenBridgeHost(new ClaudeCodeExecutor(errorProcessOpts));
+        var errorProcessHost = new OpenBridgeHost(new CommandExecutor(errorProcessOpts));
 
         var r12 = await errorProcessHost.ExecuteAsync(new HostCommandRequest
         {
@@ -172,13 +172,13 @@ class Program
         Assert(r12.StdoutPreview != null && r12.StdoutPreview.Contains("failing operation"), "Stdout captured despite error exit");
 
         // 13. Process mode captures stderr
-        var stderrProcessOpts = new ClaudeCodeExecutorOptions
+        var stderrProcessOpts = new CommandExecutorOptions
         {
-            Mode = ClaudeCodeExecutorMode.Process,
+            Mode = CommandExecutorMode.Process,
             ExecutablePath = "cmd.exe",
             ArgumentsTemplate = "/c \"echo to_stderr_test >&2\""
         };
-        var stderrProcessHost = new OpenBridgeHost(new ClaudeCodeExecutor(stderrProcessOpts));
+        var stderrProcessHost = new OpenBridgeHost(new CommandExecutor(stderrProcessOpts));
 
         var r13 = await stderrProcessHost.ExecuteAsync(new HostCommandRequest
         {
@@ -200,12 +200,12 @@ class Program
         Assert(r14.Status is HostExecutionStatus.Error or HostExecutionStatus.Ok, "CancellationToken passed to executor");
 
         // 15. Invalid executable returns controlled error
-        var badExeOpts = new ClaudeCodeExecutorOptions
+        var badExeOpts = new CommandExecutorOptions
         {
-            Mode = ClaudeCodeExecutorMode.Process,
+            Mode = CommandExecutorMode.Process,
             ExecutablePath = "nonexistent_executable_xyz_12345"
         };
-        var badExeHost = new OpenBridgeHost(new ClaudeCodeExecutor(badExeOpts));
+        var badExeHost = new OpenBridgeHost(new CommandExecutor(badExeOpts));
 
         var r15 = await badExeHost.ExecuteAsync(new HostCommandRequest
         {
@@ -218,13 +218,13 @@ class Program
         Assert(r15.Message != null && r15.Message.Contains("not found"), "Message mentions executable not found");
 
         // 16. Process mode output truncation works
-        var truncProcessOpts = new ClaudeCodeExecutorOptions
+        var truncProcessOpts = new CommandExecutorOptions
         {
-            Mode = ClaudeCodeExecutorMode.Process,
+            Mode = CommandExecutorMode.Process,
             ExecutablePath = "cmd.exe",
             ArgumentsTemplate = "/c echo {prompt}"
         };
-        var truncProcessHost = new OpenBridgeHost(new ClaudeCodeExecutor(truncProcessOpts));
+        var truncProcessHost = new OpenBridgeHost(new CommandExecutor(truncProcessOpts));
         var longEchoText = new string('Y', 200);
 
         var r16 = await truncProcessHost.ExecuteAsync(new HostCommandRequest
@@ -254,15 +254,15 @@ class Program
 
         // 18. Missing optional config returns null (no file = default dry-run)
         var missingPath = Path.Combine(Path.GetTempPath(), $"openbridge_nonexistent_{Guid.NewGuid():N}.json");
-        var rCfg1 = ClaudeCodeExecutorOptionsLoader.TryLoad(missingPath);
+        var rCfg1 = CommandExecutorOptionsLoader.TryLoad(missingPath);
         Assert(rCfg1 == null, "TryLoad returns null for missing file");
 
         // 19. Example config can be parsed
         var examplePath = Path.GetFullPath(Path.Combine(allowedRoot, "config", "examples", "claude-code-executor.example.json"));
         if (File.Exists(examplePath))
         {
-            var rCfg2 = ClaudeCodeExecutorOptionsLoader.LoadOrThrow(examplePath);
-            Assert(rCfg2.Mode == ClaudeCodeExecutorMode.DryRun, "Example config mode is DryRun");
+            var rCfg2 = CommandExecutorOptionsLoader.LoadOrThrow(examplePath);
+            Assert(rCfg2.Mode == CommandExecutorMode.DryRun, "Example config mode is DryRun");
             Assert(rCfg2.DefaultTimeoutMs == 720_000, "Example config has default timeout");
             Assert(rCfg2.DefaultMaxOutputChars == 50_000, "Example config has default max output");
         }
@@ -283,15 +283,15 @@ class Program
         try
         {
             File.WriteAllText(tempConfigPath, tempJson);
-            var rCfg3 = ClaudeCodeExecutorOptionsLoader.LoadOrThrow(tempConfigPath);
-            Assert(rCfg3.Mode == ClaudeCodeExecutorMode.Process, "Temp config mode is Process");
+            var rCfg3 = CommandExecutorOptionsLoader.LoadOrThrow(tempConfigPath);
+            Assert(rCfg3.Mode == CommandExecutorMode.Process, "Temp config mode is Process");
             Assert(rCfg3.ExecutablePath == "cmd.exe", "Temp config has executable path");
             Assert(rCfg3.ArgumentsTemplate == "/c echo CONFIG_TEST", "Temp config has arguments template");
             Assert(rCfg3.DefaultTimeoutMs == 120000, "Temp config has custom timeout");
             Assert(rCfg3.DefaultMaxOutputChars == 10000, "Temp config has custom max output chars");
 
             // Also verify the loaded config works with the executor (no process invoked here — only parsing)
-            var configExecutor = new ClaudeCodeExecutor(rCfg3);
+            var configExecutor = new CommandExecutor(rCfg3);
             var configHost = new OpenBridgeHost(configExecutor);
             var rCfg3exec = await configHost.ExecuteAsync(new HostCommandRequest
             {
@@ -314,7 +314,7 @@ class Program
             File.WriteAllText(badJsonPath, "{ this is not valid json }");
             try
             {
-                ClaudeCodeExecutorOptionsLoader.LoadOrThrow(badJsonPath);
+                CommandExecutorOptionsLoader.LoadOrThrow(badJsonPath);
                 Assert(false, "Invalid JSON should throw");
             }
             catch (System.Text.Json.JsonException)
@@ -337,9 +337,9 @@ class Program
         try
         {
             File.WriteAllText(safeConfigPath, safeJson);
-            var rCfg4 = ClaudeCodeExecutorOptionsLoader.TryLoad(safeConfigPath);
+            var rCfg4 = CommandExecutorOptionsLoader.TryLoad(safeConfigPath);
             Assert(rCfg4 != null, "Safe config loads successfully");
-            Assert(rCfg4!.Mode == ClaudeCodeExecutorMode.DryRun, "Safe config stays in dry-run mode");
+            Assert(rCfg4!.Mode == CommandExecutorMode.DryRun, "Safe config stays in dry-run mode");
             Assert(string.IsNullOrEmpty(rCfg4.ExecutablePath), "Safe config has no executable");
         }
         finally
@@ -359,8 +359,8 @@ class Program
         try
         {
             File.WriteAllText(camelConfigPath, camelJson);
-            var rCfg5 = ClaudeCodeExecutorOptionsLoader.LoadOrThrow(camelConfigPath);
-            Assert(rCfg5.Mode == ClaudeCodeExecutorMode.DryRun, "camelCase mode parses correctly");
+            var rCfg5 = CommandExecutorOptionsLoader.LoadOrThrow(camelConfigPath);
+            Assert(rCfg5.Mode == CommandExecutorMode.DryRun, "camelCase mode parses correctly");
             Assert(rCfg5.DefaultTimeoutMs == 60000, "camelCase timeout parses correctly");
             Assert(rCfg5.DefaultMaxOutputChars == 5000, "camelCase max output parses correctly");
         }
@@ -373,14 +373,14 @@ class Program
         Console.WriteLine("--- Default Timeout Tests ---");
 
         // 24. Default timeout is 720000 (12 minutes)
-        var defaultOpts = new ClaudeCodeExecutorOptions();
+        var defaultOpts = new CommandExecutorOptions();
         Assert(defaultOpts.DefaultTimeoutMs == 720_000, "Default timeout is 720000ms (12 min)");
 
         // 25. Example config timeout is 720000
         var exampleCfgPath = Path.GetFullPath(Path.Combine(allowedRoot, "config", "examples", "claude-code-executor.example.json"));
         if (File.Exists(exampleCfgPath))
         {
-            var r25 = ClaudeCodeExecutorOptionsLoader.LoadOrThrow(exampleCfgPath);
+            var r25 = CommandExecutorOptionsLoader.LoadOrThrow(exampleCfgPath);
             Assert(r25.DefaultTimeoutMs == 720_000, "Example config timeout is 720000");
         }
         else
@@ -389,8 +389,8 @@ class Program
         }
 
         // 26. Short timeout tests still override to small values explicitly
-        var shortOpts = new ClaudeCodeExecutorOptions { DefaultTimeoutMs = 500 };
-        var shortExecutor = new ClaudeCodeExecutor(shortOpts);
+        var shortOpts = new CommandExecutorOptions { DefaultTimeoutMs = 500 };
+        var shortExecutor = new CommandExecutor(shortOpts);
         var shortHost = new OpenBridgeHost(shortExecutor);
         var r26 = await shortHost.ExecuteAsync(new HostCommandRequest
         {
@@ -514,7 +514,7 @@ class Program
         };
         approval.TrySetPending(env39, out _);
         var result39 = await approval.ApproveDryRunAsync();
-        Assert(result39.Message != null && result39.Message.Contains("No Claude Code process"), "DryRun confirms no real process");
+        Assert(result39.Message != null && result39.Message.Contains("No real process was launched"), "DryRun confirms no real process");
         Assert(result39.Message != null && !result39.Message.Contains("Process"), "Result does not mention Process mode");
 
         // 40. Unsupported command rejected by mapper
@@ -639,7 +639,7 @@ class Program
         approval.TrySetPending(env48, out _);
         var result48 = await approval.ApproveDryRunAsync();
         Assert(result48.Status == HostExecutionStatus.Ok, "DryRun approval works");
-        Assert(result48.Message != null && result48.Message.Contains("No Claude Code process"), "Result confirms no real Claude process");
+        Assert(result48.Message != null && result48.Message.Contains("No real process was launched"), "Result confirms no real Claude process");
 
         // 49. Process approval with missing config returns controlled error
         var noConfigPath = Path.Combine(Path.GetTempPath(), "openbridge_nonexistent_config.json");
@@ -894,7 +894,7 @@ class Program
     {
         private readonly int _delayMs;
 
-        public DelayedClaudeCodeExecutor(int delayMs) : base(new ClaudeCodeExecutorOptions())
+        public DelayedClaudeCodeExecutor(int delayMs) : base(new CommandExecutorOptions())
         {
             _delayMs = delayMs;
         }

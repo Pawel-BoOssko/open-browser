@@ -1,9 +1,9 @@
 using System.Diagnostics;
-using BridgeBrowserAlpha0.OpenBridgeHost.ClaudeCode;
+using BridgeBrowserAlpha0.OpenBridgeHost.Commands;
 
 namespace BridgeBrowserAlpha0.OpenBridgeHost.GeneralCommand;
 
-public class GeneralCommandExecutor : IClaudeCodeExecutor
+public class GeneralCommandExecutor : IOpenBridgeCommandExecutor
 {
     private readonly string _executablePath;
     private readonly string _argumentsTemplate;

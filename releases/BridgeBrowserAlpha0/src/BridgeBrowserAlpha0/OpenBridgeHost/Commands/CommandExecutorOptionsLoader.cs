@@ -1,9 +1,9 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace BridgeBrowserAlpha0.OpenBridgeHost.ClaudeCode;
+namespace BridgeBrowserAlpha0.OpenBridgeHost.Commands;
 
-public static class ClaudeCodeExecutorOptionsLoader
+public static class CommandExecutorOptionsLoader
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -12,17 +12,17 @@ public static class ClaudeCodeExecutorOptionsLoader
         Converters = { new JsonStringEnumConverter() }
     };
 
-    public static ClaudeCodeExecutorOptions? TryLoad(string path)
+    public static CommandExecutorOptions? TryLoad(string path)
     {
         if (!File.Exists(path)) return null;
         var json = File.ReadAllText(path);
-        return JsonSerializer.Deserialize<ClaudeCodeExecutorOptions>(json, JsonOptions);
+        return JsonSerializer.Deserialize<CommandExecutorOptions>(json, JsonOptions);
     }
 
-    public static ClaudeCodeExecutorOptions LoadOrThrow(string path)
+    public static CommandExecutorOptions LoadOrThrow(string path)
     {
         var json = File.ReadAllText(path);
-        return JsonSerializer.Deserialize<ClaudeCodeExecutorOptions>(json, JsonOptions)
+        return JsonSerializer.Deserialize<CommandExecutorOptions>(json, JsonOptions)
                ?? throw new InvalidOperationException("Failed to deserialize executor options from: " + path);
     }
 }

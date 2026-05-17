@@ -1,4 +1,4 @@
-using BridgeBrowserAlpha0.OpenBridgeHost.ClaudeCode;
+using BridgeBrowserAlpha0.OpenBridgeHost.Commands;
 using BridgeBrowserAlpha0.OpenBridgeHost.GeneralCommand;
 using BridgeBrowserAlpha0.OpenBridgeProtocol;
 
@@ -68,8 +68,8 @@ public class OpenBridgeRuntimeApproval
         {
             try
             {
-                var opts = ClaudeCode.ClaudeCodeExecutorOptionsLoader.LoadOrThrow(_configPath);
-                if (opts.Mode != ClaudeCode.ClaudeCodeExecutorMode.Process)
+                var opts = Commands.CommandExecutorOptionsLoader.LoadOrThrow(_configPath);
+                if (opts.Mode != Commands.CommandExecutorMode.Process)
                     return "Process mode unavailable: config is not in Process mode.";
                 if (string.IsNullOrWhiteSpace(opts.ExecutablePath))
                     return "Process mode unavailable: executable path not configured.";
@@ -107,11 +107,11 @@ public class OpenBridgeRuntimeApproval
             "Starting execution via Host",
             new { command = request.Command, mode = modeLabel });
 
-        IClaudeCodeExecutor executor = isPs
+        IOpenBridgeCommandExecutor executor = isPs
             ? new GeneralCommand.GeneralCommandExecutor("powershell.exe", "-NoProfile -Command \"{prompt}\"")
-            : new ClaudeCode.ClaudeCodeExecutor(new ClaudeCode.ClaudeCodeExecutorOptions
+            : new Commands.CommandExecutor(new Commands.CommandExecutorOptions
             {
-                Mode = ClaudeCode.ClaudeCodeExecutorMode.DryRun,
+                Mode = Commands.CommandExecutorMode.DryRun,
                 DefaultTimeoutMs = 720_000,
                 DefaultMaxOutputChars = 50_000
             });
@@ -153,10 +153,10 @@ public class OpenBridgeRuntimeApproval
             };
         }
 
-        ClaudeCode.ClaudeCodeExecutorOptions opts;
+        Commands.CommandExecutorOptions opts;
         try
         {
-            opts = ClaudeCode.ClaudeCodeExecutorOptionsLoader.LoadOrThrow(_configPath);
+            opts = Commands.CommandExecutorOptionsLoader.LoadOrThrow(_configPath);
         }
         catch (Exception ex)
         {
@@ -170,7 +170,7 @@ public class OpenBridgeRuntimeApproval
             };
         }
 
-        if (opts.Mode != ClaudeCode.ClaudeCodeExecutorMode.Process)
+        if (opts.Mode != Commands.CommandExecutorMode.Process)
         {
             _log?.WriteRun("runtime_approval", "approval_process_rejected", "error",
                 "Process approval rejected: config not in Process mode", new { mode = opts.Mode });
@@ -202,7 +202,7 @@ public class OpenBridgeRuntimeApproval
             "Starting Process execution via Host",
             new { command = request.Command, mode = "Process", timeoutMs = opts.DefaultTimeoutMs });
 
-        var executor = new ClaudeCode.ClaudeCodeExecutor(opts);
+        var executor = new Commands.CommandExecutor(opts);
         var host = new OpenBridgeHost(executor);
         var result = await host.ExecuteAsync(request);
 
@@ -273,8 +273,8 @@ public class OpenBridgeRuntimeApproval
         try
         {
             if (!File.Exists(_configPath)) return false;
-            var opts = ClaudeCode.ClaudeCodeExecutorOptionsLoader.LoadOrThrow(_configPath);
-            return opts.Mode == ClaudeCode.ClaudeCodeExecutorMode.Process
+            var opts = Commands.CommandExecutorOptionsLoader.LoadOrThrow(_configPath);
+            return opts.Mode == Commands.CommandExecutorMode.Process
                    && !string.IsNullOrWhiteSpace(opts.ExecutablePath)
                    && !HasUnsafeFlags(opts);
         }
@@ -284,7 +284,7 @@ public class OpenBridgeRuntimeApproval
         }
     }
 
-    private static bool HasUnsafeFlags(ClaudeCode.ClaudeCodeExecutorOptions opts)
+    private static bool HasUnsafeFlags(Commands.CommandExecutorOptions opts)
     {
         var args = opts.ArgumentsTemplate ?? "";
         var exe = opts.ExecutablePath ?? "";

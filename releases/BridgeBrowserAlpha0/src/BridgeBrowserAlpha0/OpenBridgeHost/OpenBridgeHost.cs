@@ -1,17 +1,17 @@
 using System.Diagnostics;
-using BridgeBrowserAlpha0.OpenBridgeHost.ClaudeCode;
+using BridgeBrowserAlpha0.OpenBridgeHost.Commands;
 
 namespace BridgeBrowserAlpha0.OpenBridgeHost;
 
 public class OpenBridgeHost
 {
-    private readonly IClaudeCodeExecutor _executor;
+    private readonly IOpenBridgeCommandExecutor _executor;
     private readonly object _operationGate = new();
     private bool _busy;
 
-    public OpenBridgeHost(IClaudeCodeExecutor? executor = null)
+    public OpenBridgeHost(IOpenBridgeCommandExecutor? executor = null)
     {
-        _executor = executor ?? new ClaudeCode.ClaudeCodeExecutor();
+        _executor = executor ?? new Commands.CommandExecutor();
     }
 
     public async Task<HostCommandResult> ExecuteAsync(HostCommandRequest request, CancellationToken ct = default)
