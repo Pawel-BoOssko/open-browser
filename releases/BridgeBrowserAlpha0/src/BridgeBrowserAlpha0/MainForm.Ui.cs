@@ -9,16 +9,26 @@ public sealed partial class MainForm
     private readonly Button _hideWebButton = new() { Text = "Hide web", Width = 110 };
     private readonly Button _testInjectButton = new() { Text = "Test inject", Width = 110, BackColor = Color.LightYellow };
     private readonly Label _status = new() { AutoSize = true, Text = "..." };
-    private readonly Label _buildLabel = new() { AutoSize = true, Text = AppConstants.AppVersion, ForeColor = Color.Gray };
 
     private bool _webHidden;
 
     private void InitializeUi()
     {
-        Text = AppConstants.AppTitleWithVersion;
+        Text = AppConstants.AppTitleWithBuild;
         Width = 1500;
         Height = 950;
         StartPosition = FormStartPosition.CenterScreen;
+
+        try
+        {
+            var pngPath = Path.Combine(AppContext.BaseDirectory, "app_icon.png");
+            if (File.Exists(pngPath))
+            {
+                var bmp = new Bitmap(pngPath);
+                Icon = Icon.FromHandle(bmp.GetHicon());
+            }
+        }
+        catch { }
 
         var panel = new FlowLayoutPanel
         {
@@ -32,7 +42,6 @@ public sealed partial class MainForm
         panel.Controls.Add(_hideWebButton);
         panel.Controls.Add(_testInjectButton);
         panel.Controls.Add(_status);
-        panel.Controls.Add(_buildLabel);
 
         _webView.Dock = DockStyle.Fill;
         Controls.Add(_webView);
