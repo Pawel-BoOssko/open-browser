@@ -11,9 +11,10 @@ public static class OpenBridgeHostCommandMapper
         request = null;
         error = null;
 
-        if (!string.Equals(envelope.Command, "CC", StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(envelope.Command, "CC", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(envelope.Command, "PS", StringComparison.OrdinalIgnoreCase))
         {
-            error = $"Command not supported by Claude Code path: {envelope.Command}. Only CC is accepted.";
+            error = $"Command not supported: {envelope.Command}. Supported: CC, PS.";
             return false;
         }
 
@@ -26,7 +27,7 @@ public static class OpenBridgeHostCommandMapper
 
         request = new HostCommandRequest
         {
-            Command = "CC",
+            Command = envelope.Command,
             WorkingDirectory = defaultWorkingDirectory,
             Prompt = prompt,
             TimeoutMs = defaultTimeoutMs,
