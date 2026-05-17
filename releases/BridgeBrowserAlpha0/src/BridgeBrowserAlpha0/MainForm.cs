@@ -8,12 +8,10 @@ namespace BridgeBrowserAlpha0;
 
 public sealed partial class MainForm : Form
 {
-    private readonly System.Windows.Forms.Timer _diagnosticsTimer = new() { Interval = 5000 };
     private readonly LogWriter _log = new();
     private readonly ResponseExtractor _extractor;
     private readonly BridgeBrowserModuleManager _moduleManager;
     private readonly WebViewMessageHandler _messageHandler;
-    private readonly DiagnosticsController _diagnosticsController;
     private readonly OpenBridgeHost.OpenBridgeRuntimeApproval _runtimeApproval;
     private BrowserTabRuntime? _tabRuntime;
 
@@ -21,8 +19,7 @@ public sealed partial class MainForm : Form
     {
         _extractor = new ResponseExtractor(_log);
         _moduleManager = new BridgeBrowserModuleManager(_log);
-        _diagnosticsController = new DiagnosticsController(_log, _moduleManager, SetDiagnostics, () => _webView.CoreWebView2 != null);
-        _messageHandler = new WebViewMessageHandler(_log, _extractor, () => { _ = _diagnosticsController.RefreshAsync(false); });
+        _messageHandler = new WebViewMessageHandler(_log, _extractor, () => { });
         _runtimeApproval = new OpenBridgeHost.OpenBridgeRuntimeApproval(@"D:\projects\open-browser", _log);
 
         _extractor.OnEnvelopeDetected = parseResult =>
@@ -44,25 +41,15 @@ public sealed partial class MainForm : Form
 
         InitializeUi();
 
-        _newLogButton.Click += (_, _) => _tabRuntime?.StartNewRun();
-        _openLogsButton.Click += (_, _) => OpenFolder(AppPaths.Logs);
-        _openExtractedButton.Click += (_, _) => OpenFolder(AppPaths.Extracted);
-        _exportRedactedButton.Click += (_, _) => ExportRedactedRun();
-        _loadTrimmerButton.Click += async (_, _) => await LoadTrimmerAsync();
-        _promoteTrimmerButton.Click += async (_, _) => await PromoteTrimmerAsync();
-        _trimmerStatusButton.Click += async (_, _) => await ShowTrimmerStatusAsync();
         _hideWebButton.Click += (_, _) => ToggleWebVisibility();
-        _approveDryRunButton.Click += async (_, _) => await ApproveDryRunAsync();
-        _approveProcessButton.Click += async (_, _) => await ApproveProcessAsync();
+        _approveDryRunButton.Click += async (_, _) => await ExecuteCommandAsync();
         _rejectButton.Click += (_, _) => RejectRuntimeCommand();
-        _copyDetailsButton.Click += (_, _) => CopyApprovalDetails();
-        _copyResultButton.Click += (_, _) => CopyApprovalResult();
-        _diagnosticsTimer.Tick += async (_, _) => await _diagnosticsController.RefreshAsync(false);
+        _copyDetailsButton.Click += (_, _) => CopyApprovalPrompt();
+        _copyResultButton.Click += (_, _) => CopyApprovalOutput();
 
         Load += async (_, _) => await InitializeAsync();
         FormClosing += (_, _) =>
         {
-            _diagnosticsTimer.Stop();
             _extractor.Finish();
             _log.WriteApp("app", "app_exit", "ok", "Application closing");
             _log.Dispose();
@@ -87,12 +74,10 @@ public sealed partial class MainForm : Form
                 _moduleManager,
                 _messageHandler,
                 SetStatus,
-                (writeLog) => _diagnosticsController.RefreshAsync(writeLog)
+                (_) => Task.CompletedTask
             );
 
             await _tabRuntime.InitializeAsync();
-
-            _diagnosticsTimer.Start();
         }
         catch (Exception ex)
         {
@@ -102,76 +87,21 @@ public sealed partial class MainForm : Form
         }
     }
 
-    private async Task LoadTrimmerAsync()
+    private async Task ExecuteCommandAsync()
     {
         try
         {
-            var version = await _moduleManager.LoadCurrentConversationTrimmerAsync();
-            SetStatus("Loaded trimmer: " + version);
-            await _diagnosticsController.RefreshAsync(true);
-        }
-        catch (Exception ex)
-        {
-            _log.WriteRun("modules", "module_load", "error", "Load trimmer failed", new { ex.Message });
-            SetStatus("Load trimmer failed: " + ex.Message);
-        }
-    }
-
-    private async Task PromoteTrimmerAsync()
-    {
-        try
-        {
-            var version = await _moduleManager.PromoteLatestConversationTrimmerAsync();
-            SetStatus("Promoted trimmer: " + version);
-            await _diagnosticsController.RefreshAsync(true);
-        }
-        catch (Exception ex)
-        {
-            _log.WriteRun("modules", "module_promote", "error", "Promote trimmer failed", new { ex.Message });
-            SetStatus("Promote trimmer failed: " + ex.Message);
-        }
-    }
-
-    private async Task ShowTrimmerStatusAsync()
-    {
-        await _diagnosticsController.RefreshAsync(true);
-        MessageBox.Show(_diagnostics.Text, $"{AppConstants.AppTitle} trimmer status", MessageBoxButtons.OK, MessageBoxIcon.Information);
-    }
-
-    private async Task ApproveDryRunAsync()
-    {
-        try
-        {
-            SetStatus("Executing CC command (DryRun)...");
-            ShowApprovalResult("Executing DryRun...");
+            SetStatus("Executing...");
+            ShowApprovalResult("Executing...");
             var result = await _runtimeApproval.ApproveDryRunAsync();
-            var text = _runtimeApproval.ResultSummary();
-            ShowApprovalResult(text);
-            SetStatus(result.Status == HostExecutionStatus.Ok ? "CC DryRun OK" : "CC DryRun failed: " + result.ErrorCode);
+            var output = result.StdoutPreview ?? "";
+            ShowApprovalResult(output);
+            SetStatus(result.Status == HostExecutionStatus.Ok ? "OK" : "Failed: " + result.ErrorCode);
         }
         catch (Exception ex)
         {
             ShowApprovalResult("Execution error: " + ex.Message);
-            SetStatus("CC execution error: " + ex.Message);
-            _log.WriteRun("runtime_approval", "host_execution_failed", "error", ex.Message);
-        }
-    }
-
-    private async Task ApproveProcessAsync()
-    {
-        try
-        {
-            SetStatus("Executing CC command (Process)...");
-            ShowApprovalResult("Executing Process...");
-            var result = await _runtimeApproval.ApproveProcessAsync();
-            var text = _runtimeApproval.ResultSummary();
-            ShowApprovalResult(text);
-            SetStatus(result.Status == HostExecutionStatus.Ok ? "CC Process OK" : "CC Process failed: " + result.ErrorCode);
-        }
-        catch (Exception ex)
-        {
-            ShowApprovalResult("Execution error: " + ex.Message);
-            SetStatus("CC execution error: " + ex.Message);
+            SetStatus("Execution error: " + ex.Message);
             _log.WriteRun("runtime_approval", "host_execution_failed", "error", ex.Message);
         }
     }
@@ -179,45 +109,27 @@ public sealed partial class MainForm : Form
     private void RejectRuntimeCommand()
     {
         _runtimeApproval.Reject();
-        SetStatus("CC command rejected.");
+        SetStatus("Command rejected.");
         HidePendingCommand();
     }
 
-    private void CopyApprovalDetails()
+    private void CopyApprovalPrompt()
     {
         var details = _runtimeApproval.PendingCommandDetails();
         if (!string.IsNullOrEmpty(details))
         {
             Clipboard.SetText(details);
-            SetStatus("Approval details copied.");
+            SetStatus("Prompt copied.");
         }
     }
 
-    private void CopyApprovalResult()
+    private void CopyApprovalOutput()
     {
-        var result = _runtimeApproval.ResultSummary();
-        if (!string.IsNullOrEmpty(result))
+        var text = _approvalResult.Text;
+        if (!string.IsNullOrEmpty(text))
         {
-            Clipboard.SetText(result);
-            SetStatus("Approval result copied.");
-        }
-    }
-
-    private void ExportRedactedRun()
-    {
-        try
-        {
-            _extractor.Finish();
-            var exportPath = RedactedExport.ExportRun(_log.RunId);
-            _log.WriteRun("export", "redacted_export", "ok", "GitHub-safe redacted export created", new { exportPath });
-            SetStatus("Redacted export: " + exportPath);
-            OpenFolder(exportPath);
-        }
-        catch (Exception ex)
-        {
-            _log.WriteRun("export", "redacted_export", "error", "Redacted export failed", new { ex.Message });
-            SetStatus("Redacted export failed: " + ex.Message);
-            MessageBox.Show("Redacted export failed:\n" + ex.Message, AppConstants.AppTitle, MessageBoxButtons.OK, MessageBoxIcon.Error);
+            Clipboard.SetText(text);
+            SetStatus("Output copied.");
         }
     }
 }

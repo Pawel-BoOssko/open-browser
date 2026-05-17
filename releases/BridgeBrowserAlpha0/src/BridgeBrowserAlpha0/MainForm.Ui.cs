@@ -6,25 +6,9 @@ namespace BridgeBrowserAlpha0;
 public sealed partial class MainForm
 {
     private readonly WebView2 _webView = new();
-    private readonly Button _newLogButton = new() { Text = "New log", Width = 110 };
-    private readonly Button _openLogsButton = new() { Text = "Open logs", Width = 105 };
-    private readonly Button _openExtractedButton = new() { Text = "Extracted", Width = 105 };
-    private readonly Button _exportRedactedButton = new() { Text = "Export", Width = 95 };
-    private readonly Button _loadTrimmerButton = new() { Text = "Load trim", Width = 100 };
-    private readonly Button _promoteTrimmerButton = new() { Text = "Promote trim", Width = 120 };
-    private readonly Button _trimmerStatusButton = new() { Text = "Trim status", Width = 110 };
     private readonly Button _hideWebButton = new() { Text = "Hide web", Width = 110 };
     private readonly Label _status = new() { AutoSize = true, Text = "Starting..." };
-    private readonly TextBox _diagnostics = new()
-    {
-        Dock = DockStyle.Bottom,
-        Height = 120,
-        Multiline = true,
-        ReadOnly = true,
-        ScrollBars = ScrollBars.Vertical,
-        Font = new Font(FontFamily.GenericMonospace, 9)
-    };
-    
+
     private bool _webHidden;
 
     private void InitializeUi()
@@ -37,25 +21,17 @@ public sealed partial class MainForm
         var panel = new FlowLayoutPanel
         {
             Dock = DockStyle.Top,
-            Height = 92,
+            Height = 36,
             Padding = new Padding(8),
             FlowDirection = FlowDirection.LeftToRight,
             WrapContents = true,
             AutoScroll = true
         };
-        panel.Controls.Add(_newLogButton);
-        panel.Controls.Add(_openLogsButton);
-        panel.Controls.Add(_openExtractedButton);
-        panel.Controls.Add(_exportRedactedButton);
-        panel.Controls.Add(_loadTrimmerButton);
-        panel.Controls.Add(_promoteTrimmerButton);
-        panel.Controls.Add(_trimmerStatusButton);
         panel.Controls.Add(_hideWebButton);
         panel.Controls.Add(_status);
 
         _webView.Dock = DockStyle.Fill;
         Controls.Add(_webView);
-        Controls.Add(_diagnostics);
         Controls.Add(panel);
         BuildApprovalPanel();
     }
@@ -84,87 +60,76 @@ public sealed partial class MainForm
         _status.Text = text;
     }
 
-    private void SetDiagnostics(string text)
-    {
-        if (InvokeRequired)
-        {
-            BeginInvoke(new Action(() => SetDiagnostics(text)));
-            return;
-        }
-        _diagnostics.Text = text;
-    }
-
     // ---- Runtime approval panel ----
 
     private readonly Panel _approvalPanel = new()
     {
         Dock = DockStyle.Bottom,
-        Height = 230,
+        Height = 260,
         Visible = false,
         BorderStyle = BorderStyle.FixedSingle
     };
     private readonly Label _approvalTitle = new()
     {
-        Text = "Pending CC Command — Operator Approval Required",
+        Text = "Pending PS Command",
         AutoSize = true,
         Font = new Font(FontFamily.GenericSansSerif, 10, FontStyle.Bold),
         Location = new Point(8, 4)
     };
-    private readonly Label _approvalDetails = new()
+    private readonly TextBox _approvalDetails = new()
     {
-        AutoSize = true,
+        ReadOnly = true,
+        Multiline = false,
         Location = new Point(8, 26),
-        MaximumSize = new Size(1200, 52)
+        Width = 1200,
+        BorderStyle = BorderStyle.None,
+        BackColor = SystemColors.Control
     };
     private readonly Label _approvalProcessStatus = new()
     {
         Text = "",
         AutoSize = true,
         ForeColor = Color.DarkGreen,
-        Location = new Point(8, 84)
+        Location = new Point(8, 50)
     };
     private readonly Button _approveDryRunButton = new()
     {
-        Text = "Approve DryRun",
+        Text = "Execute",
         Width = 140,
-        Location = new Point(8, 110),
+        Location = new Point(8, 76),
         BackColor = Color.LightGreen,
-        Enabled = false
-    };
-    private readonly Button _approveProcessButton = new()
-    {
-        Text = "Approve Process",
-        Width = 140,
-        Location = new Point(156, 110),
-        BackColor = Color.LightSalmon,
         Enabled = false
     };
     private readonly Button _rejectButton = new()
     {
         Text = "Reject",
         Width = 100,
-        Location = new Point(304, 110),
+        Location = new Point(156, 76),
         Enabled = false
     };
     private readonly Button _copyDetailsButton = new()
     {
-        Text = "Copy details",
+        Text = "Copy prompt",
         Width = 110,
-        Location = new Point(412, 110),
+        Location = new Point(264, 76),
         Enabled = false
     };
-    private readonly Label _approvalResult = new()
+    private readonly TextBox _approvalResult = new()
     {
-        AutoSize = true,
-        Location = new Point(8, 142),
-        MaximumSize = new Size(1200, 52),
-        ForeColor = Color.DarkBlue
+        ReadOnly = true,
+        Multiline = true,
+        ScrollBars = ScrollBars.Vertical,
+        Location = new Point(8, 110),
+        Width = 1200,
+        Height = 100,
+        Font = new Font(FontFamily.GenericMonospace, 9),
+        BorderStyle = BorderStyle.FixedSingle
     };
     private readonly Button _copyResultButton = new()
     {
         Text = "Copy result",
         Width = 110,
-        Location = new Point(8, 198),
+        Location = new Point(8, 218),
         Enabled = false,
         Visible = false
     };
@@ -175,7 +140,6 @@ public sealed partial class MainForm
         _approvalPanel.Controls.Add(_approvalDetails);
         _approvalPanel.Controls.Add(_approvalProcessStatus);
         _approvalPanel.Controls.Add(_approveDryRunButton);
-        _approvalPanel.Controls.Add(_approveProcessButton);
         _approvalPanel.Controls.Add(_rejectButton);
         _approvalPanel.Controls.Add(_copyDetailsButton);
         _approvalPanel.Controls.Add(_approvalResult);
@@ -193,10 +157,9 @@ public sealed partial class MainForm
         _approvalDetails.Text = summary;
         _approvalResult.Text = "";
         _approveDryRunButton.Enabled = true;
-        _approveProcessButton.Enabled = processAvailable;
+        _rejectButton.Enabled = true;
         _approvalProcessStatus.Text = processMessage ?? "";
         _approvalProcessStatus.ForeColor = processAvailable ? Color.DarkGreen : Color.DarkOrange;
-        _rejectButton.Enabled = true;
         _copyDetailsButton.Enabled = true;
         _copyResultButton.Visible = false;
         _approvalPanel.Visible = true;
@@ -211,7 +174,6 @@ public sealed partial class MainForm
         }
         _approvalPanel.Visible = false;
         _approveDryRunButton.Enabled = false;
-        _approveProcessButton.Enabled = false;
         _rejectButton.Enabled = false;
         _copyDetailsButton.Enabled = false;
         _copyResultButton.Visible = false;
@@ -229,8 +191,9 @@ public sealed partial class MainForm
         }
         PipelineRawDump.Write("09_MainFormUi.txt", text);
         _approvalResult.Text = text;
+        _approvalResult.SelectionStart = 0;
+        _approvalResult.SelectionLength = 0;
         _approveDryRunButton.Enabled = false;
-        _approveProcessButton.Enabled = false;
         _rejectButton.Enabled = false;
         _copyResultButton.Visible = true;
         _copyResultButton.Enabled = true;

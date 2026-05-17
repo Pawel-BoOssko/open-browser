@@ -233,7 +233,7 @@ public class OpenBridgeRuntimeApproval
             var prompt = PendingCommand.Prompt ?? "";
             var promptLen = prompt.Length;
             var preview = promptLen > 1000 ? prompt[..1000] + "..." : prompt;
-            return $"Command: CC | Prompt ({promptLen} chars): {preview} | Timeout: 720000ms | Dir: {_workingDirectory}";
+            return $"Command: PS | Prompt ({promptLen} chars): {preview} | Dir: {_workingDirectory}";
         }
     }
 
@@ -242,9 +242,9 @@ public class OpenBridgeRuntimeApproval
         lock (_gate)
         {
             if (PendingCommand == null) return "";
-            return $"Command: CC\nVersion: 001\nTimeout: 720000ms\nMaxOutput: 50000 chars\n" +
-                   $"WorkingDir: {PendingCommand.WorkingDirectory}\n" +
-                   $"PromptLength: {PendingCommand.Prompt?.Length ?? 0} chars";
+            var prompt = PendingCommand.Prompt ?? "";
+            return $"Command: PS\nWorkingDir: {PendingCommand.WorkingDirectory}\n" +
+                   $"Prompt:\n{prompt}";
         }
     }
 
