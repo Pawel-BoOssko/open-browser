@@ -12,6 +12,16 @@ Only active, binding decisions. One line + date per decision. Historical or supe
 - **2026-05-16** The source of truth for model responses is the stream/delta, not the DOM.
 - **2026-05-17** Autonomous execution loop: LLM decides → executor executes → result returns to LLM. No human in the runtime loop.
 
+## Core Philosophy
+
+- **2026-05-16** Stream and message capture is preferred over full DOM dependence — the DOM is a visual surface, not the source of truth.
+- **2026-05-16** Tab-local state lives near the tab; global routing lives in the Host; executors sit behind explicit boundaries.
+- **2026-05-16** The Host should be stable and minimal — complex reasoning belongs to the LLM, the Host provides reliable plumbing.
+- **2026-05-16** Every operation must return a result, error, or timeout — silence breaks model-driven operation.
+- **2026-05-16** Capabilities should be added because the design needs them, not because old code already exists.
+- **2026-05-16** The LLM should not depend on hidden magic — it sees explicit results from the local system.
+- **2026-05-16** Safety boundaries are at the OS and sandbox configuration level — not in a human runtime gate.
+
 ## Envelopes
 
 - **2026-05-17** Markers: `@@OPENBRIDGE_EXEC_BEGIN@@` and `@@OPENBRIDGE_EXEC_END@@`.
