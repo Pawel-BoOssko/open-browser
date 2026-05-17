@@ -19,6 +19,18 @@ public class GeneralCommandExecutor : IOpenBridgeCommandExecutor
         var startedAt = Stopwatch.GetTimestamp();
         var opId = request.OperationId ?? "";
 
+        if (string.IsNullOrWhiteSpace(request.Prompt))
+        {
+            return new HostCommandResult
+            {
+                Status = HostExecutionStatus.Error,
+                OperationId = opId,
+                DurationMs = ElapsedMs(startedAt),
+                ErrorCode = HostErrorCodes.PromptEmpty,
+                Message = "Prompt must not be empty."
+            };
+        }
+
         var psi = new ProcessStartInfo
         {
             FileName = _executablePath,

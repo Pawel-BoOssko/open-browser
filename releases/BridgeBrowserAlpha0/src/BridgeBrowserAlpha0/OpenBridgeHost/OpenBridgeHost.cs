@@ -9,9 +9,9 @@ public class OpenBridgeHost
     private readonly object _operationGate = new();
     private bool _busy;
 
-    public OpenBridgeHost(IOpenBridgeCommandExecutor? executor = null)
+    public OpenBridgeHost(IOpenBridgeCommandExecutor executor)
     {
-        _executor = executor ?? new Commands.CommandExecutor();
+        _executor = executor;
     }
 
     public async Task<HostCommandResult> ExecuteAsync(HostCommandRequest request, CancellationToken ct = default)
