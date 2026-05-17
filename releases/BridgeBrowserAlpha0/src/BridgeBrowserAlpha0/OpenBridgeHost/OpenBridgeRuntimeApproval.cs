@@ -1,3 +1,5 @@
+using BridgeBrowserAlpha0.OpenBridgeHost.ClaudeCode;
+using BridgeBrowserAlpha0.OpenBridgeHost.GeneralCommand;
 using BridgeBrowserAlpha0.OpenBridgeProtocol;
 
 namespace BridgeBrowserAlpha0.OpenBridgeHost;
@@ -94,20 +96,25 @@ public class OpenBridgeRuntimeApproval
             PendingCommand = null;
         }
 
+        var isPs = string.Equals(request.Command, "PS", StringComparison.OrdinalIgnoreCase);
+        var modeLabel = isPs ? "PS" : "DryRun";
+
         _log?.WriteRun("runtime_approval", "approval_dryrun_accepted", "ok",
-            "Operator approved CC command — DryRun",
+            "Operator approved command",
             new { command = request.Command, promptLength = request.Prompt?.Length ?? 0 });
 
         _log?.WriteRun("runtime_approval", "host_execution_started", "ok",
-            "Starting DryRun execution via Host",
-            new { command = request.Command, mode = "DryRun", timeoutMs = 720_000 });
+            "Starting execution via Host",
+            new { command = request.Command, mode = modeLabel });
 
-        var executor = new ClaudeCode.ClaudeCodeExecutor(new ClaudeCode.ClaudeCodeExecutorOptions
-        {
-            Mode = ClaudeCode.ClaudeCodeExecutorMode.DryRun,
-            DefaultTimeoutMs = 720_000,
-            DefaultMaxOutputChars = 50_000
-        });
+        IClaudeCodeExecutor executor = isPs
+            ? new GeneralCommand.GeneralCommandExecutor("powershell.exe", "-NoProfile -Command \"{prompt}\"")
+            : new ClaudeCode.ClaudeCodeExecutor(new ClaudeCode.ClaudeCodeExecutorOptions
+            {
+                Mode = ClaudeCode.ClaudeCodeExecutorMode.DryRun,
+                DefaultTimeoutMs = 720_000,
+                DefaultMaxOutputChars = 50_000
+            });
 
         var host = new OpenBridgeHost(executor);
         var result = await host.ExecuteAsync(request);
