@@ -14,6 +14,7 @@ public sealed partial class MainForm : Form
     private readonly WebViewMessageHandler _messageHandler;
     private readonly OpenBridgeHost.OpenBridgeRuntimeApproval _runtimeApproval;
     private BrowserTabRuntime? _tabRuntime;
+    private DateTime _cooldownUntil = DateTime.MinValue;
 
     public MainForm()
     {
@@ -24,6 +25,12 @@ public sealed partial class MainForm : Form
 
         _extractor.OnEnvelopeDetected = parseResult =>
         {
+            if (DateTime.UtcNow < _cooldownUntil)
+            {
+                _log.WriteRun("runtime_approval", "cooldown_skip", "ok",
+                    "Skipping auto-execute — within cooldown window");
+                return;
+            }
             var ok = _runtimeApproval.TrySetPending(parseResult, out var error);
             if (ok)
             {
@@ -105,6 +112,7 @@ public sealed partial class MainForm : Form
                     "console.log('OpenBridge: injected');}else{console.log('OpenBridge: no el');}";
                 _log.WriteRun("runtime_approval", "webview_inject", "ok", "Injecting result into chat input", new { outputLength = output.Length });
                 await _webView.CoreWebView2.ExecuteScriptAsync(js);
+                _cooldownUntil = DateTime.UtcNow.AddSeconds(15);
                 SetStatus(result.Status == HostExecutionStatus.Ok ? "OK" : "Failed: " + result.ErrorCode);
             }
             else
