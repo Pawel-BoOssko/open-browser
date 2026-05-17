@@ -7,7 +7,7 @@ public sealed partial class MainForm
 {
     private readonly WebView2 _webView = new();
     private readonly Button _hideWebButton = new() { Text = "Hide web", Width = 110 };
-    private readonly Label _status = new() { AutoSize = true, Text = "Starting..." };
+    private readonly Label _status = new() { AutoSize = true, Text = AppConstants.AppVersion };
 
     private bool _webHidden;
 
