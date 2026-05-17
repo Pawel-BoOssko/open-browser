@@ -40,7 +40,7 @@ public sealed partial class MainForm : Form
             if (ok)
             {
                 SetStatus("Executing command...");
-                ShowApprovalResult("Executing...");
+                ShowOutputResult("Executing...");
                 _ = ExecuteAndInjectResultAsync();
             }
             else
@@ -55,8 +55,7 @@ public sealed partial class MainForm : Form
 
         _hideWebButton.Click += (_, _) => ToggleWebVisibility();
         _testInjectButton.Click += async (_, _) => await TestInjectAsync();
-        _copyDetailsButton.Click += (_, _) => CopyApprovalPrompt();
-        _copyResultButton.Click += (_, _) => CopyApprovalOutput();
+        _copyOutputButton.Click += (_, _) => CopyOutput();
 
         Load += async (_, _) => await InitializeAsync();
         FormClosing += (_, _) =>
@@ -148,7 +147,7 @@ public sealed partial class MainForm : Form
             var output = result.StdoutPreview ?? "";
             if (string.IsNullOrWhiteSpace(output))
                 output = result.StderrPreview ?? "";
-            ShowApprovalResult(output);
+            ShowOutputResult(output);
 
             if (!string.IsNullOrWhiteSpace(output))
             {
@@ -163,7 +162,7 @@ public sealed partial class MainForm : Form
         }
         catch (Exception ex)
         {
-            ShowApprovalResult("Execution error: " + ex.Message);
+            ShowOutputResult("Execution error: " + ex.Message);
             SetStatus("Execution error: " + ex.Message);
             _log.WriteRun("runtime_approval", "host_execution_failed", "error", ex.Message);
         }
@@ -193,19 +192,9 @@ public sealed partial class MainForm : Form
         catch (Exception ex) { SetStatus("Inject error: " + ex.Message); }
     }
 
-    private void CopyApprovalPrompt()
+    private void CopyOutput()
     {
-        var details = _runtimeApproval.PendingCommandDetails();
-        if (!string.IsNullOrEmpty(details))
-        {
-            Clipboard.SetText(details);
-            SetStatus("Prompt copied.");
-        }
-    }
-
-    private void CopyApprovalOutput()
-    {
-        var text = _approvalResult.Text;
+        var text = _outputResult.Text;
         if (!string.IsNullOrEmpty(text))
         {
             Clipboard.SetText(text);

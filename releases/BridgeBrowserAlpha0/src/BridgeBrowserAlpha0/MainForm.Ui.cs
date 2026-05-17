@@ -46,7 +46,7 @@ public sealed partial class MainForm
         _webView.Dock = DockStyle.Fill;
         Controls.Add(_webView);
         Controls.Add(panel);
-        BuildApprovalPanel();
+        BuildOutputPanel();
     }
 
     private void ToggleWebVisibility()
@@ -75,79 +75,59 @@ public sealed partial class MainForm
 
     // ---- Output panel ----
 
-    private readonly Panel _approvalPanel = new()
+    private readonly Panel _outputPanel = new()
     {
         Dock = DockStyle.Bottom,
-        Height = 180,
+        Height = 160,
         Visible = false,
         BorderStyle = BorderStyle.FixedSingle
     };
-    private readonly Label _approvalTitle = new()
+    private readonly Label _outputTitle = new()
     {
-        Text = "OpenBridge",
+        Text = "Output",
         AutoSize = true,
         Font = new Font(FontFamily.GenericSansSerif, 10, FontStyle.Bold),
         Location = new Point(8, 4)
     };
-    private readonly TextBox _approvalDetails = new()
-    {
-        ReadOnly = true,
-        Multiline = false,
-        Location = new Point(8, 26),
-        Width = 1200,
-        BorderStyle = BorderStyle.None,
-        BackColor = SystemColors.Control
-    };
-    private readonly TextBox _approvalResult = new()
+    private readonly TextBox _outputResult = new()
     {
         ReadOnly = true,
         Multiline = true,
         ScrollBars = ScrollBars.Vertical,
-        Location = new Point(8, 50),
+        Location = new Point(8, 26),
         Width = 1200,
-        Height = 85,
+        Height = 90,
         Font = new Font(FontFamily.GenericMonospace, 9),
         BorderStyle = BorderStyle.FixedSingle
     };
-    private readonly Button _copyDetailsButton = new()
+    private readonly Button _copyOutputButton = new()
     {
-        Text = "Copy prompt",
+        Text = "Copy output",
         Width = 110,
-        Location = new Point(8, 142),
-        Enabled = false
-    };
-    private readonly Button _copyResultButton = new()
-    {
-        Text = "Copy result",
-        Width = 110,
-        Location = new Point(126, 142),
+        Location = new Point(8, 124),
         Enabled = false
     };
 
-    private void BuildApprovalPanel()
+    private void BuildOutputPanel()
     {
-        _approvalPanel.Controls.Add(_approvalTitle);
-        _approvalPanel.Controls.Add(_approvalDetails);
-        _approvalPanel.Controls.Add(_approvalResult);
-        _approvalPanel.Controls.Add(_copyDetailsButton);
-        _approvalPanel.Controls.Add(_copyResultButton);
-        Controls.Add(_approvalPanel);
+        _outputPanel.Controls.Add(_outputTitle);
+        _outputPanel.Controls.Add(_outputResult);
+        _outputPanel.Controls.Add(_copyOutputButton);
+        Controls.Add(_outputPanel);
     }
 
-    public void ShowApprovalResult(string text)
+    public void ShowOutputResult(string text)
     {
         if (InvokeRequired)
         {
-            BeginInvoke(new Action(() => ShowApprovalResult(text)));
+            BeginInvoke(new Action(() => ShowOutputResult(text)));
             return;
         }
         PipelineRawDump.Write("09_MainFormUi.txt", text);
-        _approvalDetails.Text = _runtimeApproval.HasPending ? _runtimeApproval.PendingSummary() : "";
-        _approvalResult.Text = text;
-        _approvalResult.SelectionStart = 0;
-        _approvalResult.SelectionLength = 0;
-        _copyDetailsButton.Enabled = true;
-        _copyResultButton.Enabled = true;
-        _approvalPanel.Visible = true;
+        _outputResult.Text = text;
+        _outputResult.SelectionStart = 0;
+        _outputResult.SelectionLength = 0;
+        _copyOutputButton.Enabled = true;
+        _outputPanel.Visible = true;
     }
 }
