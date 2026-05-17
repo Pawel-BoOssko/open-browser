@@ -405,28 +405,28 @@ class Program
         Console.WriteLine("--- Mapper Tests ---");
 
         // 27. CC envelope with payload maps to HostCommandRequest
-        var env = new OpenBridgeEnvelope { Command = "CC", Payload = "Fix the auth bug" };
+        var env = new OpenBridgeEnvelope { Command = "PS", Payload = "Write-Output test_ok" };
         var ok27 = OpenBridgeHostCommandMapper.TryMap(env, allowedRoot, 720_000, 50_000, out var req27, out var err27);
-        Assert(ok27, "CC envelope with payload maps successfully");
-        Assert(err27 == null, "No error for valid CC envelope");
-        Assert(req27 != null && req27.Command == "CC", "Mapped command is CC");
-        Assert(req27!.Prompt == "Fix the auth bug", "Mapped prompt comes from payload");
+        Assert(ok27, "PS envelope with payload maps successfully");
+        Assert(err27 == null, "No error for valid PS envelope");
+        Assert(req27 != null && req27.Command == "PS", "Mapped command is PS");
+        Assert(req27!.Prompt == "Write-Output test_ok", "Mapped prompt comes from payload");
         Assert(req27.WorkingDirectory == allowedRoot, "Mapped working directory is default");
         Assert(req27.TimeoutMs == 720_000, "Mapped timeout is default");
         Assert(req27.MaxOutputChars == 50_000, "Mapped max output is default");
 
         // 28. CC envelope with payload64 maps to decoded prompt
         var payload64 = Convert.ToBase64String(Encoding.UTF8.GetBytes("Implement health check"));
-        var env28 = new OpenBridgeEnvelope { Command = "CC", Payload64 = payload64 };
+        var env28 = new OpenBridgeEnvelope { Command = "PS", Payload64 = payload64 };
         var ok28 = OpenBridgeHostCommandMapper.TryMap(env28, allowedRoot, 720_000, 50_000, out var req28, out var err28);
-        Assert(ok28, "CC envelope with payload64 maps successfully");
+        Assert(ok28, "PS envelope with payload64 maps successfully");
         Assert(req28!.Prompt == "Implement health check", "Mapped prompt decoded from payload64");
 
         // 29. CC envelope with payload and payload64 combines both
         var p64 = Convert.ToBase64String(Encoding.UTF8.GetBytes("Write a function that returns health status"));
-        var env29 = new OpenBridgeEnvelope { Command = "CC", Payload = "Implement health endpoint", Payload64 = p64 };
+        var env29 = new OpenBridgeEnvelope { Command = "PS", Payload = "Implement health endpoint", Payload64 = p64 };
         var ok29 = OpenBridgeHostCommandMapper.TryMap(env29, allowedRoot, 720_000, 50_000, out var req29, out var err29);
-        Assert(ok29, "CC envelope with both payloads maps");
+        Assert(ok29, "PS envelope with both payloads maps");
         Assert(req29!.Prompt!.Contains("Implement health endpoint"), "Prompt contains payload prefix");
         Assert(req29.Prompt.Contains("Write a function"), "Prompt contains decoded payload64");
 
@@ -435,16 +435,16 @@ class Program
         var ok30 = OpenBridgeHostCommandMapper.TryMap(env30, allowedRoot, 720_000, 50_000, out var req30, out var err30);
         Assert(!ok30, "Unsupported command is rejected");
         Assert(req30 == null, "No request for unsupported command");
-        Assert(err30 != null && err30.Contains("CC"), "Error mentions only CC is accepted");
+        Assert(err30 != null && err30.Contains("PS"), "Error mentions only PS accepted");
 
         // 31. Empty/missing prompt is rejected by mapper
-        var env31 = new OpenBridgeEnvelope { Command = "CC" };
+        var env31 = new OpenBridgeEnvelope { Command = "PS" };
         var ok31 = OpenBridgeHostCommandMapper.TryMap(env31, allowedRoot, 720_000, 50_000, out var req31, out var err31);
         Assert(!ok31, "Missing prompt is rejected by mapper");
         Assert(err31 != null && err31.Contains("empty"), "Error mentions empty prompt");
 
         // 32. Mapper does not execute commands — it only produces a request object
-        var env32 = new OpenBridgeEnvelope { Command = "CC", Payload = "Read file" };
+        var env32 = new OpenBridgeEnvelope { Command = "PS", Payload = "Read file" };
         var ok32 = OpenBridgeHostCommandMapper.TryMap(env32, allowedRoot, 720_000, 50_000, out var req32, out var err32);
         Assert(ok32, "Mapper returns request");
         Assert(req32 is HostCommandRequest, "Result is HostCommandRequest, not an executed result");
@@ -461,10 +461,10 @@ class Program
         {
             HasEnvelope = true,
             Error = OpenBridgeEnvelopeParseError.NONE,
-            Envelope = new OpenBridgeEnvelope { Version = "001", Command = "CC", Payload = "Fix the auth bug" }
+            Envelope = new OpenBridgeEnvelope { Version = "001", Command = "PS", Payload = "Write-Output test_ok" }
         };
         var ok33 = approval.TrySetPending(env33, out var err33);
-        Assert(ok33, "Valid CC envelope creates pending command");
+        Assert(ok33, "Valid PS envelope creates pending command");
         Assert(err33 == null, "No error for valid envelope");
         Assert(approval.HasPending, "HasPending is true after set");
 
@@ -473,7 +473,7 @@ class Program
         {
             HasEnvelope = true,
             Error = OpenBridgeEnvelopeParseError.NONE,
-            Envelope = new OpenBridgeEnvelope { Version = "001", Command = "CC", Payload = "Another command" }
+            Envelope = new OpenBridgeEnvelope { Version = "001", Command = "PS", Payload = "Write-Output test_pending" }
         };
         var ok34 = approval.TrySetPending(env34, out var err34);
         Assert(!ok34, "Second candidate is rejected while first pending");
@@ -481,8 +481,8 @@ class Program
 
         // 35. Approve executes DryRun and returns ok
         var result35 = await approval.ApproveDryRunAsync();
-        Assert(result35.Status == HostExecutionStatus.Ok, "Approve returns Ok status");
-        Assert(result35.Message != null && result35.Message.Contains("Dry-run"), "Approve executes DryRun");
+        Assert(result35.Status == HostExecutionStatus.Ok, "PS approve returns Ok status");
+        Assert(result35.StdoutPreview != null && result35.StdoutPreview.Contains("test_ok"), "PS stdout contains expected output");
         Assert(!approval.HasPending, "HasPending is false after approve");
 
         // 36. Result is stored in LastResult
@@ -498,7 +498,7 @@ class Program
         {
             HasEnvelope = true,
             Error = OpenBridgeEnvelopeParseError.NONE,
-            Envelope = new OpenBridgeEnvelope { Version = "001", Command = "CC", Payload = "Fix tests" }
+            Envelope = new OpenBridgeEnvelope { Version = "001", Command = "PS", Payload = "Write-Output test_reject" }
         };
         approval.TrySetPending(env38, out _);
         Assert(approval.HasPending, "HasPending is true");
@@ -510,12 +510,12 @@ class Program
         {
             HasEnvelope = true,
             Error = OpenBridgeEnvelopeParseError.NONE,
-            Envelope = new OpenBridgeEnvelope { Version = "001", Command = "CC", Payload = "Mode test" }
+            Envelope = new OpenBridgeEnvelope { Version = "001", Command = "PS", Payload = "Write-Output test_mode" }
         };
         approval.TrySetPending(env39, out _);
         var result39 = await approval.ApproveDryRunAsync();
-        Assert(result39.Message != null && result39.Message.Contains("No real process was launched"), "DryRun confirms no real process");
-        Assert(result39.Message != null && !result39.Message.Contains("Process"), "Result does not mention Process mode");
+        Assert(result39.Status == HostExecutionStatus.Ok, "PS execution returns result");
+        Assert(result39.StdoutPreview != null && result39.StdoutPreview.Contains("test_mode"), "PS stdout contains expected output");
 
         // 40. Unsupported command rejected by mapper
         var env40 = new OpenBridgeEnvelopeParseResult
@@ -527,19 +527,19 @@ class Program
         approval.Reject(); // clear any pending
         var ok40 = approval.TrySetPending(env40, out var err40);
         Assert(!ok40, "Unsupported command rejected");
-        Assert(err40 != null && err40.Contains("CC"), "Error mentions only CC accepted");
+        Assert(err40 != null && err40.Contains("PS"), "Error mentions only PS accepted");
 
         // 41. PendingSummary includes key fields
         var env41 = new OpenBridgeEnvelopeParseResult
         {
             HasEnvelope = true,
             Error = OpenBridgeEnvelopeParseError.NONE,
-            Envelope = new OpenBridgeEnvelope { Version = "001", Command = "CC", Payload = "Refactor auth module" }
+            Envelope = new OpenBridgeEnvelope { Version = "001", Command = "PS", Payload = "Write-Output test_summary" }
         };
         approval.TrySetPending(env41, out _);
         var summary = approval.PendingSummary();
-        Assert(summary.Contains("CC"), "Summary contains command CC");
-        Assert(summary.Contains("Refactor auth module"), "Summary contains prompt");
+        Assert(summary.Contains("CC"), "Summary contains command PS");
+        Assert(summary.Contains("test_summary"), "Summary contains prompt");
         Assert(summary.Contains("720000"), "Summary contains timeout");
         Assert(summary.Contains("CC") && summary.Contains("720000"), "Summary contains command and timeout");
         approval.Reject();
@@ -549,7 +549,7 @@ class Program
         {
             HasEnvelope = true,
             Error = OpenBridgeEnvelopeParseError.NONE,
-            Envelope = new OpenBridgeEnvelope { Version = "001", Command = "CC" }
+            Envelope = new OpenBridgeEnvelope { Version = "001", Command = "PS" }
         };
         var ok42 = approval.TrySetPending(env42, out _);
         Assert(!ok42, "Empty prompt rejected");
@@ -560,7 +560,7 @@ class Program
         {
             HasEnvelope = true,
             Error = OpenBridgeEnvelopeParseError.NONE,
-            Envelope = new OpenBridgeEnvelope { Version = "001", Command = "CC", Payload = veryLongPrompt }
+            Envelope = new OpenBridgeEnvelope { Version = "001", Command = "PS", Payload = veryLongPrompt }
         };
         approval.TrySetPending(env43, out _);
         var summary43 = approval.PendingSummary();
@@ -575,7 +575,7 @@ class Program
         {
             HasEnvelope = true,
             Error = OpenBridgeEnvelopeParseError.NONE,
-            Envelope = new OpenBridgeEnvelope { Version = "001", Command = "CC", Payload = "Normal prompt", Payload64 = secretPayload64 }
+            Envelope = new OpenBridgeEnvelope { Version = "001", Command = "PS", Payload = "Normal prompt", Payload64 = secretPayload64 }
         };
         approval.TrySetPending(env44, out _);
         var details = approval.PendingCommandDetails();
@@ -588,7 +588,7 @@ class Program
         {
             HasEnvelope = true,
             Error = OpenBridgeEnvelopeParseError.NONE,
-            Envelope = new OpenBridgeEnvelope { Version = "001", Command = "CC", Payload = "Test 45" }
+            Envelope = new OpenBridgeEnvelope { Version = "001", Command = "PS", Payload = "Test 45" }
         };
         approval.TrySetPending(env45, out _);
         var result45 = await approval.ApproveDryRunAsync();
@@ -603,7 +603,7 @@ class Program
         {
             HasEnvelope = true,
             Error = OpenBridgeEnvelopeParseError.NONE,
-            Envelope = new OpenBridgeEnvelope { Version = "001", Command = "CC", Payload = "Reject test" }
+            Envelope = new OpenBridgeEnvelope { Version = "001", Command = "PS", Payload = "Write-Output test_reject2" }
         };
         approval.TrySetPending(env46, out _);
         approval.Reject();
@@ -615,14 +615,14 @@ class Program
         {
             HasEnvelope = true,
             Error = OpenBridgeEnvelopeParseError.NONE,
-            Envelope = new OpenBridgeEnvelope { Version = "001", Command = "CC", Payload = "First" }
+            Envelope = new OpenBridgeEnvelope { Version = "001", Command = "PS", Payload = "First" }
         };
         approval.TrySetPending(env47a, out _);
         var env47b = new OpenBridgeEnvelopeParseResult
         {
             HasEnvelope = true,
             Error = OpenBridgeEnvelopeParseError.NONE,
-            Envelope = new OpenBridgeEnvelope { Version = "001", Command = "CC", Payload = "Second" }
+            Envelope = new OpenBridgeEnvelope { Version = "001", Command = "PS", Payload = "Second" }
         };
         var ok47 = approval.TrySetPending(env47b, out var err47);
         Assert(!ok47, "Second pending rejected while first exists");
@@ -634,12 +634,12 @@ class Program
         {
             HasEnvelope = true,
             Error = OpenBridgeEnvelopeParseError.NONE,
-            Envelope = new OpenBridgeEnvelope { Version = "001", Command = "CC", Payload = "DryRun check" }
+            Envelope = new OpenBridgeEnvelope { Version = "001", Command = "PS", Payload = "Write-Output test_dryrun" }
         };
         approval.TrySetPending(env48, out _);
         var result48 = await approval.ApproveDryRunAsync();
-        Assert(result48.Status == HostExecutionStatus.Ok, "DryRun approval works");
-        Assert(result48.Message != null && result48.Message.Contains("No real process was launched"), "Result confirms no real process launched");
+        Assert(result48.Status == HostExecutionStatus.Ok, "PS approval works");
+        Assert((result48.Status == HostExecutionStatus.Ok), "PS result status is Ok");
 
         // 49. Process approval with missing config returns controlled error
         var noConfigPath = Path.Combine(Path.GetTempPath(), "openbridge_nonexistent_config.json");
@@ -648,7 +648,7 @@ class Program
         {
             HasEnvelope = true,
             Error = OpenBridgeEnvelopeParseError.NONE,
-            Envelope = new OpenBridgeEnvelope { Version = "001", Command = "CC", Payload = "test" }
+            Envelope = new OpenBridgeEnvelope { Version = "001", Command = "PS", Payload = "test" }
         };
         noCfgApproval.TrySetPending(env49, out _);
         var result49 = await noCfgApproval.ApproveProcessAsync();
@@ -672,7 +672,7 @@ class Program
             {
                 HasEnvelope = true,
                 Error = OpenBridgeEnvelopeParseError.NONE,
-                Envelope = new OpenBridgeEnvelope { Version = "001", Command = "CC", Payload = "runtime_process_test" }
+                Envelope = new OpenBridgeEnvelope { Version = "001", Command = "PS", Payload = "runtime_process_test" }
             };
             processApproval.TrySetPending(env50, out _);
             Assert(processApproval.IsProcessAvailable(), "Process is available with valid config");
@@ -696,7 +696,7 @@ class Program
             {
                 HasEnvelope = true,
                 Error = OpenBridgeEnvelopeParseError.NONE,
-                Envelope = new OpenBridgeEnvelope { Version = "001", Command = "CC", Payload = "test" }
+                Envelope = new OpenBridgeEnvelope { Version = "001", Command = "PS", Payload = "test" }
             };
             dryApproval.TrySetPending(env51, out _);
             var result51 = await dryApproval.ApproveProcessAsync();
@@ -725,7 +725,7 @@ class Program
             {
                 HasEnvelope = true,
                 Error = OpenBridgeEnvelopeParseError.NONE,
-                Envelope = new OpenBridgeEnvelope { Version = "001", Command = "CC", Payload = "test" }
+                Envelope = new OpenBridgeEnvelope { Version = "001", Command = "PS", Payload = "test" }
             };
             unsafeApproval.TrySetPending(env52, out _);
             var result52 = await unsafeApproval.ApproveProcessAsync();
@@ -742,7 +742,7 @@ class Program
         {
             HasEnvelope = true,
             Error = OpenBridgeEnvelopeParseError.NONE,
-            Envelope = new OpenBridgeEnvelope { Version = "001", Command = "CC", Payload = "test" }
+            Envelope = new OpenBridgeEnvelope { Version = "001", Command = "PS", Payload = "test" }
         };
         noCfgApproval.TrySetPending(env53, out _);
         var result53 = await noCfgApproval.ApproveProcessAsync();

@@ -96,25 +96,16 @@ public class OpenBridgeRuntimeApproval
             PendingCommand = null;
         }
 
-        var isPs = string.Equals(request.Command, "PS", StringComparison.OrdinalIgnoreCase);
-        var modeLabel = isPs ? "PS" : "DryRun";
-
         _log?.WriteRun("runtime_approval", "approval_dryrun_accepted", "ok",
             "Operator approved command",
             new { command = request.Command, promptLength = request.Prompt?.Length ?? 0 });
 
         _log?.WriteRun("runtime_approval", "host_execution_started", "ok",
             "Starting execution via Host",
-            new { command = request.Command, mode = modeLabel });
+            new { command = request.Command });
 
-        IOpenBridgeCommandExecutor executor = isPs
-            ? new GeneralCommand.GeneralCommandExecutor("powershell.exe", "-NoProfile -Command \"{prompt}\"")
-            : new Commands.CommandExecutor(new Commands.CommandExecutorOptions
-            {
-                Mode = Commands.CommandExecutorMode.DryRun,
-                DefaultTimeoutMs = 720_000,
-                DefaultMaxOutputChars = 50_000
-            });
+        IOpenBridgeCommandExecutor executor = new GeneralCommand.GeneralCommandExecutor(
+            "powershell.exe", "-NoProfile -Command \"{prompt}\"");
 
         var host = new OpenBridgeHost(executor);
         var result = await host.ExecuteAsync(request);

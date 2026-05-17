@@ -11,10 +11,9 @@ public static class OpenBridgeHostCommandMapper
         request = null;
         error = null;
 
-        if (!string.Equals(envelope.Command, "CC", StringComparison.OrdinalIgnoreCase)
-            && !string.Equals(envelope.Command, "PS", StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(envelope.Command, "PS", StringComparison.OrdinalIgnoreCase))
         {
-            error = $"Command not supported: {envelope.Command}. Supported: CC, PS.";
+            error = $"Command not supported: {envelope.Command}. Only PS is accepted.";
             return false;
         }
 
