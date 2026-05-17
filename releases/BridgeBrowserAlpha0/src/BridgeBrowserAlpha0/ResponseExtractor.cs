@@ -46,7 +46,7 @@ public sealed class ResponseExtractor
     private int _emptyDeltaValues;
     private string? _currentAssistantMessageId;
     private string _currentEventTsUtc = DateTime.UtcNow.ToString("O");
-    private volatile bool _shouldFinish;
+    private volatile int _pendingFinishCount;
     private readonly HashSet<string> _observedMessageIds = new(StringComparer.Ordinal);
 
     public ResponseExtractor(LogWriter log)
@@ -135,10 +135,11 @@ public sealed class ResponseExtractor
                 });
             }
         }
-        if (_shouldFinish)
+        if (_pendingFinishCount > 0)
         {
-            _shouldFinish = false;
-            Finish();
+            var count = Interlocked.Exchange(ref _pendingFinishCount, 0);
+            for (int i = 0; i < count; i++)
+                Finish();
         }
     }
 
@@ -500,7 +501,7 @@ public sealed class ResponseExtractor
         if (string.Equals(_currentAssistantMessageId, messageId, StringComparison.Ordinal))
             _currentAssistantMessageId = null;
         if (reason == "last_token" && frame.Text.Length > 0)
-            _shouldFinish = true;
+            Interlocked.Increment(ref _pendingFinishCount);
     }
 
     private void CloseOpenFrames(string reason)
