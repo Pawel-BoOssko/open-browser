@@ -109,7 +109,7 @@ public class OpenBridgeRuntimeApproval
             DefaultMaxOutputChars = 50_000
         });
 
-        var host = new OpenBridgeHost(_workingDirectory, executor);
+        var host = new OpenBridgeHost(executor);
         var result = await host.ExecuteAsync(request);
 
         lock (_gate) { LastResult = result; }
@@ -196,7 +196,7 @@ public class OpenBridgeRuntimeApproval
             new { command = request.Command, mode = "Process", timeoutMs = opts.DefaultTimeoutMs });
 
         var executor = new ClaudeCode.ClaudeCodeExecutor(opts);
-        var host = new OpenBridgeHost(_workingDirectory, executor);
+        var host = new OpenBridgeHost(executor);
         var result = await host.ExecuteAsync(request);
 
         lock (_gate) { LastResult = result; }

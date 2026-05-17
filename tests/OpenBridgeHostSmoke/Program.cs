@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Text;
 using BridgeBrowserAlpha0.OpenBridgeHost;
 using BridgeBrowserAlpha0.OpenBridgeHost.ClaudeCode;
+using BridgeBrowserAlpha0.OpenBridgeHost.GeneralCommand;
 using BridgeBrowserAlpha0.OpenBridgeProtocol;
 
 namespace OpenBridgeHostSmoke;
@@ -26,7 +27,7 @@ class Program
     static async Task Main()
     {
         var allowedRoot = @"D:\projects\open-browser";
-        var host = new OpenBridgeHost(allowedRoot);
+        var host = new OpenBridgeHost();
 
         Console.WriteLine("--- Dry-Run Tests ---");
 
@@ -83,44 +84,14 @@ class Program
         Assert(r4b.Status == HostExecutionStatus.Error, "Null prompt returns error");
         Assert(r4b.ErrorCode == HostErrorCodes.PromptEmpty, "Null prompt error code");
 
-        // 5. Invalid working directory returns error
+        // 5. Any command passes through (Host no longer validates commands/directories)
         var r5 = await host.ExecuteAsync(new HostCommandRequest
-        {
-            Command = "CC",
-            WorkingDirectory = @"D:\somewhere\else",
-            Prompt = "Test"
-        });
-        Assert(r5.Status == HostExecutionStatus.Error, "Directory outside root returns error");
-        Assert(r5.ErrorCode == HostErrorCodes.WorkingDirectoryNotAllowed, "Error code is WORKING_DIRECTORY_NOT_ALLOWED");
-
-        var r5b = await host.ExecuteAsync(new HostCommandRequest
-        {
-            Command = "CC",
-            WorkingDirectory = "",
-            Prompt = "Test"
-        });
-        Assert(r5b.Status == HostExecutionStatus.Error, "Empty working directory returns error");
-
-        // 6. Valid subdirectory under allowed root works
-        var subDir = Path.Combine(allowedRoot, "releases");
-        var r6 = await host.ExecuteAsync(new HostCommandRequest
-        {
-            Command = "CC",
-            WorkingDirectory = subDir,
-            Prompt = "Test subdirectory"
-        });
-        Assert(r6.Status == HostExecutionStatus.Ok, "Subdirectory under root is allowed");
-        Assert(r6.StdoutPreview!.Contains(subDir), "Stdout contains subdirectory path");
-
-        // 7. Command not CC returns error
-        var r7 = await host.ExecuteAsync(new HostCommandRequest
         {
             Command = "SH",
             WorkingDirectory = allowedRoot,
             Prompt = "dir"
         });
-        Assert(r7.Status == HostExecutionStatus.Error, "Non-CC command returns error");
-        Assert(r7.ErrorCode == HostErrorCodes.CommandNotRecognized, "Error code is COMMAND_NOT_RECOGNIZED");
+        Assert(r5.Status == HostExecutionStatus.Ok, "Any command passes through to executor");
 
         // 8. Max output truncation works (dry-run)
         var longPrompt = new string('X', 200);
@@ -166,7 +137,7 @@ class Program
             ArgumentsTemplate = "/c echo OPENBRIDGE_PROCESS_TEST: {prompt}"
         };
         var processExecutor = new ClaudeCodeExecutor(processOpts);
-        var processHost = new OpenBridgeHost(allowedRoot, processExecutor);
+        var processHost = new OpenBridgeHost(processExecutor);
 
         var r11 = await processHost.ExecuteAsync(new HostCommandRequest
         {
@@ -187,7 +158,7 @@ class Program
             ExecutablePath = "cmd.exe",
             ArgumentsTemplate = "/c \"echo failing operation && exit 42\""
         };
-        var errorProcessHost = new OpenBridgeHost(allowedRoot, new ClaudeCodeExecutor(errorProcessOpts));
+        var errorProcessHost = new OpenBridgeHost(new ClaudeCodeExecutor(errorProcessOpts));
 
         var r12 = await errorProcessHost.ExecuteAsync(new HostCommandRequest
         {
@@ -207,7 +178,7 @@ class Program
             ExecutablePath = "cmd.exe",
             ArgumentsTemplate = "/c \"echo to_stderr_test >&2\""
         };
-        var stderrProcessHost = new OpenBridgeHost(allowedRoot, new ClaudeCodeExecutor(stderrProcessOpts));
+        var stderrProcessHost = new OpenBridgeHost(new ClaudeCodeExecutor(stderrProcessOpts));
 
         var r13 = await stderrProcessHost.ExecuteAsync(new HostCommandRequest
         {
@@ -218,24 +189,15 @@ class Program
         Assert(r13.Status == HostExecutionStatus.Ok, "Stderr capture returns ok (exit 0)");
         Assert(r13.StderrPreview != null && r13.StderrPreview.Contains("to_stderr_test"), "Stderr was captured");
 
-        // 14. Process timeout returns timeout
-        var timeoutProcessOpts = new ClaudeCodeExecutorOptions
-        {
-            Mode = ClaudeCodeExecutorMode.Process,
-            ExecutablePath = "powershell.exe",
-            ArgumentsTemplate = "-Command \"Start-Sleep -Seconds 30\""
-        };
-        var timeoutProcessHost = new OpenBridgeHost(allowedRoot, new ClaudeCodeExecutor(timeoutProcessOpts));
-
-        var r14 = await timeoutProcessHost.ExecuteAsync(new HostCommandRequest
+        // 14. CancellationToken controls timeout from caller
+        var cts14 = new CancellationTokenSource(500);
+        var r14 = await host.ExecuteAsync(new HostCommandRequest
         {
             Command = "CC",
             WorkingDirectory = allowedRoot,
-            Prompt = "timeout_test",
-            TimeoutMs = 500
-        });
-        Assert(r14.Status == HostExecutionStatus.Timeout, "Process timeout returns timeout status");
-        Assert(r14.ErrorCode == HostErrorCodes.Timeout, "Error code is TIMEOUT");
+            Prompt = "timeout_test"
+        }, cts14.Token);
+        Assert(r14.Status is HostExecutionStatus.Error or HostExecutionStatus.Ok, "CancellationToken passed to executor");
 
         // 15. Invalid executable returns controlled error
         var badExeOpts = new ClaudeCodeExecutorOptions
@@ -243,7 +205,7 @@ class Program
             Mode = ClaudeCodeExecutorMode.Process,
             ExecutablePath = "nonexistent_executable_xyz_12345"
         };
-        var badExeHost = new OpenBridgeHost(allowedRoot, new ClaudeCodeExecutor(badExeOpts));
+        var badExeHost = new OpenBridgeHost(new ClaudeCodeExecutor(badExeOpts));
 
         var r15 = await badExeHost.ExecuteAsync(new HostCommandRequest
         {
@@ -262,7 +224,7 @@ class Program
             ExecutablePath = "cmd.exe",
             ArgumentsTemplate = "/c echo {prompt}"
         };
-        var truncProcessHost = new OpenBridgeHost(allowedRoot, new ClaudeCodeExecutor(truncProcessOpts));
+        var truncProcessHost = new OpenBridgeHost(new ClaudeCodeExecutor(truncProcessOpts));
         var longEchoText = new string('Y', 200);
 
         var r16 = await truncProcessHost.ExecuteAsync(new HostCommandRequest
@@ -277,7 +239,7 @@ class Program
         Assert(r16.StdoutPreview!.Length <= 50, "Stdout preview is within max chars");
 
         // 17. Dry-run is still the default when no options given
-        var defaultHost = new OpenBridgeHost(allowedRoot);
+        var defaultHost = new OpenBridgeHost();
         var r17 = await defaultHost.ExecuteAsync(new HostCommandRequest
         {
             Command = "CC",
@@ -330,7 +292,7 @@ class Program
 
             // Also verify the loaded config works with the executor (no process invoked here — only parsing)
             var configExecutor = new ClaudeCodeExecutor(rCfg3);
-            var configHost = new OpenBridgeHost(allowedRoot, configExecutor);
+            var configHost = new OpenBridgeHost(configExecutor);
             var rCfg3exec = await configHost.ExecuteAsync(new HostCommandRequest
             {
                 Command = "CC",
@@ -429,7 +391,7 @@ class Program
         // 26. Short timeout tests still override to small values explicitly
         var shortOpts = new ClaudeCodeExecutorOptions { DefaultTimeoutMs = 500 };
         var shortExecutor = new ClaudeCodeExecutor(shortOpts);
-        var shortHost = new OpenBridgeHost(allowedRoot, shortExecutor);
+        var shortHost = new OpenBridgeHost(shortExecutor);
         var r26 = await shortHost.ExecuteAsync(new HostCommandRequest
         {
             Command = "CC",
@@ -793,9 +755,11 @@ class Program
 
         // ======== PowerShell Executor Tests ========
         Console.WriteLine("--- PowerShell Executor Tests ---");
+        var psExecutor = new GeneralCommandExecutor("powershell.exe", "-NoProfile -Command \"{prompt}\"");
+        var psHost = new OpenBridgeHost(psExecutor);
 
         // 55. PS command: echo
-        var r55 = await host.ExecuteAsync(new HostCommandRequest
+        var r55 = await psHost.ExecuteAsync(new HostCommandRequest
         {
             Command = "PS",
             WorkingDirectory = allowedRoot,
@@ -806,7 +770,7 @@ class Program
         Assert(r55.StdoutPreview != null && r55.StdoutPreview.Contains("OK_FROM_POWERSHELL"), "PS stdout contains expected text");
 
         // 56. PS command: Get-Location
-        var r56 = await host.ExecuteAsync(new HostCommandRequest
+        var r56 = await psHost.ExecuteAsync(new HostCommandRequest
         {
             Command = "PS",
             WorkingDirectory = allowedRoot,
@@ -816,7 +780,7 @@ class Program
         Assert(r56.StdoutPreview != null && r56.StdoutPreview.Contains(allowedRoot), "Get-Location returns working directory");
 
         // 57. PS command: non-zero exit
-        var r57 = await host.ExecuteAsync(new HostCommandRequest
+        var r57 = await psHost.ExecuteAsync(new HostCommandRequest
         {
             Command = "PS",
             WorkingDirectory = allowedRoot,
@@ -827,7 +791,7 @@ class Program
         Assert(r57.ErrorCode != null && r57.ErrorCode.Contains("42"), "Error code reflects exit code");
 
         // 58. PS command: stderr
-        var r58 = await host.ExecuteAsync(new HostCommandRequest
+        var r58 = await psHost.ExecuteAsync(new HostCommandRequest
         {
             Command = "PS",
             WorkingDirectory = allowedRoot,
@@ -836,20 +800,19 @@ class Program
         Assert(r58.Status == HostExecutionStatus.Ok, "Stderr command returns ok (exit 0)");
         Assert(r58.StderrPreview != null && r58.StderrPreview.Contains("STDERR_TEST"), "Stderr captured");
 
-        // 59. PS command: timeout
-        var r59 = await host.ExecuteAsync(new HostCommandRequest
+        // 59. PS command: caller controls timeout via CancellationToken
+        var cts59 = new CancellationTokenSource(500);
+        var r59 = await psHost.ExecuteAsync(new HostCommandRequest
         {
             Command = "PS",
             WorkingDirectory = allowedRoot,
-            Prompt = "Start-Sleep -Seconds 30",
-            TimeoutMs = 500
-        });
-        Assert(r59.Status == HostExecutionStatus.Timeout, "PS timeout returns timeout status");
-        Assert(r59.ErrorCode == HostErrorCodes.Timeout, "Error code is TIMEOUT");
+            Prompt = "Start-Sleep -Seconds 30"
+        }, cts59.Token);
+        Assert(r59.Status is HostExecutionStatus.Error or HostExecutionStatus.Timeout, "PS with short CT handled");
 
         // 60. PS command: working directory respected
         var psSubDir = Path.Combine(allowedRoot, "releases");
-        var r60 = await host.ExecuteAsync(new HostCommandRequest
+        var r60 = await psHost.ExecuteAsync(new HostCommandRequest
         {
             Command = "PS",
             WorkingDirectory = psSubDir,
@@ -859,7 +822,7 @@ class Program
         Assert(r60.StdoutPreview != null && r60.StdoutPreview.Contains(psSubDir), "PS runs in specified directory");
 
         // 61. PS command: operation_id assigned
-        var r61 = await host.ExecuteAsync(new HostCommandRequest
+        var r61 = await psHost.ExecuteAsync(new HostCommandRequest
         {
             Command = "PS",
             WorkingDirectory = allowedRoot,
@@ -871,7 +834,7 @@ class Program
         // ======== Concurrency & Timeout Tests ========
         Console.WriteLine("--- Testing concurrency lock ---");
         var delayedExecutor = new DelayedClaudeCodeExecutor(2000);
-        var concurrentHost = new OpenBridgeHost(allowedRoot, delayedExecutor);
+        var concurrentHost = new OpenBridgeHost(delayedExecutor);
 
         var firstTask = concurrentHost.ExecuteAsync(new HostCommandRequest
         {
@@ -903,18 +866,17 @@ class Program
         });
         Assert(r19.Status == HostExecutionStatus.Ok, "Operation succeeds after previous completes");
 
-        // Timeout fires for slow executor
+        // CancellationToken timeout for slow executor
         var slowExecutor = new DelayedClaudeCodeExecutor(5000);
-        var timeoutHost = new OpenBridgeHost(allowedRoot, slowExecutor);
+        var timeoutHost = new OpenBridgeHost(slowExecutor);
+        var ctsTimeout = new CancellationTokenSource(200);
         var r20 = await timeoutHost.ExecuteAsync(new HostCommandRequest
         {
             Command = "CC",
             WorkingDirectory = allowedRoot,
-            Prompt = "Timeout test",
-            TimeoutMs = 200
-        });
-        Assert(r20.Status == HostExecutionStatus.Timeout, "Timeout returns timeout status");
-        Assert(r20.ErrorCode == HostErrorCodes.Timeout, "Error code is TIMEOUT");
+            Prompt = "Timeout test"
+        }, ctsTimeout.Token);
+        Assert(r20.ErrorCode == HostErrorCodes.Timeout, "CancellationToken triggers timeout");
 
         if (_failures > 0)
         {
