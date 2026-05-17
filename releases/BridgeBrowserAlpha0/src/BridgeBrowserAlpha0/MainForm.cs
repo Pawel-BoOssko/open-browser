@@ -32,7 +32,7 @@ public sealed partial class MainForm : Form
             {
                 var msg = BridgeBrowserAlpha0.OpenBridgeProtocol.OpenBridgeEnvelopeParser.ErrorToUserMessage(parseResult);
                 _log.WriteRun("runtime_approval", "envelope_parse_error", "error", msg);
-                _ = SendTextToChatAsync(msg);
+                _ = SendWithDeadlineAsync(msg);
                 return;
             }
 
@@ -47,7 +47,7 @@ public sealed partial class MainForm : Form
             {
                 var msg = $"[OpenBridge] {error}";
                 _log.WriteRun("runtime_approval", "envelope_rejected", "warning", msg);
-                _ = SendTextToChatAsync(msg);
+                _ = SendWithDeadlineAsync(msg);
             }
         };
 
@@ -113,14 +113,18 @@ public sealed partial class MainForm : Form
         return baseDelayMs + extra;
     }
 
+    private volatile bool _cycleClosed;
+
     private async Task SendTextToChatAsync(string text)
     {
         if (_webView.CoreWebView2 == null || string.IsNullOrWhiteSpace(text)) return;
+        if (_cycleClosed) return;
         try
         {
             var delayMs = ComputeHumanDelayMs();
             _log.WriteRun("runtime_approval", "human_delay", "ok", $"Delaying {delayMs}ms before inject");
             await Task.Delay(delayMs);
+            if (_cycleClosed) return;
             var safeText = System.Text.Json.JsonSerializer.Serialize(text);
             var js = "var el=document.querySelector('#prompt-textarea,.ProseMirror,[contenteditable=true]');" +
                 $"if(el){{el.focus();el.textContent={safeText};el.dispatchEvent(new Event('input',{{bubbles:true}}));" +
@@ -139,9 +143,55 @@ public sealed partial class MainForm : Form
         }
     }
 
+    private async Task InjectImmediatelyAsync(string text)
+    {
+        if (_webView.CoreWebView2 == null || string.IsNullOrWhiteSpace(text)) return;
+        try
+        {
+            var safeText = System.Text.Json.JsonSerializer.Serialize(text);
+            var js = "var el=document.querySelector('#prompt-textarea,.ProseMirror,[contenteditable=true]');" +
+                $"if(el){{el.focus();el.textContent={safeText};el.dispatchEvent(new Event('input',{{bubbles:true}}));" +
+                "setTimeout(function(){" +
+                "var btn=document.querySelector('[data-testid=\\'send-button\\']')||document.querySelector('button[aria-label*=\\'Send\\'] i')||document.querySelector('button svg');" +
+                "if(btn&&btn.tagName!=='svg'){btn.click();console.log('OpenBridge: send btn clicked');}" +
+                "else if(btn&&btn.tagName==='svg'){btn.closest('button')?.click();console.log('OpenBridge: send svg->btn clicked');}" +
+                "else{console.log('OpenBridge: no send btn, falling back');}" +
+                "},500);" +
+                "console.log('OpenBridge: immediate inject');}else{console.log('OpenBridge: no el');}";
+            await _webView.CoreWebView2.ExecuteScriptAsync(js);
+        }
+        catch (Exception ex)
+        {
+            _log.WriteRun("runtime_approval", "inject_error", "error", ex.Message);
+        }
+    }
+
+    private async Task SendWithDeadlineAsync(string text)
+    {
+        const int cycleTimeoutMs = 120_000;
+        _cycleClosed = false;
+        var deadline = Task.Delay(cycleTimeoutMs);
+        var work = SendTextToChatAsync(text);
+        var completed = await Task.WhenAny(work, deadline);
+        if (completed == deadline)
+        {
+            _cycleClosed = true;
+            _log.WriteRun("runtime_approval", "cycle_timeout", "error", "Error feedback cycle timeout");
+            await InjectImmediatelyAsync("[OpenBridge] Timeout: no response within 120s.");
+        }
+        else
+        {
+            _cycleClosed = true;
+            await work;
+        }
+    }
+
     private async Task ExecuteAndInjectResultAsync()
     {
-        try
+        const int cycleTimeoutMs = 120_000;
+        _cycleClosed = false;
+
+        async Task DoCycleAsync()
         {
             var result = await _runtimeApproval.ExecutePendingAsync();
             var output = result.StdoutPreview ?? "";
@@ -160,8 +210,30 @@ public sealed partial class MainForm : Form
                 SetStatus(result.Status == HostExecutionStatus.Ok ? "OK" : "Failed: " + result.ErrorCode);
             }
         }
+
+        try
+        {
+            var deadline = Task.Delay(cycleTimeoutMs);
+            var work = DoCycleAsync();
+            var completed = await Task.WhenAny(work, deadline);
+
+            if (completed == deadline)
+            {
+                _cycleClosed = true;
+                ShowOutputResult("Timeout: cycle exceeded 120s");
+                _log.WriteRun("runtime_approval", "cycle_timeout", "error", "Cycle timeout — injecting fallback");
+                await InjectImmediatelyAsync("[OpenBridge] Timeout: no response within 120s.");
+                SetStatus("Timeout");
+            }
+            else
+            {
+                _cycleClosed = true;
+                await work;
+            }
+        }
         catch (Exception ex)
         {
+            _cycleClosed = true;
             ShowOutputResult("Execution error: " + ex.Message);
             SetStatus("Execution error: " + ex.Message);
             _log.WriteRun("runtime_approval", "host_execution_failed", "error", ex.Message);
