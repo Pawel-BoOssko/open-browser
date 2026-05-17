@@ -84,7 +84,24 @@ Expected: output contains "file written". File `test-output.txt` created.
 ```
 Expected: output contains `TEST_008_FILE_OK`.
 
-### Test 10 — Empty prompt rejection
+### Test 10 — Base64 payload (payload64)
+```
+@@OPENBRIDGE_EXEC_BEGIN@@
+{"version":"001","command":"PS","payload64":"V3JpdGUtT3V0cHV0ICdURVNUXzAxMF9CQVNFNjRfT0sn"}
+@@OPENBRIDGE_EXEC_END@@
+```
+The payload64 decodes to: `Write-Output 'TEST_010_BASE64_OK'`
+Expected: output contains `TEST_010_BASE64_OK`.
+
+### Test 11 — Payload + payload64 combined
+```
+@@OPENBRIDGE_EXEC_BEGIN@@
+{"version":"001","command":"PS","payload":"Write-Output 'TEST_011_PREFIX'","payload64":"V3JpdGUtT3V0cHV0ICdURVNUXzAxMV9CQVNFNjRfT0sn"}
+@@OPENBRIDGE_EXEC_END@@
+```
+Expected: output contains both `TEST_011_PREFIX` and `TEST_011_BASE64_OK`.
+
+### Test 12 — Empty prompt rejection
 ```
 @@OPENBRIDGE_EXEC_BEGIN@@
 {"version":"001","command":"PS"}
@@ -94,7 +111,7 @@ Expected: error message containing "empty" or "PROMPT_EMPTY".
 
 ---
 
-## After all 10 tests
+## After all 12 tests
 
 Save the full report to: `D:\projects\open-browser\test-results.md`
 

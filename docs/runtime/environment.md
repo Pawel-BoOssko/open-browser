@@ -80,7 +80,7 @@ To run the infrastructure test plan, read the file:
 ```
 Get-Content D:\projects\open-browser\test-plan.md
 ```
-Then execute all 10 tests in order, recording results after each test.
+Then execute all 12 tests in order, recording results after each test.
 
 After completing all tests, save the results to:
 ```
