@@ -20,7 +20,11 @@ public sealed partial class MainForm : Form
         _extractor = new ResponseExtractor(_log);
         _moduleManager = new BridgeBrowserModuleManager(_log);
         _messageHandler = new WebViewMessageHandler(_log, _extractor, () => { });
-        _runtimeApproval = new OpenBridgeHost.OpenBridgeRuntimeApproval(@"D:\projects\open-browser", _log);
+
+        var psExecutor = new BridgeBrowserAlpha0.OpenBridgeHost.GeneralCommand.GeneralCommandExecutor(
+            "powershell.exe", "-NoProfile -Command \"{prompt}\"");
+        var host = new OpenBridgeHost.OpenBridgeHost(psExecutor);
+        _runtimeApproval = new OpenBridgeHost.OpenBridgeRuntimeApproval(host, @"D:\projects\open-browser", _log);
 
         _extractor.OnEnvelopeDetected = parseResult =>
         {
@@ -90,7 +94,7 @@ public sealed partial class MainForm : Form
     {
         try
         {
-            var result = await _runtimeApproval.ApproveDryRunAsync();
+            var result = await _runtimeApproval.ExecutePendingAsync();
             var output = result.StdoutPreview ?? "";
             if (string.IsNullOrWhiteSpace(output))
                 output = result.StderrPreview ?? "";

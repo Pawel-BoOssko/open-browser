@@ -303,7 +303,7 @@ class Program
         // ======== Runtime Approval Tests ========
         Console.WriteLine("--- Runtime Approval Tests ---");
 
-        var approval = new OpenBridgeRuntimeApproval(allowedRoot);
+        var approval = new OpenBridgeRuntimeApproval(host, allowedRoot);
 
         var env27 = new OpenBridgeEnvelopeParseResult
         {
@@ -326,14 +326,14 @@ class Program
         Assert(!ok28, "Second candidate is rejected while first pending");
         Assert(err28 != null && err28.Contains("pending"), "Error mentions pending");
 
-        var result29 = await approval.ApproveDryRunAsync();
+        var result29 = await approval.ExecutePendingAsync();
         Assert(result29.Status == HostExecutionStatus.Ok, "PS approve returns Ok status");
         Assert(result29.StdoutPreview != null && result29.StdoutPreview.Contains("test_ok"), "PS stdout contains expected output");
         Assert(!approval.HasPending, "HasPending is false after approve");
 
         Assert(approval.LastResult == result29, "LastResult stores execution result");
 
-        var result30 = await approval.ApproveDryRunAsync();
+        var result30 = await approval.ExecutePendingAsync();
         Assert(result30.Status == HostExecutionStatus.Error, "Approve with no pending returns error");
         Assert(result30.ErrorCode == HostErrorCodes.ExecutorError, "Error code is EXECUTOR_ERROR");
 
@@ -401,7 +401,7 @@ class Program
             Envelope = new OpenBridgeEnvelope { Version = "001", Command = "PS", Payload = "Write-Output test_result" }
         };
         approval.TrySetPending(env36, out _);
-        var result36 = await approval.ApproveDryRunAsync();
+        var result36 = await approval.ExecutePendingAsync();
         Assert(!string.IsNullOrEmpty(result36.OperationId), "Result has operation_id");
         Assert(result36.DurationMs >= 0, "Result has duration");
         var resultSummary36 = approval.ResultSummary();

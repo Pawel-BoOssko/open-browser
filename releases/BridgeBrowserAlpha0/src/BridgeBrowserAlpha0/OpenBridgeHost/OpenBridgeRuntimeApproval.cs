@@ -1,11 +1,10 @@
-using BridgeBrowserAlpha0.OpenBridgeHost.Commands;
-using BridgeBrowserAlpha0.OpenBridgeHost.GeneralCommand;
 using BridgeBrowserAlpha0.OpenBridgeProtocol;
 
 namespace BridgeBrowserAlpha0.OpenBridgeHost;
 
 public class OpenBridgeRuntimeApproval
 {
+    private readonly OpenBridgeHost _host;
     private readonly string _workingDirectory;
     private readonly LogWriter? _log;
     private readonly object _gate = new();
@@ -14,8 +13,9 @@ public class OpenBridgeRuntimeApproval
     public HostCommandResult? LastResult { get; private set; }
     public bool HasPending => PendingCommand != null;
 
-    public OpenBridgeRuntimeApproval(string workingDirectory, LogWriter? log = null)
+    public OpenBridgeRuntimeApproval(OpenBridgeHost host, string workingDirectory, LogWriter? log = null)
     {
+        _host = host;
         _workingDirectory = workingDirectory;
         _log = log;
     }
@@ -54,7 +54,7 @@ public class OpenBridgeRuntimeApproval
         }
     }
 
-    public async Task<HostCommandResult> ApproveDryRunAsync()
+    public async Task<HostCommandResult> ExecutePendingAsync()
     {
         HostCommandRequest request;
         lock (_gate)
@@ -69,11 +69,7 @@ public class OpenBridgeRuntimeApproval
             "Starting execution via Host",
             new { command = request.Command });
 
-        IOpenBridgeCommandExecutor executor = new GeneralCommandExecutor(
-            "powershell.exe", "-NoProfile -Command \"{prompt}\"");
-
-        var host = new OpenBridgeHost(executor);
-        var result = await host.ExecuteAsync(request);
+        var result = await _host.ExecuteAsync(request);
 
         lock (_gate) { LastResult = result; }
 
