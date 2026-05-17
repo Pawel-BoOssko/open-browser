@@ -90,6 +90,11 @@ public class GeneralCommandExecutor : IOpenBridgeCommandExecutor
 
             var stdout = await stdoutTask.ConfigureAwait(false);
             var stderr = await stderrTask.ConfigureAwait(false);
+
+            var max = request.MaxOutputChars > 0 ? request.MaxOutputChars : 50_000;
+            var stdoutTrunc = stdout.Length > max;
+            var stderrTrunc = stderr.Length > max;
+
             var ok = process.ExitCode == 0;
 
             return new HostCommandResult
@@ -97,11 +102,13 @@ public class GeneralCommandExecutor : IOpenBridgeCommandExecutor
                 Status = ok ? HostExecutionStatus.Ok : HostExecutionStatus.Error,
                 OperationId = opId,
                 DurationMs = ElapsedMs(startedAt),
-                StdoutPreview = stdout,
-                StderrPreview = stderr,
+                StdoutPreview = stdoutTrunc ? stdout[..max] + "\n[... truncated ...]" : stdout,
+                StderrPreview = stderrTrunc ? stderr[..max] + "\n[... truncated ...]" : stderr,
                 ExitCode = process.ExitCode,
                 ErrorCode = ok ? null : $"EXIT_CODE_{process.ExitCode}",
-                Message = ok ? "Process completed." : $"Process exited with code {process.ExitCode}."
+                Message = ok ? "Process completed." : $"Process exited with code {process.ExitCode}.",
+                StdoutFullTruncated = stdoutTrunc,
+                StderrFullTruncated = stderrTrunc
             };
         }
     }
