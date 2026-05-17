@@ -91,7 +91,7 @@ public class ClaudeCodeExecutor : IClaudeCodeExecutor
             executablePath = resolved;
         }
 
-        var arguments = BuildArguments(request.Prompt ?? "");
+        var arguments = BuildArguments(request);
         var maxChars = request.MaxOutputChars > 0 ? request.MaxOutputChars : _options.DefaultMaxOutputChars;
 
         var psi = new ProcessStartInfo
@@ -167,11 +167,13 @@ public class ClaudeCodeExecutor : IClaudeCodeExecutor
         }
     }
 
-    private string BuildArguments(string prompt)
+    private string BuildArguments(HostCommandRequest request)
     {
         var template = _options.ArgumentsTemplate;
-        if (string.IsNullOrEmpty(template)) return prompt;
-        return template.Replace("{prompt}", prompt, StringComparison.Ordinal);
+        if (string.IsNullOrEmpty(template)) return request.Prompt ?? "";
+        return template
+            .Replace("{prompt}", request.Prompt ?? "", StringComparison.Ordinal)
+            .Replace("{workingDirectory}", request.WorkingDirectory ?? "", StringComparison.Ordinal);
     }
 
     private static string? FindOnPath(string executable)
