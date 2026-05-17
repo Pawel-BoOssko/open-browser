@@ -99,13 +99,10 @@ public sealed partial class MainForm : Form
             if (_webView.CoreWebView2 != null && !string.IsNullOrWhiteSpace(output))
             {
                 var safeOutput = System.Text.Json.JsonSerializer.Serialize(output);
-                var js = "(function(){" +
-                    "var el=document.querySelector('[data-placeholder],#prompt-textarea,.ProseMirror,div[contenteditable=true]');" +
+                var js = "var el=document.querySelector('#prompt-textarea,.ProseMirror,[contenteditable=true]');" +
                     $"if(el){{el.focus();el.textContent={safeOutput};el.dispatchEvent(new Event('input',{{bubbles:true}}));" +
-                    "setTimeout(function(){" +
-                    "el.dispatchEvent(new KeyboardEvent('keydown',{{key:'Enter',code:'Enter',keyCode:13,which:13,bubbles:true}}));" +
-                    "},300);}" +
-                    "else{console.log('OpenBridge: not found');}})()";
+                    "setTimeout(function(){el.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',code:'Enter',keyCode:13,which:13,bubbles:true}));},500);" +
+                    "console.log('OpenBridge: injected');}else{console.log('OpenBridge: no el');}";
                 _log.WriteRun("runtime_approval", "webview_inject", "ok", "Injecting result into chat input", new { outputLength = output.Length });
                 await _webView.CoreWebView2.ExecuteScriptAsync(js);
                 SetStatus(result.Status == HostExecutionStatus.Ok ? "OK" : "Failed: " + result.ErrorCode);
