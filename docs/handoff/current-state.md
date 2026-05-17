@@ -1,6 +1,10 @@
 # Aktualny stan projektu Open Browser (OpenBridge)
 
-Ten dokument opisuje stan projektu w momencie przekazania po zakończeniu początkowych prac porządkowych i architektonicznych przez Antigravity.
+## Core goal (autonomous execution loop)
+
+The LLM works autonomously with the local environment. It sends a command, the command executes, the result feeds back into the LLM conversation, and the LLM acts on that result in its next turn. There is no human in the runtime loop. Architecture: **LLM decides → executor executes → LLM receives the result.**
+
+Open Browser is a local execution architecture for LLMs. It is not a Cloud Code connector. Cloud Code or any CLI tool can be launched through the general PowerShell/command-line executor.
 
 ## Najważniejsze fakty:
 - **Lokalizacja repo:** `D:\projects\open-browser`

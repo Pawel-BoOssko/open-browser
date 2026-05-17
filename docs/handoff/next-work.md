@@ -1,6 +1,8 @@
 # Proponowana kolejność dalszych prac (Next Work)
 
-Ten dokument sugeruje podzielony na sekwencyjne etapy schemat dalszego wdrażania projektu po etapie "pasywnego parsera", minimalizujący narzut na ryzyka regresji systemu i odchyleń od zatwierdzonych ram projektu.
+## Current priority: close the autonomous execution loop
+
+The LLM must work autonomously: send command → executor executes → result feeds back to LLM conversation. No human in the runtime loop. The remaining gap is result delivery from Host back to the WebView conversation.
 
 ## Etap A: Domknięcie procesu karty bez Hosta
 - **Cel:** Ostatnie ewentualne sprzątanie plików i izolowanie warstw przed wprowadzeniem w projekt logiki biznesowej, która dotknie wykonywania poleceń.

@@ -773,33 +773,33 @@ watchdog
 
 ---
 
-## 26. Runtime command approval
+## 26. Autonomous execution loop
 
-26a. OpenBridge envelopes detected in runtime must not execute automatically.
+26a. The LLM works autonomously with the local environment. It sends a command, the command executes, the result feeds back into the conversation, and the LLM acts on that result in its next turn.
 
-26b. A valid envelope detection creates a pending command candidate, not an execution order.
+26b. There is no human in the loop during runtime. The human built the system, configured the sandbox, and decided what resources to expose — but the human is not a runtime participant.
 
-26c. Operator approval is mandatory before Host execution.
+26c. The architecture is: **LLM decides, executor executes, LLM receives the result.** The loop is fully automatic.
 
-26d. First runtime execution integration must use DryRun only. Process mode from runtime requires a later explicit decision.
+26d. The runtime approval panel (human Approve/Reject buttons) is superseded by this decision. It will be removed or bypassed in a future implementation step.
 
-26e. Result delivery to the LLM conversation is not approved yet. The first runtime milestone stops at operator-visible result.
+26e. Result delivery back to the LLM conversation is mandatory. The LLM must see the output of the commands it issued.
 
-26f. Automatic WebView result injection is not approved yet.
+26f. Safety boundaries are provided by the OS, the sandbox, and the working directory configuration — not by a human gate at runtime.
 
-26g. Every Process-mode CC operation requires individual operator approval. No batch approval. No "remember this choice."
+26g. Envelopes inside code blocks, with parse errors, or in multiple-envelope responses must not execute. These are structural safety rules, not human-judgment gates.
 
-26h. Envelopes inside code blocks, with parse errors, or in multiple-envelope responses must not execute.
-
-26i. The observer remains passive. Execution is triggered by the runtime approval layer, not by the observer.
+26h. Open Browser is a local execution architecture for LLMs. It is not a Cloud Code connector. Cloud Code or any other CLI tool can be launched through the general PowerShell/command-line executor, the same as any other local tool.
 
 ---
 
 # Open decisions
 
-1. Exact timeout configuration model in layer/executor definitions.
-2. Executor type after auditing the working pattern.
-3. Final command for listing available LLM instances.
-4. Final cross-tab commands.
-5. Watchdog/recovery details.
-6. Exact implementation of linguistic response variants for system responses.
+1. Exact mechanism for result delivery back to the LLM conversation (system message injection, chat input paste, structured response).
+2. Whether the approval panel should be removed entirely or kept as an optional debug/audit view.
+3. Exact timeout configuration model in layer/executor definitions.
+4. Executor type after auditing the working pattern.
+5. Final command for listing available LLM instances.
+6. Final cross-tab commands.
+7. Watchdog/recovery details.
+8. Exact implementation of linguistic response variants for system responses.
