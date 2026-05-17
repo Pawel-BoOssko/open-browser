@@ -639,7 +639,7 @@ class Program
         approval.TrySetPending(env48, out _);
         var result48 = await approval.ApproveDryRunAsync();
         Assert(result48.Status == HostExecutionStatus.Ok, "DryRun approval works");
-        Assert(result48.Message != null && result48.Message.Contains("No real process was launched"), "Result confirms no real Claude process");
+        Assert(result48.Message != null && result48.Message.Contains("No real process was launched"), "Result confirms no real process launched");
 
         // 49. Process approval with missing config returns controlled error
         var noConfigPath = Path.Combine(Path.GetTempPath(), "openbridge_nonexistent_config.json");
@@ -833,7 +833,7 @@ class Program
 
         // ======== Concurrency & Timeout Tests ========
         Console.WriteLine("--- Testing concurrency lock ---");
-        var delayedExecutor = new DelayedClaudeCodeExecutor(2000);
+        var delayedExecutor = new DelayedCommandExecutor(2000);
         var concurrentHost = new OpenBridgeHost(delayedExecutor);
 
         var firstTask = concurrentHost.ExecuteAsync(new HostCommandRequest
@@ -867,7 +867,7 @@ class Program
         Assert(r19.Status == HostExecutionStatus.Ok, "Operation succeeds after previous completes");
 
         // CancellationToken timeout for slow executor
-        var slowExecutor = new DelayedClaudeCodeExecutor(5000);
+        var slowExecutor = new DelayedCommandExecutor(5000);
         var timeoutHost = new OpenBridgeHost(slowExecutor);
         var ctsTimeout = new CancellationTokenSource(200);
         var r20 = await timeoutHost.ExecuteAsync(new HostCommandRequest
@@ -890,11 +890,11 @@ class Program
         }
     }
 
-    private sealed class DelayedClaudeCodeExecutor : ClaudeCodeExecutor
+    private sealed class DelayedCommandExecutor : CommandExecutor
     {
         private readonly int _delayMs;
 
-        public DelayedClaudeCodeExecutor(int delayMs) : base(new CommandExecutorOptions())
+        public DelayedCommandExecutor(int delayMs) : base(new CommandExecutorOptions())
         {
             _delayMs = delayMs;
         }
