@@ -11,9 +11,22 @@ public static class OpenBridgeHostCommandMapper
         request = null;
         error = null;
 
+        if (string.Equals(envelope.Command, "HST_HELP", StringComparison.OrdinalIgnoreCase))
+        {
+            request = new HostCommandRequest
+            {
+                Command = "HST_HELP",
+                WorkingDirectory = defaultWorkingDirectory,
+                Prompt = "HST_HELP",
+                TimeoutMs = 5000,
+                MaxOutputChars = 50_000
+            };
+            return true;
+        }
+
         if (!string.Equals(envelope.Command, "PS", StringComparison.OrdinalIgnoreCase))
         {
-            error = $"Command not supported: {envelope.Command}. Only PS is accepted.";
+            error = $"Command not supported: {envelope.Command}. Only PS and HST_HELP are accepted.";
             return false;
         }
 

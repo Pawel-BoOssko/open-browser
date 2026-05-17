@@ -65,6 +65,13 @@ public class OpenBridgeRuntimeApproval
             PendingCommand = null;
         }
 
+        if (string.Equals(request.Command, "HST_HELP", StringComparison.OrdinalIgnoreCase))
+        {
+            var helpResult = ExecuteHelpCommand();
+            lock (_gate) { LastResult = helpResult; }
+            return helpResult;
+        }
+
         _log?.WriteRun("runtime_approval", "execution_started", "ok",
             "Starting execution via Host",
             new { command = request.Command });
@@ -129,6 +136,46 @@ public class OpenBridgeRuntimeApproval
             return $"OperationId: {LastResult.OperationId}  Status: {LastResult.Status}  " +
                    $"Duration: {LastResult.DurationMs}ms  ExitCode: {LastResult.ExitCode}  " +
                    $"Message: {LastResult.Message}";
+        }
+    }
+
+    private HostCommandResult ExecuteHelpCommand()
+    {
+        try
+        {
+            var runtimeDoc = Path.Combine(_workingDirectory, "docs", "runtime", "environment.md");
+            if (File.Exists(runtimeDoc))
+            {
+                var content = File.ReadAllText(runtimeDoc);
+                return new HostCommandResult
+                {
+                    Status = HostExecutionStatus.Ok,
+                    OperationId = Guid.NewGuid().ToString("N")[..12],
+                    DurationMs = 0,
+                    StdoutPreview = content,
+                    ExitCode = 0,
+                    Message = "HST_HELP completed."
+                };
+            }
+            return new HostCommandResult
+            {
+                Status = HostExecutionStatus.Error,
+                OperationId = Guid.NewGuid().ToString("N")[..12],
+                DurationMs = 0,
+                ErrorCode = HostErrorCodes.ExecutorError,
+                Message = "Runtime documentation not found."
+            };
+        }
+        catch (Exception ex)
+        {
+            return new HostCommandResult
+            {
+                Status = HostExecutionStatus.Error,
+                OperationId = Guid.NewGuid().ToString("N")[..12],
+                DurationMs = 0,
+                ErrorCode = HostErrorCodes.ExecutorError,
+                Message = $"Failed to read runtime docs: {ex.Message}"
+            };
         }
     }
 
