@@ -1,8 +1,9 @@
 # Claude Code Executor Decisions
 
-Status: approved implementation decisions
+Status: historical — some decisions superseded by autonomous execution loop (additional-architecture-decisions.md section 26)
 Created: 2026-05-16
 Parent: [claude-code-executor-design.md](claude-code-executor-design.md)
+Note: Decision 8 (result delivery) is superseded — result delivery to LLM is now mandatory per the autonomous loop goal.
 
 ---
 

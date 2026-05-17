@@ -1,7 +1,7 @@
 # Runtime Command Approval Design
 
-Status: design + DryRun-only implementation
-Date: 2026-05-16 (design), 2026-05-16 (DryRun implementation)
+Status: SUPERSEDED — replaced by autonomous execution loop (see additional-architecture-decisions.md section 26). The human-approval model described in this document is no longer the project direction. The approval panel exists but will be removed or bypassed.
+Date: 2026-05-16 (original), 2026-05-17 (superseded)
 
 ---
 

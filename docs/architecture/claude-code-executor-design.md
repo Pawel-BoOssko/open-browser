@@ -1,8 +1,8 @@
 # Claude Code Executor Design
 
-Status: draft design document
+Status: superseded — see additional-architecture-decisions.md section 26 (Autonomous execution loop)
 Created: 2026-05-16
-Commit: 062e793 (at time of writing)
+Note: This document was written when Cloud Code was the primary executor direction. The project has since pivoted to a general PowerShell/command-line executor. Cloud Code is just one CLI tool among many that PowerShell can launch. The autonomous execution loop (LLM decides → executor executes → LLM receives result) replaces the human-approval model described here.
 
 ---
 
