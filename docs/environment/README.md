@@ -1,10 +1,10 @@
 # docs/environment/
 
-**Po co ten folder:** Archiwalne opisy możliwości środowiska OpenBridge. Zawartość jest stopniowo migrowana do `docs/runtime/` (dla modelu) i `docs/development/decisions.md` (dla decyzji).
+**Purpose:** Legacy environment capability descriptions. Contents are being migrated to `docs/runtime/` (for the runtime model) and `docs/development/decisions.md` (for decisions).
 
-**Stworzony przez:** poprzednich agentów, README dodane przez Claude Code 2026-05-18.
+**Created by:** Previous agents. README added by Claude Code, 2026-05-18.
 
-**Zasady:**
-1. Nowe opisy capabilities nie trafiają tu — idą do `docs/runtime/` lub `docs/development/`.
-2. Pliki historyczne trafiają do `D:\projects\old-files\`.
-3. Ten folder jest w trakcie wygaszania.
+**Rules:**
+1. New capability descriptions do not go here — they go to `docs/runtime/` or `docs/development/`.
+2. Historical files go to `D:\projects\old-files\`.
+3. This folder is being phased out.

@@ -1,12 +1,12 @@
 # docs/development/
 
-**Po co ten folder:** Dokumenty dla modeli AI (Claude Code, ChatGPT, Opus i innych), które rozwijają kod Open Browser. Tu śledzimy co zrobione, co planowane, jakie obowiązują zasady i decyzje.
+**Purpose:** Documents for AI agents (Claude Code, ChatGPT, Opus, and others) that develop the Open Browser codebase. Tracks what has been done, what is planned, and what rules and decisions are in effect.
 
-**Stworzony przez:** Claude Code, 2026-05-18.
+**Created by:** Claude Code, 2026-05-18.
 
-**Zasady:**
-1. Czytaj `README.md` tego folderu przed rozpoczęciem pracy.
-2. `journal.md` — luźny dziennik rozwoju. Po każdej sesji: data, co dodane/zmienione/usunięte, pomysły.
-3. `rules.md` — obowiązujące zasady pracy: build, testy, commity, zakazy.
-4. `decisions.md` — tylko żywe decyzje architektoniczne, jednozdaniowo, z datą.
-5. Żadnych formalnych "handoffów" w tym folderze. Handoff to jednorazowy dokument w `handoff/`, po użyciu do `old-files`.
+**Rules:**
+1. Read this README before starting work.
+2. `journal.md` — loose development journal. After each session: date, what was added/changed/removed, ideas.
+3. `rules.md` — current working rules: build, tests, commits, prohibitions.
+4. `decisions.md` — only active architectural decisions, one line + date per decision.
+5. No formal handoff documents in this folder. Handoffs are one-shot documents in `docs/handoff/`; after use they go to `D:\projects\old-files\`.

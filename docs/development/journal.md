@@ -1,56 +1,58 @@
-# Dziennik rozwoju
+# Development Journal
 
-Luźna, chronologiczna lista co się zmieniło. Najnowsze na górze.
+A loose, chronological list of changes. Most recent first.
 
 ---
 
 ## 2026-05-18
 
-- **dodane:** wersjonowanie z gita — build number = `git rev-list --count HEAD`, hash = `git rev-parse --short HEAD`, data z kropkami. Wyświetlane w tytule okna.
-- **dodane:** human delay (20s baza + rozkład normalny: mean=22s, std=11s, min=0, max=50s). W `SendTextToChatAsync` — obejmuje wynik i błędy.
-- **dodane:** `docs/development/` i `docs/runtime/` — nowa struktura dokumentacji.
-- **dodane:** `docs/README.md` — indeks docs/ z zasadami.
-- **przeniesione:** 10 historycznych plików docs do `old-files/`.
-- **zmiana:** uporządkowane `D:\projects\` — stare testowe repo do `old-files/`.
+- **added:** Git-based versioning — build number = `git rev-list --count HEAD`, hash = `git rev-parse --short HEAD`, date with dots. Shown in window title.
+- **added:** Human delay (20s base + truncated normal distribution: mean=22s, std=11s, min=0, max=50s). Applied in `SendTextToChatAsync` — covers both success and error paths.
+- **added:** `docs/development/` and `docs/runtime/` — new documentation structure.
+- **added:** `docs/README.md` — docs index with rules.
+- **added:** README in every docs subfolder with purpose, creator, date, and rules.
+- **added:** Rule: when you create a folder, you must add a README with purpose/creator/date/rules. Enter a folder → read its README first.
+- **moved:** 10 historical docs files to `old-files/`.
+- **change:** Cleaned up `D:\projects\` — old test repos moved to `old-files/`.
 
-## 2026-05-17 (późne)
+## 2026-05-17 (late)
 
-- **dodane:** truncation stdout/stderr w `GeneralCommandExecutor` — `MaxOutputChars` (domyślnie 50k), znacznik `[... truncated ...]`.
-- **dodane:** pierwsza koperta tylko — parser bierze pierwsze `@@OPENBRIDGE_EXEC_BEGIN@@`, ignoruje resztę.
-- **dodane:** feedback błędów do LLM — każda próba koperty dostaje odpowiedź (błąd parsera, nieobsługiwana komenda, pusty prompt, busy). `SendTextToChatAsync` wysyła `[OpenBridge] ...` do czatu.
-- **usunięte:** `CommandExecutor`, `CommandExecutorOptions`, `CommandExecutorOptionsLoader`, `CommandExecutorMode` — martwy kod po Cloud Code.
-- **usunięte:** `ApproveProcessAsync`, `IsProcessAvailable`, `ProcessAvailableMessage` z `OpenBridgeRuntimeApproval`.
-- **zmiana:** `OpenBridgeHost` — executor wymagany w konstruktorze (bez defaultu).
-- **zmiana:** `OpenBridgeRuntimeApproval` — przyjmuje `OpenBridgeHost` przez konstruktor.
-- **zmiana:** `ApproveDryRunAsync` → `ExecutePendingAsync`.
-- **zmiana:** `GeneralCommandExecutor` — walidacja pustego prompta (`PROMPT_EMPTY`).
+- **added:** stdout/stderr truncation in `GeneralCommandExecutor` — `MaxOutputChars` (default 50k), `[... truncated ...]` marker.
+- **added:** First envelope only — parser takes the first `@@OPENBRIDGE_EXEC_BEGIN@@`, ignores everything after `@@OPENBRIDGE_EXEC_END@@`.
+- **added:** Error feedback to LLM — every envelope attempt gets a response (parse error, unsupported command, empty prompt, busy). `SendTextToChatAsync` sends `[OpenBridge] ...` to chat.
+- **removed:** `CommandExecutor`, `CommandExecutorOptions`, `CommandExecutorOptionsLoader`, `CommandExecutorMode` — dead code from Cloud Code era.
+- **removed:** `ApproveProcessAsync`, `IsProcessAvailable`, `ProcessAvailableMessage` from `OpenBridgeRuntimeApproval`.
+- **change:** `OpenBridgeHost` — executor now required in constructor (no default).
+- **change:** `OpenBridgeRuntimeApproval` — now takes `OpenBridgeHost` via constructor (shared Host).
+- **change:** `ApproveDryRunAsync` renamed to `ExecutePendingAsync`.
+- **change:** `GeneralCommandExecutor` — empty prompt validation (`PROMPT_EMPTY`).
 
-## 2026-05-17 (wczesne)
+## 2026-05-17 (early)
 
-- **dodane:** auto-execution — koperta wykryta → PS wykonane → wynik wstrzyknięty do `#prompt-textarea.ProseMirror` → Send kliknięty.
-- **dodane:** Message ID dedup — `_observedMessageIds` w `ResponseExtractor.Finish()` zapobiega ponownemu przetwarzaniu tej samej wiadomości.
-- **dodane:** observer tylko z nowych ramek — `GetCurrentAnswerTextForFrames(newFrames)` zamiast pełnego `GetCurrentAnswerText()`.
-- **usunięte:** cooldown 15s — zastąpiony przez message ID dedup.
-- **dodane:** Send button click — szuka `[data-testid='send-button']`, potem `button[aria-label*='Send']`, potem `button svg`.
-- **dodane:** ikona (ChatGPT PNG, konwersja przez `Bitmap.GetHicon()`).
-- **dodane:** timestamp kompilacji w tytule okna.
-- **usunięte:** duplikat `_buildLabel` z paska statusu.
-- **zmiana:** markery kopert z `<<<OPENBRIDGE:EXEC:BEGIN>>>` na `@@OPENBRIDGE_EXEC_BEGIN@@` (hard migration).
-- **usunięte:** komenda CC (Cloud Code) — tylko PS akceptowane.
-- **zmiana:** `IClaudeCodeExecutor` → `IOpenBridgeCommandExecutor`.
-- **zmiana:** `ClaudeCodeExecutor` → `CommandExecutor` (później usunięty).
-- **dodane:** `GeneralCommandExecutor` — uruchamia dowolny proces przez `System.Diagnostics.Process`.
-- **sprzątnięcie UI:** usunięte nieużywane przyciski, panel diagnostyczny, result text selectable.
-- **dodane:** `PipelineRawDump` — diagnostyczne zrzuty na każdym etapie pipeline.
-- **naprawione:** CDP body routing do ResponseExtractor przez `isCdpConversationBody` bypass.
-- **naprawione:** rekurencyjne odpakowanie CDP body (loop do 5).
-- **dodane:** `_sawPageStream` gate na CDP dane po WebSocket.
+- **added:** Auto-execution — envelope detected → PS executed → result injected into `#prompt-textarea.ProseMirror` → Send clicked.
+- **added:** Message ID dedup — `_observedMessageIds` in `ResponseExtractor.Finish()` prevents re-processing the same message.
+- **added:** Observer scoped to new frames only — `GetCurrentAnswerTextForFrames(newFrames)` instead of full `GetCurrentAnswerText()`.
+- **removed:** 15s cooldown — replaced by message ID dedup.
+- **added:** Send button click — searches `[data-testid='send-button']`, then `button[aria-label*='Send']`, then `button svg`.
+- **added:** App icon (ChatGPT PNG, loaded via `Bitmap.GetHicon()`).
+- **added:** Build timestamp in window title.
+- **removed:** Duplicate `_buildLabel` from status bar.
+- **change:** Envelope markers from `<<<OPENBRIDGE:EXEC:BEGIN>>>` to `@@OPENBRIDGE_EXEC_BEGIN@@` (hard migration, no backward compatibility).
+- **removed:** CC command (Cloud Code) — only PS accepted by mapper.
+- **change:** `IClaudeCodeExecutor` → `IOpenBridgeCommandExecutor`.
+- **change:** `ClaudeCodeExecutor` → `CommandExecutor` (later removed entirely).
+- **added:** `GeneralCommandExecutor` — runs any executable via `System.Diagnostics.Process`.
+- **UI cleanup:** Removed unused buttons, diagnostics panel; result text made selectable.
+- **added:** `PipelineRawDump` — diagnostic dumps at every pipeline stage.
+- **fixed:** CDP body routing to ResponseExtractor via `isCdpConversationBody` bypass.
+- **fixed:** Recursive CDP body unwrap (loop up to 5 levels).
+- **added:** `_sawPageStream` gate to block CDP data after WebSocket messages.
 
-## 2026-05-16 i wcześniej
+## 2026-05-16 and earlier
 
-- Struktura projektu: `MainForm`, `PageTap.js`, `ResponseExtractor`, `NetworkLogger`, `BrowserTabRuntime`, `WebViewMessageHandler`.
+- Project structure: `MainForm`, `PageTap.js`, `ResponseExtractor`, `NetworkLogger`, `BrowserTabRuntime`, `WebViewMessageHandler`.
 - OpenBridge Protocol: `OpenBridgeEnvelopeParser`, `OpenBridgeEnvelopeObserver`, `OpenBridgeHostCommandMapper`.
 - `OpenBridgeHost`, `HostCommandRequest`, `HostCommandResult`, `HostErrorCodes`.
-- Smoke testy: `OpenBridgeProtocolSmoke`, `OpenBridgeHostSmoke`, `ResponseExtractorSmoke`.
-- Usunięty stary `BridgeBrowserHelper` i Cloud Code connector.
-- `config/local/` w `.gitignore`.
+- Smoke tests: `OpenBridgeProtocolSmoke`, `OpenBridgeHostSmoke`, `ResponseExtractorSmoke`.
+- Removed legacy `BridgeBrowserHelper` and Cloud Code connector.
+- `config/local/` in `.gitignore`.

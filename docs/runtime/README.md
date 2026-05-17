@@ -1,10 +1,10 @@
 # docs/runtime/
 
-**Po co ten folder:** Dokumenty dla modelu LLM, który działa WEWNĄTRZ Open Browser. Model nie zna historii projektu ani kodu — potrzebuje tylko wiedzieć: kim jest, co może robić, jak wysyłać komendy.
+**Purpose:** Documents for the LLM running INSIDE Open Browser at runtime. This model has no knowledge of the project's history or source code. It only needs to know: who it is, what it can do, and how to send commands.
 
-**Stworzony przez:** Claude Code, 2026-05-18.
+**Created by:** Claude Code, 2026-05-18.
 
-**Zasady:**
-1. Wszystko w jednym pliku lub minimalnej liczbie plików — model nie ma kontekstu na wielostronicową dokumentację.
-2. Tylko informacje potrzebne w runtime. Zero historii, zero architektury, zero kodu C#.
-3. Format kopert i lista komend muszą być zawsze aktualne — to jest kontrakt między systemem a modelem.
+**Rules:**
+1. Keep everything in a single file (or the smallest possible number of files). The runtime model has no context for multi-page documentation.
+2. Runtime information only — no project history, no architecture, no C# source references.
+3. The envelope format and command list must always be current. This is the contract between the system and the model.
