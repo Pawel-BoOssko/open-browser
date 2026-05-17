@@ -38,7 +38,15 @@ Obowiązują wszystkich agentów (Claude Code, ChatGPT, Opus i inne) pracującyc
 20. Gdy potrzebna decyzja architektoniczna — zatrzymaj się, przedstaw opcje, czekaj na użytkownika.
 21. Po podjęciu decyzji — zapisz ją w `docs/development/decisions.md`.
 
+## Dokumentacja
+
+21. Każdy nowy folder w `docs/` musi mieć `README.md`: po co folder, kto stworzył, kiedy, jakie zasady.
+22. Wchodzisz do folderu — najpierw czytasz jego `README.md`.
+23. `docs/development/journal.md` aktualizuj po każdej sesji — data + co zrobione.
+24. `docs/development/decisions.md` aktualizuj po każdej podjętej decyzji architektonicznej.
+25. Pliki historyczne/superseded trafiają do `D:\projects\old-files\` z nazwą: `<opis>__by-<autor>__keep-until-YYYYMMDD`.
+
 ## Po sesji
 
-22. Zaktualizuj `docs/development/journal.md` — dodaj datę i co zrobione/zmienione.
-23. Jeśli powstał handoff — trafia do `docs/handoff/`, po użyciu do `old-files/`.
+26. Zaktualizuj `docs/development/journal.md` — dodaj datę i co zrobione/zmienione.
+27. Jeśli powstał handoff — trafia do `docs/handoff/`, po użyciu do `old-files/`.
