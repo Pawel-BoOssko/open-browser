@@ -27,9 +27,9 @@ public sealed partial class MainForm : Form
             var ok = _runtimeApproval.TrySetPending(parseResult, out var error);
             if (ok)
             {
-                var processAvail = _runtimeApproval.IsProcessAvailable();
-                var processMsg = _runtimeApproval.ProcessAvailableMessage();
-                ShowPendingCommand(_runtimeApproval.PendingSummary(), processAvail, processMsg);
+                SetStatus("Executing command...");
+                ShowApprovalResult("Executing...");
+                _ = ExecuteAndInjectResultAsync();
             }
             else
             {
@@ -42,8 +42,6 @@ public sealed partial class MainForm : Form
         InitializeUi();
 
         _hideWebButton.Click += (_, _) => ToggleWebVisibility();
-        _approveDryRunButton.Click += async (_, _) => await ExecuteCommandAsync();
-        _rejectButton.Click += (_, _) => RejectRuntimeCommand();
         _copyDetailsButton.Click += (_, _) => CopyApprovalPrompt();
         _copyResultButton.Click += (_, _) => CopyApprovalOutput();
 
@@ -87,16 +85,35 @@ public sealed partial class MainForm : Form
         }
     }
 
-    private async Task ExecuteCommandAsync()
+    private async Task ExecuteAndInjectResultAsync()
     {
         try
         {
-            SetStatus("Executing...");
-            ShowApprovalResult("Executing...");
             var result = await _runtimeApproval.ApproveDryRunAsync();
             var output = result.StdoutPreview ?? "";
+            if (string.IsNullOrWhiteSpace(output))
+                output = result.StderrPreview ?? "";
             ShowApprovalResult(output);
-            SetStatus(result.Status == HostExecutionStatus.Ok ? "OK" : "Failed: " + result.ErrorCode);
+
+            if (_webView.CoreWebView2 != null && !string.IsNullOrWhiteSpace(output))
+            {
+                var escaped = output
+                    .Replace("\\", "\\\\")
+                    .Replace("`", "\\`")
+                    .Replace("$", "\\$")
+                    .Replace("\r", "")
+                    .Replace("\n", "\\n");
+                var js = "(function(){var el=document.querySelector('[data-placeholder],#prompt-textarea,.ProseMirror,div[contenteditable=true]');" +
+                         $"if(el){{el.focus();el.textContent=`{escaped}`;el.dispatchEvent(new Event('input',{{bubbles:true}}));" +
+                         "setTimeout(function(){var btn=document.querySelector('[data-testid=send-button],button[aria-label=Send],button.absolute');" +
+                         "if(btn){btn.click();}}},300);}})()";
+                await _webView.CoreWebView2.ExecuteScriptAsync(js);
+                SetStatus(result.Status == HostExecutionStatus.Ok ? "OK" : "Failed: " + result.ErrorCode);
+            }
+            else
+            {
+                SetStatus(result.Status == HostExecutionStatus.Ok ? "OK" : "Failed: " + result.ErrorCode);
+            }
         }
         catch (Exception ex)
         {
@@ -104,13 +121,6 @@ public sealed partial class MainForm : Form
             SetStatus("Execution error: " + ex.Message);
             _log.WriteRun("runtime_approval", "host_execution_failed", "error", ex.Message);
         }
-    }
-
-    private void RejectRuntimeCommand()
-    {
-        _runtimeApproval.Reject();
-        SetStatus("Command rejected.");
-        HidePendingCommand();
     }
 
     private void CopyApprovalPrompt()
