@@ -169,7 +169,7 @@ public sealed partial class MainForm : Form
 
     private async Task SendWithDeadlineAsync(string text)
     {
-        const int cycleTimeoutMs = 120_000;
+        const int cycleTimeoutMs = 360_000;
         _cycleClosed = false;
         var deadline = Task.Delay(cycleTimeoutMs);
         var work = SendTextToChatAsync(text);
@@ -178,7 +178,7 @@ public sealed partial class MainForm : Form
         {
             _cycleClosed = true;
             _log.WriteRun("runtime_approval", "cycle_timeout", "error", "Error feedback cycle timeout");
-            await InjectImmediatelyAsync("[OpenBridge] Timeout: no response within 120s.");
+            await InjectImmediatelyAsync("[OpenBridge] Timeout: no response within 360s. Your command may have already executed — check before retrying. Results may have been saved to a file. For long operations: redirect output to a file and read it in the next step, or split the operation into shorter stages.");
         }
         else
         {
@@ -189,7 +189,7 @@ public sealed partial class MainForm : Form
 
     private async Task ExecuteAndInjectResultAsync()
     {
-        const int cycleTimeoutMs = 120_000;
+        const int cycleTimeoutMs = 360_000;
         _cycleClosed = false;
 
         async Task DoCycleAsync()
@@ -217,9 +217,9 @@ public sealed partial class MainForm : Form
             if (completed == deadline)
             {
                 _cycleClosed = true;
-                ShowOutputResult("Timeout: cycle exceeded 120s");
+                ShowOutputResult("Timeout: cycle exceeded 360s");
                 _log.WriteRun("runtime_approval", "cycle_timeout", "error", "Cycle timeout — injecting fallback");
-                await InjectImmediatelyAsync("[OpenBridge] Timeout: no response within 120s.");
+                await InjectImmediatelyAsync("[OpenBridge] Timeout: no response within 360s. Your command may have already executed — check before retrying. Results may have been saved to a file. For long operations: redirect output to a file and read it in the next step, or split the operation into shorter stages.");
                 SetStatus("Timeout");
             }
             else
