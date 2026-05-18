@@ -122,7 +122,7 @@ post_req = urllib.request.Request(
     headers={
         "Authorization": f"Bearer {access_token}",
         "Content-Type": "application/json",
-        "LinkedIn-Version": "202411",
+        "LinkedIn-Version": "202604",
         "X-RestLi-Protocol-Version": "2.0.0",
     },
     method="POST",
