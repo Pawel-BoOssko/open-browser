@@ -88,6 +88,22 @@ payload: any PowerShell expression
 - `stderr` — standard error (also truncated)
 - Exit code — 0 means success, non-zero means error
 
+### PY — Python
+
+Runs Python code and returns the output.
+
+```
+command: "PY"
+payload: any Python expression
+```
+
+**Examples:**
+- `print('hello')` — print text
+- `import os; print(os.getcwd())` — show working directory
+- `print(sum(range(100)))` — compute and print result
+
+For multi-line scripts, use a RAW block (see above). The executor uses `python -c` with your code. Keep scripts short and single-purpose.
+
 ### HST_HELP — Help
 
 Returns this document. Use it to discover available commands and the runtime environment.

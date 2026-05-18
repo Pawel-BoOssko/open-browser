@@ -1,3 +1,4 @@
+using BridgeBrowserAlpha0.OpenBridgeHost.GeneralCommand;
 using BridgeBrowserAlpha0.OpenBridgeProtocol;
 
 namespace BridgeBrowserAlpha0.OpenBridgeHost;
@@ -13,11 +14,15 @@ public class OpenBridgeRuntimeApproval
     public HostCommandResult? LastResult { get; private set; }
     public bool HasPending => PendingCommand != null;
 
+    private readonly OpenBridgeHost _pythonHost;
+
     public OpenBridgeRuntimeApproval(OpenBridgeHost host, string workingDirectory, LogWriter? log = null)
     {
         _host = host;
         _workingDirectory = workingDirectory;
         _log = log;
+        _pythonHost = new OpenBridgeHost(
+            new GeneralCommand.GeneralCommandExecutor("python", "-c \"{prompt}\""));
     }
 
     public bool TrySetPending(OpenBridgeEnvelopeParseResult parseResult, out string? error)
@@ -84,6 +89,19 @@ public class OpenBridgeRuntimeApproval
             var statusResult = ExecuteStatusCommand();
             lock (_gate) { LastResult = statusResult; }
             return statusResult;
+        }
+
+        if (string.Equals(request.Command, "PY", StringComparison.OrdinalIgnoreCase))
+        {
+            _log?.WriteRun("runtime_approval", "execution_started", "ok",
+                "Starting Python execution", new { command = "PY" });
+            var pyResult = await _pythonHost.ExecuteAsync(request);
+            lock (_gate) { LastResult = pyResult; }
+            _log?.WriteRun("runtime_approval", "execution_finished",
+                pyResult.Status == HostExecutionStatus.Ok ? "ok" : "error",
+                pyResult.Message ?? "",
+                new { pyResult.Status, pyResult.DurationMs, pyResult.ExitCode });
+            return pyResult;
         }
 
         _log?.WriteRun("runtime_approval", "execution_started", "ok",
