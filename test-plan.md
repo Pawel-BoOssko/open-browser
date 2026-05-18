@@ -1,26 +1,30 @@
-# OpenBridge Infrastructure Test Plan
+# OpenBridge Infrastructure Test Plan v2
 
-Run these tests one by one. After each test, record the result.
-Execute all 10 tests, then save the full report.
+Run all tests in order. Record pass/fail after each. Save the full report at the end.
 
-## Test procedure
+## Prompt for the model
 
-For each test:
-1. Send an envelope with the specified command.
-2. Wait for the result to appear in chat.
-3. Record: test number, pass/fail, what you received, any errors.
+> Read `D:\projects\open-browser\test-plan.md` via `Get-Content`. Execute all tests in order. After each test, record the result. After all tests, save the report to `D:\projects\open-browser\test-results.md` using a PowerShell command. Do not skip any test. Continue until all are done.
 
 ## Tests
 
-### Test 1 — Basic PS echo
+### Test 1 — PS echo
 ```
 @@OPENBRIDGE_EXEC_BEGIN@@
 {"version":"001","command":"PS","payload":"Write-Output 'TEST_001_OK'"}
 @@OPENBRIDGE_EXEC_END@@
 ```
-Expected: output contains `TEST_001_OK`, exit code 0.
+Expected: output contains `TEST_001_OK`, humanizer prefix present.
 
-### Test 2 — Get-Location
+### Test 2 — HST_HELP
+```
+@@OPENBRIDGE_EXEC_BEGIN@@
+{"version":"001","command":"HST_HELP"}
+@@OPENBRIDGE_EXEC_END@@
+```
+Expected: help text with "Open Bridge Runtime Environment", humanizer prefix present.
+
+### Test 3 — Get-Location
 ```
 @@OPENBRIDGE_EXEC_BEGIN@@
 {"version":"001","command":"PS","payload":"Get-Location"}
@@ -28,99 +32,80 @@ Expected: output contains `TEST_001_OK`, exit code 0.
 ```
 Expected: output contains `D:\projects\open-browser`.
 
-### Test 3 — HST_HELP metacommand
-```
-@@OPENBRIDGE_EXEC_BEGIN@@
-{"version":"001","command":"HST_HELP"}
-@@OPENBRIDGE_EXEC_END@@
-```
-Expected: output contains "Open Bridge Runtime Environment", "PS", "HST_HELP".
-
-### Test 4 — Unsupported command (error feedback)
-```
-@@OPENBRIDGE_EXEC_BEGIN@@
-{"version":"001","command":"INVALID_CMD","payload":"test"}
-@@OPENBRIDGE_EXEC_END@@
-```
-Expected: error message containing `[OpenBridge]`, mention of "not supported" or "Only PS".
-
-### Test 5 — Process exit code (non-zero)
+### Test 4 — Non-zero exit code
 ```
 @@OPENBRIDGE_EXEC_BEGIN@@
 {"version":"001","command":"PS","payload":"exit 7"}
 @@OPENBRIDGE_EXEC_END@@
 ```
-Expected: error status, exit code 7, containing `EXIT_CODE_7`.
+Expected: message `Process exited with code 7. No output.` (no silence).
 
-### Test 6 — Working directory respected
+### Test 5 — Unsupported command (error feedback)
 ```
 @@OPENBRIDGE_EXEC_BEGIN@@
-{"version":"001","command":"PS","payload":"Set-Location D:\\projects; Get-Location"}
+{"version":"001","command":"INVALID_CMD","payload":"test"}
 @@OPENBRIDGE_EXEC_END@@
 ```
-Expected: output contains `D:\projects`.
+Expected: error message with "not supported", humanizer prefix present.
 
-### Test 7 — stderr capture
-```
-@@OPENBRIDGE_EXEC_BEGIN@@
-{"version":"001","command":"PS","payload":"[Console]::Error.WriteLine('TEST_007_STDERR')"}
-@@OPENBRIDGE_EXEC_END@@
-```
-Expected: stderr contains `TEST_007_STDERR`.
-
-### Test 8 — Write file (real side effect)
-```
-@@OPENBRIDGE_EXEC_BEGIN@@
-{"version":"001","command":"PS","payload":"Write-Output 'TEST_008_FILE_OK' | Out-File -FilePath 'D:\\projects\\open-browser\\test-output.txt' -Encoding UTF8; Write-Output 'file written'"}
-@@OPENBRIDGE_EXEC_END@@
-```
-Expected: output contains "file written". File `test-output.txt` created.
-
-### Test 9 — Read the file back
-```
-@@OPENBRIDGE_EXEC_BEGIN@@
-{"version":"001","command":"PS","payload":"Get-Content 'D:\\projects\\open-browser\\test-output.txt'"}
-@@OPENBRIDGE_EXEC_END@@
-```
-Expected: output contains `TEST_008_FILE_OK`.
-
-### Test 10 — Base64 payload (payload64)
-```
-@@OPENBRIDGE_EXEC_BEGIN@@
-{"version":"001","command":"PS","payload64":"V3JpdGUtT3V0cHV0ICdURVNUXzAxMF9CQVNFNjRfT0sn"}
-@@OPENBRIDGE_EXEC_END@@
-```
-The payload64 decodes to: `Write-Output 'TEST_010_BASE64_OK'`
-Expected: output contains `TEST_010_BASE64_OK`.
-
-### Test 11 — Payload + payload64 combined
-```
-@@OPENBRIDGE_EXEC_BEGIN@@
-{"version":"001","command":"PS","payload":"Write-Output 'TEST_011_PREFIX'","payload64":"V3JpdGUtT3V0cHV0ICdURVNUXzAxMV9CQVNFNjRfT0sn"}
-@@OPENBRIDGE_EXEC_END@@
-```
-Expected: output contains both `TEST_011_PREFIX` and `TEST_011_BASE64_OK`.
-
-### Test 12 — Empty prompt rejection
+### Test 6 — Empty prompt rejection
 ```
 @@OPENBRIDGE_EXEC_BEGIN@@
 {"version":"001","command":"PS"}
 @@OPENBRIDGE_EXEC_END@@
 ```
-Expected: error message containing "empty" or "PROMPT_EMPTY".
+Expected: error message with "empty" or "PROMPT_EMPTY".
+
+### Test 7 — payload64 (base64)
+```
+@@OPENBRIDGE_EXEC_BEGIN@@
+{"version":"001","command":"PS","payload64":"V3JpdGUtT3V0cHV0ICdURVNUXzAwN19CQVNFNjRfT0sn"}
+@@OPENBRIDGE_EXEC_END@@
+```
+Decodes to: `Write-Output 'TEST_007_BASE64_OK'`. Expected: output contains `TEST_007_BASE64_OK`.
+
+### Test 8 — stderr capture
+```
+@@OPENBRIDGE_EXEC_BEGIN@@
+{"version":"001","command":"PS","payload":"[Console]::Error.WriteLine('TEST_008_STDERR')"}
+@@OPENBRIDGE_EXEC_END@@
+```
+Expected: stderr contains `TEST_008_STDERR`.
+
+### Test 9 — Write then read file
+```
+@@OPENBRIDGE_EXEC_BEGIN@@
+{"version":"001","command":"PS","payload":"Write-Output 'TEST_009_FILE_OK' | Out-File -FilePath 'D:\\projects\\open-browser\\test-output.txt' -Encoding UTF8; Get-Content 'D:\\projects\\open-browser\\test-output.txt'"}
+@@OPENBRIDGE_EXEC_END@@
+```
+Expected: output contains `TEST_009_FILE_OK`.
+
+### Test 10 — Humanizer variety check
+Run Test 1 again and compare the humanizer prefix to Test 1's prefix. They must be different (no same prefix twice in a row).
+```
+@@OPENBRIDGE_EXEC_BEGIN@@
+{"version":"001","command":"PS","payload":"Write-Output 'TEST_001_OK'"}
+@@OPENBRIDGE_EXEC_END@@
+```
+Expected: `TEST_001_OK` present, humanizer prefix DIFFERENT from Test 1.
 
 ---
 
-## After all 12 tests
+## Report format
 
-Save the full report to: `D:\projects\open-browser\test-results.md`
-
-Use this PowerShell command to write the file:
+Save to `D:\projects\open-browser\test-results.md`:
 
 ```
-@@OPENBRIDGE_EXEC_BEGIN@@
-{"version":"001","command":"PS","payload":"@'\n# OpenBridge Infrastructure Test Results\n\nDate: ...\n\n| Test | Result | Details |\n|------|--------|----------|\n| 1 | PASS/FAIL | ... |\n...\n'@ | Out-File -FilePath 'D:\\projects\\open-browser\\test-results.md' -Encoding UTF8"}
-@@OPENBRIDGE_EXEC_END@@
-```
+# OpenBridge Infrastructure Test Results v2
 
-Fill in the actual results for each test in the table.
+Date: ...
+
+| Test | Result | Details |
+|------|--------|---------|
+| 1 | PASS/FAIL | ... |
+| 2 | PASS/FAIL | ... |
+...
+| 10 | PASS/FAIL | ... |
+
+Summary: X PASS, Y FAIL.
+```
