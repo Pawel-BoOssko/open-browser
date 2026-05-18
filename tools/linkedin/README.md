@@ -1,8 +1,10 @@
 # tools/linkedin/
 
-**Purpose:** Python scripts for posting to LinkedIn via the OAuth 2.0 PKCE flow and LinkedIn REST API. No external callback server needed — uses a temporary local HTTP server on port 8787.
+**Purpose:** Python scripts for posting to LinkedIn via OAuth 2.0 and LinkedIn REST API. Uses the official LinkedIn Python client for reliable token exchange. Callback via local HTTP server on port 8787.
 
 **Created by:** Claude Code, 2026-05-18.
+
+**Prerequisite:** `pip install linkedin-api-client`
 
 **Rules:**
 1. First-time setup requires human interaction (browser authorization). After that, the model can post autonomously.
