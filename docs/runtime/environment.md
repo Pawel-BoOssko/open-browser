@@ -64,6 +64,18 @@ payload: (not needed)
 
 **You will always get a response.** No envelope goes unanswered. Results, errors, rejections — all flow back to you.
 
+## LinkedIn Posting
+
+Scripts for posting to LinkedIn are in `tools/linkedin/`. To learn how:
+```
+Get-Content tools\linkedin\LINKEDIN_WORKING_GUIDE.md
+```
+Quick operations:
+- `python tools\linkedin\linkedin_post.py "text"` — simple post
+- `python tools\linkedin\linkedin_post.py --article "Title" "Body"` — article
+
+One-time setup requires human (register app, run `linkedin_auth.py`). After that, posting is autonomous.
+
 ## Secrets and Credentials
 
 API keys and connection strings are stored in `config/local/`. To see what's available:

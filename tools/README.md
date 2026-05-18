@@ -15,3 +15,4 @@
 |--------|---------|
 | `n8n/` | n8n workflow management via Public API + Supabase queries |
 | `github/` | GitHub file publishing via Contents API (no local git) |
+| `linkedin/` | LinkedIn posting via OAuth 2.0 PKCE + REST API |
