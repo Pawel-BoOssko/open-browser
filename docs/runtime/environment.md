@@ -24,6 +24,12 @@ To execute a command, include an **execution envelope** in your response using t
 - `payload` contains the command to run (PowerShell syntax).
 - `payload64` — for binary or long text content. The system handles encoding/decoding automatically. See below.
 
+**Critical: never write envelope markers unless you intend to execute.**
+The markers `@@OPENBRIDGE_EXEC_BEGIN@@` and `@@OPENBRIDGE_EXEC_END@@` are ACTIVE at all times. If you write them anywhere in your response — even inside a code block, even as an example, even when discussing them — the system WILL parse and execute the first one it finds. There is no "display only" mode. There is no escaping. If you write it, it runs.
+- When explaining how envelopes work, describe them in words, never write the actual markers.
+- When showing an example, use placeholders or describe the format verbally.
+- When thinking about a command, do not quote the envelope format.
+
 ### Sending binary or long text
 
 Two methods. Use whichever fits your content.
