@@ -40,6 +40,14 @@ Only active, binding decisions. One line + date per decision. Historical or supe
 
 - **2026-05-17** Result is injected into `#prompt-textarea.ProseMirror` + Send button click (`[data-testid='send-button']`).
 - **2026-05-18** Human delay: 20s base + truncated normal distribution (mean=22s, std=11s, min=0, max=50s) before sending the response.
+- **2026-05-18** Humanizer: all LLM responses wrapped in randomized Polish text (4-slot template, 65k+ combinations) to avoid automated-response detection by backend filters.
+- **2026-05-18** Cycle timeout: 120s deadline on full execution cycle guarantees the LLM always receives a response (result or timeout fallback).
+
+## Tools
+
+- **2026-05-18** n8n tools in `tools/n8n/`: Python scripts for workflow management via n8n Public API. Generic, no hardcoded IDs.
+- **2026-05-18** GitHub tools in `tools/github/`: Python scripts for file publishing via GitHub Contents API. Generic, no hardcoded repo names.
+- **2026-05-18** All tools are self-documented with docstrings + README + working guide. Model discovers them via HST_HELP.
 
 ## Versioning
 

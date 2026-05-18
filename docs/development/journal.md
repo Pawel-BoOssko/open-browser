@@ -6,9 +6,16 @@ A loose, chronological list of changes. Most recent first.
 
 ## 2026-05-18 (later)
 
+- **added:** Humanizer — random text wrapping for all LLM responses. 4 slots × 16 variants = 65k+ combinations via Polish template. Same prefix never twice in a row. Applied in `SendTextToChatAsync`.
 - **added:** Cycle timeout — 120s deadline on full execution cycle. On timeout: `[OpenBridge] Timeout: no response within 120s.` Late responses discarded via `_cycleClosed` flag.
 - **added:** Always-send-feedback — even empty output sends `[OpenBridge] Process exited with code N. No output.`
+- **fixed:** `_shouldFinish` bool replaced with `_pendingFinishCount` counter (Interlocked) — prevents lost Finish() calls when frames finish close together.
+- **added:** `tools/n8n/` — 8 cleaned Python scripts for n8n API workflow management + Supabase queries. Secrets in `config/local/n8n/`. Docs: README + N8N_WORKING_GUIDE.md. Model can self-discover via HST_HELP.
+- **added:** `tools/github/` — 5 cleaned Python scripts for GitHub Contents API publishing. Secrets in `config/local/github/`. Docs: README + GITHUB_WORKING_GUIDE.md.
+- **added:** `tools/README.md` — index of all tools.
+- **preserved:** Mozilla Web Extensions credentials → `config/local/mozilla/`.
 - **added:** `docs/handoff/baseline-2026-05-18.md` — baseline handoff document.
+- **updated:** Test plan v2 — 10 tests including humanizer variety check.
 
 ## 2026-05-18 (early)
 
