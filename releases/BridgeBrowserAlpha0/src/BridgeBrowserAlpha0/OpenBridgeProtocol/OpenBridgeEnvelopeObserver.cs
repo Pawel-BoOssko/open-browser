@@ -42,11 +42,9 @@ public sealed class OpenBridgeEnvelopeObserver
             version = env.Version,
             command = env.Command,
             hasPayload = !string.IsNullOrEmpty(env.Payload),
-            hasPayload64 = !string.IsNullOrEmpty(env.Payload64),
             unknownFields = env.UnknownFields,
             warningCount = env.UnknownFields.Count,
-            payload64Length = env.Payload64?.Length ?? 0,
-            rawPayloadLength = env.Payload?.Length ?? 0
+            payloadLength = env.Payload?.Length ?? 0
         });
 
         return result;

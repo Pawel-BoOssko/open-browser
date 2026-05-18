@@ -63,13 +63,13 @@ public static class OpenBridgeEnvelopeParser
 
             int rawContentStart = rawBeginIndex + RawBegin.Length;
             string rawContent = envelopeContent.Substring(rawContentStart, rawEndIndex - rawContentStart);
-            
-            string base64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(rawContent), Base64FormattingOptions.None);
-            
+
+            string serialized = System.Text.Json.JsonSerializer.Serialize(rawContent);
+
             string beforeRaw = envelopeContent.Substring(0, rawBeginIndex).Trim();
             string afterRaw = envelopeContent.Substring(rawEndIndex + RawEnd.Length).Trim();
-            
-            jsonToParse = beforeRaw + "\"" + base64 + "\"" + afterRaw;
+
+            jsonToParse = beforeRaw + serialized + afterRaw;
         }
 
         try
@@ -133,27 +133,32 @@ public static class OpenBridgeEnvelopeParser
                 env.Payload = payloadProp.ValueKind == JsonValueKind.String ? payloadProp.GetString() : payloadProp.GetRawText();
             }
 
-            if (root.TryGetProperty("payload64", out JsonElement payload64Prop))
-            {
-                env.Payload64 = payload64Prop.GetString();
-            }
-
             foreach (var prop in root.EnumerateObject())
             {
-                if (prop.Name != "version" && prop.Name != "command" && prop.Name != "payload" && prop.Name != "payload64")
+                if (prop.Name != "version" && prop.Name != "command" && prop.Name != "payload")
                 {
                     env.UnknownFields.Add(prop.Name);
                 }
             }
 
             result.Envelope = env;
-            BridgeBrowserAlpha0.PipelineRawDump.Write("06_OpenBridgeEnvelopeParser.txt", env.Payload ?? env.Payload64 ?? env.Command);
+            BridgeBrowserAlpha0.PipelineRawDump.Write("06_OpenBridgeEnvelopeParser.txt", env.Payload ?? env.Command);
             return result;
         }
         catch (JsonException ex)
         {
+            var lineText = "";
+            var lineNum = (int)(ex.LineNumber ?? 0);
+            if (!string.IsNullOrEmpty(jsonToParse))
+            {
+                var lines = jsonToParse.Split('\n');
+                if (lineNum < lines.Length)
+                    lineText = lines[lineNum].Trim();
+            }
+
             result.Error = OpenBridgeEnvelopeParseError.JSON_PARSE_ERROR;
-            result.ErrorMessage = $"Line: {ex.LineNumber}, BytePosition: {ex.BytePositionInLine}, Path: {ex.Path}, Message: {ex.Message}";
+            result.ErrorMessage = $"Line {lineNum + 1}: {lineText}\n" +
+                                  $"Position {ex.BytePositionInLine}: {ex.Message}";
             return result;
         }
     }

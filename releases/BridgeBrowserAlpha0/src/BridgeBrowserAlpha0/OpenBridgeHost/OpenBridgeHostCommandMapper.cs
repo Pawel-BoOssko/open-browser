@@ -35,7 +35,7 @@ public static class OpenBridgeHostCommandMapper
         var prompt = BuildPrompt(envelope);
         if (string.IsNullOrWhiteSpace(prompt))
         {
-            error = "Prompt is empty. Provide a payload or payload64 in the envelope.";
+            error = "Prompt is empty. Provide a payload or use a RAW block in the envelope.";
             return false;
         }
 
@@ -53,33 +53,9 @@ public static class OpenBridgeHostCommandMapper
 
     private static string? BuildPrompt(OpenBridgeEnvelope envelope)
     {
-        var hasPayload = !string.IsNullOrWhiteSpace(envelope.Payload);
-        var hasPayload64 = !string.IsNullOrWhiteSpace(envelope.Payload64);
-
-        if (hasPayload && hasPayload64)
-        {
-            var decoded = DecodeBase64Utf8(envelope.Payload64!);
-            return string.IsNullOrEmpty(decoded)
-                ? envelope.Payload
-                : envelope.Payload + "\n" + decoded;
-        }
-
-        if (hasPayload) return envelope.Payload;
-        if (hasPayload64) return DecodeBase64Utf8(envelope.Payload64!);
+        if (!string.IsNullOrWhiteSpace(envelope.Payload))
+            return envelope.Payload;
 
         return null;
-    }
-
-    private static string DecodeBase64Utf8(string base64)
-    {
-        try
-        {
-            var bytes = Convert.FromBase64String(base64);
-            return Encoding.UTF8.GetString(bytes);
-        }
-        catch
-        {
-            return "";
-        }
     }
 }

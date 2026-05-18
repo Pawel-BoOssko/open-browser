@@ -36,10 +36,10 @@ class Program
         var r4 = OpenBridgeEnvelopeParser.Parse(t4);
         Assert(r4.Error == OpenBridgeEnvelopeParseError.NONE && r4.Envelope?.Payload == "dir", "Valid envelope with payload");
 
-        // 5. valid envelope with RAW block converted to payload64
-        string t5 = "@@OPENBRIDGE_EXEC_BEGIN@@\n{\"version\":\"001\", \"command\":\"FS\", \"payload64\": @@OPENBRIDGE_RAW_BEGIN@@HelloWorld@@OPENBRIDGE_RAW_END@@}\n@@OPENBRIDGE_EXEC_END@@";
+        // 5. valid envelope with RAW block — content placed in payload
+        string t5 = "@@OPENBRIDGE_EXEC_BEGIN@@\n{\"version\":\"001\", \"command\":\"FS\", \"payload\": @@OPENBRIDGE_RAW_BEGIN@@HelloWorld@@OPENBRIDGE_RAW_END@@}\n@@OPENBRIDGE_EXEC_END@@";
         var r5 = OpenBridgeEnvelopeParser.Parse(t5);
-        Assert(r5.Error == OpenBridgeEnvelopeParseError.NONE && r5.Envelope?.Payload64 == "SGVsbG9Xb3JsZA==", "RAW block to base64 payload64");
+        Assert(r5.Error == OpenBridgeEnvelopeParseError.NONE && r5.Envelope?.Payload == "HelloWorld", "RAW block content placed in payload");
 
         // 6. multiple envelopes — only first is parsed, second is ignored
         string t6 = "@@OPENBRIDGE_EXEC_BEGIN@@\n{\"version\":\"001\",\"command\":\"PS\",\"payload\":\"first\"}\n@@OPENBRIDGE_EXEC_END@@\n@@OPENBRIDGE_EXEC_BEGIN@@{\"version\":\"001\"}@@OPENBRIDGE_EXEC_END@@";
@@ -53,7 +53,7 @@ class Program
         Assert(r7.Error == OpenBridgeEnvelopeParseError.EXEC_END_MISSING, "Missing EXEC END error");
 
         // 8. missing RAW END -> error
-        string t8 = "@@OPENBRIDGE_EXEC_BEGIN@@\n{\"version\":\"001\", \"command\":\"FS\", \"payload64\": @@OPENBRIDGE_RAW_BEGIN@@Hello}\n@@OPENBRIDGE_EXEC_END@@";
+        string t8 = "@@OPENBRIDGE_EXEC_BEGIN@@\n{\"version\":\"001\", \"command\":\"FS\", \"payload\": @@OPENBRIDGE_RAW_BEGIN@@Hello}\n@@OPENBRIDGE_EXEC_END@@";
         var r8 = OpenBridgeEnvelopeParser.Parse(t8);
         Assert(r8.Error == OpenBridgeEnvelopeParseError.RAW_END_MISSING, "Missing RAW END error");
 

@@ -269,18 +269,18 @@ class Program
         Assert(req21!.Prompt == "Write-Output test_ok", "Mapped prompt comes from payload");
         Assert(req21.WorkingDirectory == allowedRoot, "Mapped working directory is default");
 
-        var payload64 = Convert.ToBase64String(Encoding.UTF8.GetBytes("Implement health check"));
-        var env22 = new OpenBridgeEnvelope { Command = "PS", Payload64 = payload64 };
+        // 22. PS envelope with payload maps
+        var env22 = new OpenBridgeEnvelope { Command = "PS", Payload = "Write-Output test_simple" };
         var ok22 = OpenBridgeHostCommandMapper.TryMap(env22, allowedRoot, 720_000, 50_000, out var req22, out var err22);
-        Assert(ok22, "PS envelope with payload64 maps successfully");
-        Assert(req22!.Prompt == "Implement health check", "Mapped prompt decoded from payload64");
+        Assert(ok22, "PS envelope with payload maps");
+        Assert(req22!.Prompt == "Write-Output test_simple", "Mapped prompt matches payload");
 
-        var p64 = Convert.ToBase64String(Encoding.UTF8.GetBytes("Write a function"));
-        var env23 = new OpenBridgeEnvelope { Command = "PS", Payload = "Implement endpoint", Payload64 = p64 };
+        // 23. PS envelope with multi-line payload maps
+        var env23 = new OpenBridgeEnvelope { Command = "PS", Payload = "Write-Output line1\nWrite-Output line2" };
         var ok23 = OpenBridgeHostCommandMapper.TryMap(env23, allowedRoot, 720_000, 50_000, out var req23, out var err23);
-        Assert(ok23, "PS envelope with both payloads maps");
-        Assert(req23!.Prompt!.Contains("Implement endpoint"), "Prompt contains payload prefix");
-        Assert(req23.Prompt.Contains("Write a function"), "Prompt contains decoded payload64");
+        Assert(ok23, "PS envelope with multi-line payload maps");
+        Assert(req23!.Prompt!.Contains("line1"), "Prompt contains first line");
+        Assert(req23.Prompt.Contains("line2"), "Prompt contains second line");
 
         var env24 = new OpenBridgeEnvelope { Command = "SH", Payload = "dir" };
         var ok24 = OpenBridgeHostCommandMapper.TryMap(env24, allowedRoot, 720_000, 50_000, out var req24, out var err24);
