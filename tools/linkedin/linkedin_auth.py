@@ -71,19 +71,17 @@ print(auth_url)
 webbrowser.open(auth_url)
 
 # --- Temporary callback server ---
-auth_code = None
-received_state = None
+_callback_result = {"auth_code": None, "received_state": None}
 
 
 class CallbackHandler(BaseHTTPRequestHandler):
     def do_GET(self):
-        nonlocal auth_code, received_state
         parsed = urllib.parse.urlparse(self.path)
         qs = urllib.parse.parse_qs(parsed.query)
 
         if parsed.path == "/callback":
-            auth_code = qs.get("code", [None])[0]
-            received_state = qs.get("state", [None])[0]
+            _callback_result["auth_code"] = qs.get("code", [None])[0]
+            _callback_result["received_state"] = qs.get("state", [None])[0]
             error = qs.get("error", [None])[0]
 
             if error:
@@ -114,13 +112,15 @@ try:
 except KeyboardInterrupt:
     pass
 
-if not auth_code:
+if not _callback_result["auth_code"]:
     print("NO_AUTH_CODE")
     raise SystemExit(1)
 
-if received_state != state:
+if _callback_result["received_state"] != state:
     print("STATE_MISMATCH")
     raise SystemExit(1)
+
+auth_code = _callback_result["auth_code"]
 
 # --- Exchange code for tokens ---
 body = urllib.parse.urlencode(
