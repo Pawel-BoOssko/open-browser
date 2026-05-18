@@ -64,6 +64,18 @@ payload: (not needed)
 
 **You will always get a response.** No envelope goes unanswered. Results, errors, rejections — all flow back to you.
 
+## Secrets and Credentials
+
+API keys and connection strings are stored in `config/local/`. To see what's available:
+```
+Get-ChildItem config\local\ -Recurse
+```
+Read the index:
+```
+Get-Content config\local\README.md
+```
+The tools read secrets automatically — you don't need to pass credentials by hand.
+
 ## Working Directory
 
 Your working directory is: `D:\projects\open-browser`
