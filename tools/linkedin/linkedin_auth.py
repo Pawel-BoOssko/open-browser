@@ -135,6 +135,7 @@ body = urllib.parse.urlencode(
         "grant_type": "authorization_code",
         "code": auth_code,
         "redirect_uri": REDIRECT_URI,
+        "client_id": CLIENT_ID,
         "code_verifier": code_verifier,
     }
 ).encode("ascii")
