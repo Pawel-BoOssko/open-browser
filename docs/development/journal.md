@@ -4,12 +4,17 @@ A loose, chronological list of changes. Most recent first.
 
 ---
 
-## 2026-05-18 (publication prep)
+## 2026-05-18 (publication)
 
+- **published:** Repository pushed to GitHub — https://github.com/Pawel-BoOssko/open-browser
 - **added:** `README.md`, `LICENSE` (MIT), `SECURITY.md` — first public-facing files
+- **added:** PY command — Python executor via `python -c`. Model can run Python directly.
+- **added:** `tools-test-plan.md` — 13 tests for model to verify n8n, GitHub, Python tools, and RAW blocks
 - **cleaned:** removed 6 tracked artifact files from repo (n8n exports, github exports, test artifacts, inter-model comms)
+- **cleaned:** removed 23MB `workflows_list.json` from entire git history (push protection blocked it)
 - **updated:** `.gitignore` — tool exports, comm files, test artifacts now ignored
-- **idea:** Tool artifacts (n8n exports, github exports) need a dedicated location outside the repo — e.g., `D:\projects\open-browser-exports\` or a runtime-specific directory. Currently discarding them during publication prep.
+- **updated:** GitHub repo — description, 7 topics set
+- **idea:** Tool artifacts need a dedicated location outside the repo
 
 ## 2026-05-18 (LinkedIn)
 
