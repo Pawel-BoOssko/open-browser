@@ -57,13 +57,14 @@ params = urllib.parse.urlencode(
         "response_type": "code",
         "client_id": CLIENT_ID,
         "redirect_uri": REDIRECT_URI,
-        "scope": SCOPE,
         "state": state,
         "code_challenge": code_challenge,
         "code_challenge_method": "S256",
     }
 )
-auth_url = f"{AUTH_ENDPOINT}?{params}"
+# LinkedIn requires %20 for scope spaces, not +
+scope_encoded = urllib.parse.quote(SCOPE, safe="")
+auth_url = f"{AUTH_ENDPOINT}?{params}&scope={scope_encoded}"
 
 print("Opening browser for LinkedIn authorization...")
 print("If the browser doesn't open, visit:")
