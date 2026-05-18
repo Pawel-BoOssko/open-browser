@@ -4,7 +4,13 @@ A loose, chronological list of changes. Most recent first.
 
 ---
 
-## 2026-05-18
+## 2026-05-18 (later)
+
+- **added:** Cycle timeout — 120s deadline on full execution cycle. On timeout: `[OpenBridge] Timeout: no response within 120s.` Late responses discarded via `_cycleClosed` flag.
+- **added:** Always-send-feedback — even empty output sends `[OpenBridge] Process exited with code N. No output.`
+- **added:** `docs/handoff/baseline-2026-05-18.md` — baseline handoff document.
+
+## 2026-05-18 (early)
 
 - **added:** `docs/runtime/environment.md` — the runtime contract for the LLM inside Open Browser (commands, envelope format, what to expect).
 - **added:** HST_HELP metacommand — model can ask system what it can do, gets `environment.md` back.
