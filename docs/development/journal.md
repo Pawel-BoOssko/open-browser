@@ -4,6 +4,16 @@ A loose, chronological list of changes. Most recent first.
 
 ---
 
+## 2026-05-18 (LinkedIn)
+
+- **added:** LinkedIn posting tools — `tools/linkedin/`. OAuth via official `linkedin-api-client`, posting via REST API.
+- **fixed:** Token exchange — manual HTTP always failed with 401 "invalid_client". Official LinkedIn Python client works immediately.
+- **learned:** App must be verified with a Company Page (Settings → Verify), not just have Products added.
+- **learned:** Use `127.0.0.1` not `localhost` for redirect URI. Use API version `202604` (not `202605`). Both `LinkedIn-Version` and `X-RestLi-Protocol-Version` headers required.
+- **learned:** Keep only ONE active client secret. Multiple secrets cause confusion.
+- **first post:** Published successfully — `urn:li:share:7462137023722774529`.
+- **docs:** `LINKEDIN_WORKING_GUIDE.md` updated with full troubleshooting checklist and lessons learned.
+
 ## 2026-05-18 (later)
 
 - **added:** Humanizer — random text wrapping for all LLM responses. 4 slots × 16 variants = 65k+ combinations via Polish template. Same prefix never twice in a row. Applied in `SendTextToChatAsync`.
