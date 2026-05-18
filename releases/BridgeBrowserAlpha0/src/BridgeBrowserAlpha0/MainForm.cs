@@ -199,16 +199,12 @@ public sealed partial class MainForm : Form
                 output = result.StderrPreview ?? "";
             ShowOutputResult(output);
 
-            if (!string.IsNullOrWhiteSpace(output))
-            {
-                _log.WriteRun("runtime_approval", "webview_inject", "ok", "Injecting result into chat input", new { outputLength = output.Length });
-                await SendTextToChatAsync(output);
-                SetStatus(result.Status == HostExecutionStatus.Ok ? "OK" : "Failed: " + result.ErrorCode);
-            }
-            else
-            {
-                SetStatus(result.Status == HostExecutionStatus.Ok ? "OK" : "Failed: " + result.ErrorCode);
-            }
+            var msg = !string.IsNullOrWhiteSpace(output)
+                ? output
+                : $"[OpenBridge] Process exited with code {result.ExitCode}. No output.";
+            _log.WriteRun("runtime_approval", "webview_inject", "ok", "Injecting result into chat input", new { outputLength = msg.Length });
+            await SendTextToChatAsync(msg);
+            SetStatus(result.Status == HostExecutionStatus.Ok ? "OK" : "Failed: " + result.ErrorCode);
         }
 
         try
