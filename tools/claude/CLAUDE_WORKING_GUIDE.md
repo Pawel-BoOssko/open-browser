@@ -10,12 +10,23 @@ Claude Code saves conversation state as session files. Each session is a persist
 ```powershell
 D:\projects\open-browser\tools\claude\claude-deepseek.ps1 -p "Your prompt here"
 ```
-Claude Code prints a session ID on startup. **Save this ID.** You will need it to resume.
+Claude Code prints the session ID in its output. Look for a line like:
+```
+Session ID: abc123def456
+```
+**Save this ID.** You will need it for every subsequent call to this session.
 
 **Resume an existing session:**
 ```powershell
 D:\projects\open-browser\tools\claude\claude-deepseek.ps1 --resume <session-id> -p "Follow-up prompt"
 ```
+The session ID is the same one from the first run.
+
+**List all past sessions for this project:**
+```powershell
+Get-ChildItem "$env:USERPROFILE\.claude\projects\D--projects-open-browser\" -Name
+```
+The filenames (without `.jsonl`) are the session IDs.
 
 **Run from a specific working directory:**
 ```powershell
