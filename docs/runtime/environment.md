@@ -22,8 +22,6 @@ To execute a command, include an **execution envelope** in your response using t
 - Only one envelope per message matters — the first one is executed, the rest are ignored.
 - The envelope must contain valid JSON with `version` and `command` fields.
 - `payload` contains the command to run (PowerShell syntax).
-- `payload64` — for binary or long text content. The system handles encoding/decoding automatically. See below.
-
 **Critical: do not reproduce envelope markers unless you intend to execute.**
 The markers `@@OPENBRIDGE_EXEC_BEGIN@@` and `@@OPENBRIDGE_EXEC_END@@` are ACTIVE at all times. You may read them and understand them. This document contains them for reference. But if you reproduce them in your own response, the system WILL parse and execute the first one it finds. There is no "display only" mode. There is no escaping. If you write the markers, it runs.
 - You may read and understand the markers shown in documentation.
@@ -31,13 +29,11 @@ The markers `@@OPENBRIDGE_EXEC_BEGIN@@` and `@@OPENBRIDGE_EXEC_END@@` are ACTIVE
 - When discussing envelopes without intending to execute, describe the format in words rather than writing the markers.
 - When thinking or reasoning about a command, do not quote the envelope format.
 
-### Sending binary or long text
+### Sending long or complex scripts
 
-Two methods. Use whichever fits your content.
+Use a RAW block when your command contains quotes, backslashes, line breaks, or is longer than 3 lines. The system automatically handles encoding — you write plain text.
 
-**Method 1 — RAW block (for long or special-char-heavy text):**
-
-Place the RAW markers INSIDE the `payload64` JSON string value. The system replaces the RAW section with base64 before JSON validation, then decodes it before execution.
+Place the RAW markers inside the envelope:
 
 ```
 @@OPENBRIDGE_EXEC_BEGIN@@
@@ -53,23 +49,14 @@ for i in range(10):
 @@OPENBRIDGE_EXEC_END@@
 ```
 
-Flow: RAW block content → base64-encoded → replaces RAW section in JSON → JSON parsed with `payload64` field → mapper decodes base64 → executor receives plain text: `print('hello world')\nfor i in range(10):\n    print(i)`
-
-**Critical:** The RAW markers must be INSIDE the `payload64` JSON string — NOT after the closing `}` and NOT inside `payload`. Putting them outside the JSON produces invalid JSON. Putting them in `payload` instead of `payload64` sends raw base64 to the executor instead of the decoded text.
-
-**Method 2 — payload64 directly in JSON (for pre-encoded content):**
-
-Put base64-encoded content directly into the `payload64` field. The system decodes it automatically.
-
+The system encodes the RAW block content and passes the decoded plain text to the executor. In this example, the executor receives:
 ```
-@@OPENBRIDGE_EXEC_BEGIN@@
-{"version":"001","command":"PS","payload64":"V3JpdGUtT3V0cHV0ICdIZWxsbyc="}
-@@OPENBRIDGE_EXEC_END@@
+print('hello world')
+for i in range(10):
+    print(i)
 ```
 
-The system decodes the base64 and passes the plain text to the executor. In this example, `V3JpdGUtT3V0cHV0ICdIZWxsbyc=` decodes to `Write-Output 'Hello'`.
-
-**Rule of thumb:** use RAW blocks for code, scripts, markdown, and long text. Use `payload64` directly only when you have pre-encoded content. In both cases, the executor receives plain decoded text — you never need to manually encode/decode.
+**Critical rule for RAW placement:** The RAW markers must be INSIDE the `payload64` JSON string — NOT after the closing `}` of the JSON object. Putting them outside the JSON produces invalid JSON and the command will not execute.
 
 ## Available Commands
 
@@ -94,7 +81,7 @@ payload: any PowerShell expression
 - The system captures exit codes, stdout, and stderr automatically — you do NOT need `$ErrorActionPreference`, `Test-Path`, `if-throw`, or extra `Write-Output` diagnostics.
 - Shorter commands are more reliable. A plain `mkdir` works. Ten lines of error handling around it only adds failure points.
 - Don't wrap a value in a variable if you use it only once. Pass it directly.
-- For scripts longer than 3 lines or containing quotes/backslashes — use Method 1 (RAW block) or Method 2 (`payload64`). This avoids JSON escaping problems.
+- For scripts longer than 3 lines or containing quotes/backslashes — use a RAW block. The system handles encoding automatically. This avoids JSON escaping problems entirely.
 
 **What you get back:**
 - `stdout` — standard output of the command (truncated at 50,000 characters)
