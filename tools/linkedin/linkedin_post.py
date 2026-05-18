@@ -9,6 +9,7 @@ Usage:
 Config: config/local/linkedin/linkedin_client.json (client_id, client_secret)
         config/local/linkedin/linkedin_tokens.json (auto-managed)
 """
+import base64
 import json
 import sys
 import urllib.error
@@ -38,15 +39,17 @@ def refresh_access_token(refresh_token):
         {
             "grant_type": "refresh_token",
             "refresh_token": refresh_token,
-            "client_id": CLIENT_ID,
-            "client_secret": CLIENT_SECRET,
         }
     ).encode("ascii")
 
+    credentials = base64.b64encode(f"{CLIENT_ID}:{CLIENT_SECRET}".encode()).decode()
     req = urllib.request.Request(
         "https://www.linkedin.com/oauth/v2/accessToken",
         data=body,
-        headers={"Content-Type": "application/x-www-form-urlencoded"},
+        headers={
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Authorization": f"Basic {credentials}",
+        },
         method="POST",
     )
     try:

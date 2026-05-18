@@ -88,7 +88,7 @@ class CallbackHandler(BaseHTTPRequestHandler):
             if error:
                 body = f"<h1>Authorization failed</h1><p>{error}</p><p>You can close this window.</p>"
                 print("AUTH_ERROR", error, qs.get("error_description", [""])[0])
-            elif auth_code:
+            elif _callback_result["auth_code"]:
                 body = "<h1>Authorization successful!</h1><p>You can close this window.</p>"
                 print("AUTH_CODE_RECEIVED")
             else:
@@ -135,16 +135,18 @@ body = urllib.parse.urlencode(
         "grant_type": "authorization_code",
         "code": auth_code,
         "redirect_uri": REDIRECT_URI,
-        "client_id": CLIENT_ID,
-        "client_secret": CLIENT_SECRET,
         "code_verifier": code_verifier,
     }
 ).encode("ascii")
 
+credentials = base64.b64encode(f"{CLIENT_ID}:{CLIENT_SECRET}".encode()).decode()
 req = urllib.request.Request(
     TOKEN_ENDPOINT,
     data=body,
-    headers={"Content-Type": "application/x-www-form-urlencoded"},
+    headers={
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Authorization": f"Basic {credentials}",
+    },
     method="POST",
 )
 
