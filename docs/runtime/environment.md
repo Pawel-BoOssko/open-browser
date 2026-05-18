@@ -94,6 +94,20 @@ Quick operations (replace `<id>` with an actual workflow ID):
 - `python tools\n8n\list_executions.py <id>` — execution history
 - `python tools\n8n\supabase_query.py "select ..."` — direct DB query
 
+## GitHub Publishing
+
+Scripts for publishing files to GitHub via API are in `tools/github/`. To learn how to use them:
+```
+Get-Content tools\github\GITHUB_WORKING_GUIDE.md
+```
+
+Quick operations:
+- `python tools\github\github_whoami.py` — check auth
+- `python tools\github\github_find_repo.py <name>` — locate repo
+- `python tools\github\github_put_file.py <local> <repo_path> [msg]` — upload file
+- `python tools\github\github_check_manifest.py` — verify manifest
+- `python tools\github\github_publish_manifest.py [--dry-run]` — batch publish
+
 ## Running Tests
 ```
 Get-Content D:\projects\open-browser\test-plan.md
