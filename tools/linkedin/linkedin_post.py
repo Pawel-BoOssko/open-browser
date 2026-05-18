@@ -40,6 +40,7 @@ def refresh_access_token(refresh_token):
             "grant_type": "refresh_token",
             "refresh_token": refresh_token,
             "client_id": CLIENT_ID,
+            "client_secret": CLIENT_SECRET,
         }
     ).encode("ascii")
 
