@@ -93,10 +93,28 @@ payload: any PowerShell expression
 
 ### HST_HELP — Help
 
-Returns this document. Use it to discover available commands.
+Returns this document. Use it to discover available commands and the runtime environment.
 
 ```
 command: "HST_HELP"
+payload: (not needed)
+```
+
+### HST_TOOLS — Tool catalog
+
+Returns a catalog of all available tools in `tools/`. Each tool is discovered automatically from its README. Use this to find out what external services are available (n8n, GitHub, LinkedIn, etc.) and whether they're configured.
+
+```
+command: "HST_TOOLS"
+payload: (not needed)
+```
+
+### HST_STATUS — Environment status
+
+Returns current system status: build info, working directory, git status, available tools, whether a command is currently pending, and the last execution result.
+
+```
+command: "HST_STATUS"
 payload: (not needed)
 ```
 
@@ -188,4 +206,4 @@ After completing all tests, save the results to:
 D:\projects\open-browser\test-results.md
 ```
 
-Use `HST_HELP` if you need to re-discover this information.
+Use `HST_HELP` to re-discover this document. Use `HST_TOOLS` to see available tools. Use `HST_STATUS` to check the current environment state.

@@ -72,6 +72,20 @@ public class OpenBridgeRuntimeApproval
             return helpResult;
         }
 
+        if (string.Equals(request.Command, "HST_TOOLS", StringComparison.OrdinalIgnoreCase))
+        {
+            var toolsResult = ExecuteToolsCommand();
+            lock (_gate) { LastResult = toolsResult; }
+            return toolsResult;
+        }
+
+        if (string.Equals(request.Command, "HST_STATUS", StringComparison.OrdinalIgnoreCase))
+        {
+            var statusResult = ExecuteStatusCommand();
+            lock (_gate) { LastResult = statusResult; }
+            return statusResult;
+        }
+
         _log?.WriteRun("runtime_approval", "execution_started", "ok",
             "Starting execution via Host",
             new { command = request.Command });
@@ -136,6 +150,157 @@ public class OpenBridgeRuntimeApproval
             return $"OperationId: {LastResult.OperationId}  Status: {LastResult.Status}  " +
                    $"Duration: {LastResult.DurationMs}ms  ExitCode: {LastResult.ExitCode}  " +
                    $"Message: {LastResult.Message}";
+        }
+    }
+
+    private HostCommandResult ExecuteToolsCommand()
+    {
+        try
+        {
+            var toolsDir = Path.Combine(_workingDirectory, "tools");
+            if (!Directory.Exists(toolsDir))
+            {
+                return new HostCommandResult
+                {
+                    Status = HostExecutionStatus.Error,
+                    OperationId = Guid.NewGuid().ToString("N")[..12],
+                    DurationMs = 0,
+                    ErrorCode = HostErrorCodes.ExecutorError,
+                    Message = "Tools directory not found."
+                };
+            }
+
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine("Available tools:");
+            sb.AppendLine();
+
+            foreach (var dir in Directory.GetDirectories(toolsDir))
+            {
+                var name = Path.GetFileName(dir);
+                var readme = Path.Combine(dir, "README.md");
+                if (File.Exists(readme))
+                {
+                    var firstLine = File.ReadLines(readme).FirstOrDefault() ?? "";
+                    sb.AppendLine($"tools/{name}/ — {firstLine.TrimStart('#', ' ')}");
+                }
+                else
+                {
+                    sb.AppendLine($"tools/{name}/");
+                }
+
+                var pyFiles = Directory.GetFiles(dir, "*.py").Select(Path.GetFileNameWithoutExtension);
+                if (pyFiles.Any())
+                {
+                    sb.AppendLine($"  Scripts: {string.Join(", ", pyFiles)}");
+                }
+
+                var tokensPath = Path.Combine(_workingDirectory, "config", "local", name, $"{name}_tokens.json");
+                var altTokensPath = Path.Combine(_workingDirectory, "config", "local", name, "linkedin_tokens.json");
+                if (File.Exists(tokensPath) || File.Exists(altTokensPath))
+                {
+                    sb.AppendLine("  Status: configured (tokens present)");
+                }
+
+                sb.AppendLine();
+            }
+
+            return new HostCommandResult
+            {
+                Status = HostExecutionStatus.Ok,
+                OperationId = Guid.NewGuid().ToString("N")[..12],
+                DurationMs = 0,
+                StdoutPreview = sb.ToString(),
+                ExitCode = 0,
+                Message = "HST_TOOLS completed."
+            };
+        }
+        catch (Exception ex)
+        {
+            return new HostCommandResult
+            {
+                Status = HostExecutionStatus.Error,
+                OperationId = Guid.NewGuid().ToString("N")[..12],
+                DurationMs = 0,
+                ErrorCode = HostErrorCodes.ExecutorError,
+                Message = $"Failed to scan tools: {ex.Message}"
+            };
+        }
+    }
+
+    private HostCommandResult ExecuteStatusCommand()
+    {
+        try
+        {
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine("Open Bridge Status");
+            sb.AppendLine("=================");
+            sb.AppendLine();
+            sb.AppendLine($"Build: {AppConstants.BuildInfo}");
+            sb.AppendLine($"Started: {AppConstants.BuildStamp}");
+            sb.AppendLine($"Working directory: {_workingDirectory}");
+            sb.AppendLine();
+
+            // Git status
+            try
+            {
+                var psi = new System.Diagnostics.ProcessStartInfo("git", "status --short")
+                {
+                    WorkingDirectory = _workingDirectory,
+                    RedirectStandardOutput = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+                using var p = System.Diagnostics.Process.Start(psi);
+                if (p != null)
+                {
+                    p.WaitForExit(3000);
+                    var gitOut = p.StandardOutput.ReadToEnd().Trim();
+                    sb.AppendLine("Git status:");
+                    sb.AppendLine(string.IsNullOrEmpty(gitOut) ? "  Clean working tree" : gitOut);
+                }
+            }
+            catch
+            {
+                sb.AppendLine("Git status: unavailable");
+            }
+            sb.AppendLine();
+
+            // Tools available
+            var toolsDir = Path.Combine(_workingDirectory, "tools");
+            if (Directory.Exists(toolsDir))
+            {
+                var toolFolders = Directory.GetDirectories(toolsDir).Select(Path.GetFileName).ToArray();
+                sb.AppendLine($"Tools: {string.Join(", ", toolFolders)}");
+            }
+            sb.AppendLine();
+
+            // Current command
+            lock (_gate)
+            {
+                sb.AppendLine($"Pending command: {(HasPending ? "yes" : "none")}");
+                sb.AppendLine($"Last result: {(LastResult != null ? LastResult.Status.ToString() : "none")}");
+            }
+
+            return new HostCommandResult
+            {
+                Status = HostExecutionStatus.Ok,
+                OperationId = Guid.NewGuid().ToString("N")[..12],
+                DurationMs = 0,
+                StdoutPreview = sb.ToString(),
+                ExitCode = 0,
+                Message = "HST_STATUS completed."
+            };
+        }
+        catch (Exception ex)
+        {
+            return new HostCommandResult
+            {
+                Status = HostExecutionStatus.Error,
+                OperationId = Guid.NewGuid().ToString("N")[..12],
+                DurationMs = 0,
+                ErrorCode = HostErrorCodes.ExecutorError,
+                Message = $"Status check failed: {ex.Message}"
+            };
         }
     }
 
