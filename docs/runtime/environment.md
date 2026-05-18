@@ -87,6 +87,14 @@ payload: any PowerShell expression
 - `Get-ChildItem` — list files
 - `Write-Output "test"` — print text
 - `dotnet build ...` — build a project
+- `mkdir D:\projects\open-browser\new-folder` — create a directory
+
+**Keep commands simple:**
+- Prefer short, single-purpose commands. Complexity creates errors.
+- The system captures exit codes, stdout, and stderr automatically — you do NOT need `$ErrorActionPreference`, `Test-Path`, `if-throw`, or extra `Write-Output` diagnostics.
+- Shorter commands are more reliable. A plain `mkdir` works. Ten lines of error handling around it only adds failure points.
+- Don't wrap a value in a variable if you use it only once. Pass it directly.
+- For scripts longer than 3 lines or containing quotes/backslashes — use Method 1 (RAW block) or Method 2 (`payload64`). This avoids JSON escaping problems.
 
 **What you get back:**
 - `stdout` — standard output of the command (truncated at 50,000 characters)
