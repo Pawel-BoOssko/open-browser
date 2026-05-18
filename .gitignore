@@ -18,3 +18,16 @@ tools/local/
 TestResults/
 *.cache
 config/local/
+
+# Tool artifacts (runtime output)
+tools/*/exports/*.json
+!tools/*/exports/.gitkeep
+
+# Inter-model communication files
+linkedin-response.md
+linkedin-response.lastread.txt
+
+# Test artifacts
+test-output.txt
+test-results.md
+test-plan.md

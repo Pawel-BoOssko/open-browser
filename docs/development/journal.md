@@ -4,6 +4,13 @@ A loose, chronological list of changes. Most recent first.
 
 ---
 
+## 2026-05-18 (publication prep)
+
+- **added:** `README.md`, `LICENSE` (MIT), `SECURITY.md` — first public-facing files
+- **cleaned:** removed 6 tracked artifact files from repo (n8n exports, github exports, test artifacts, inter-model comms)
+- **updated:** `.gitignore` — tool exports, comm files, test artifacts now ignored
+- **idea:** Tool artifacts (n8n exports, github exports) need a dedicated location outside the repo — e.g., `D:\projects\open-browser-exports\` or a runtime-specific directory. Currently discarding them during publication prep.
+
 ## 2026-05-18 (LinkedIn)
 
 - **added:** LinkedIn posting tools — `tools/linkedin/`. OAuth via official `linkedin-api-client`, posting via REST API.
