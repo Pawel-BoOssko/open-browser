@@ -74,9 +74,27 @@ Your working directory is: `D:\projects\open-browser`
 - Only one command runs at a time. If a command is already running, new envelopes are rejected.
 - Only the `PS` command is available for execution. Other commands will be rejected with a message.
 
-## Running Tests
+## n8n Workflow Management
 
-To run the infrastructure test plan, read the file:
+Scripts for managing n8n workflows via API are in `tools/n8n/`. To learn how to use them:
+```
+Get-Content tools\n8n\N8N_WORKING_GUIDE.md
+```
+Or explore the available scripts:
+```
+Get-ChildItem tools\n8n\*.py
+```
+
+Quick operations (replace `<id>` with an actual workflow ID):
+- `python tools\n8n\list_workflows.py` — list all workflows
+- `python tools\n8n\get_workflow.py <id>` — download a workflow
+- `python tools\n8n\create_workflow.py <payload.json>` — create new
+- `python tools\n8n\update_workflow.py <id> <payload.json>` — update existing
+- `python tools\n8n\activate_workflow.py <id>` / `deactivate_workflow.py <id>`
+- `python tools\n8n\list_executions.py <id>` — execution history
+- `python tools\n8n\supabase_query.py "select ..."` — direct DB query
+
+## Running Tests
 ```
 Get-Content D:\projects\open-browser\test-plan.md
 ```
