@@ -107,11 +107,17 @@ class CallbackHandler(BaseHTTPRequestHandler):
 
 
 server = HTTPServer(("localhost", PORT), CallbackHandler)
-server.timeout = 120  # max 2 minutes for user to authorize
-try:
-    server.handle_request()
-except KeyboardInterrupt:
-    pass
+server.timeout = 5  # per-request timeout
+deadline = 180  # total 3 minutes
+elapsed = 0
+print(f"Waiting for authorization on http://localhost:{PORT}/callback ...")
+while not _callback_result["auth_code"] and elapsed < deadline:
+    try:
+        server.handle_request()
+        elapsed += 5
+    except KeyboardInterrupt:
+        break
+server.server_close()
 
 if not _callback_result["auth_code"]:
     print("NO_AUTH_CODE")
