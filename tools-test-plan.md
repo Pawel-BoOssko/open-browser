@@ -113,6 +113,30 @@ Write-Output "SHOULD_NOT_RUN"
 ```
 Expected: error message — invalid JSON. RAW block placed outside JSON object.
 
+## Part 5: Research — propose new tools
+
+Do a broad research exercise. Think about what external services, APIs, or automation would be useful from inside Open Browser.
+
+Explore the environment:
+```
+Get-ChildItem tools\ -Recurse -Directory | Select-Object FullName
+HST_TOOLS
+```
+
+Then write your proposals to a file. Consider:
+- Email (Gmail, Outlook)
+- Calendar (Google, Outlook)
+- Web automation (government portals, form filling, data extraction)
+- Messaging (Slack, Discord, WhatsApp)
+- Knowledge (Notion, Obsidian)
+- Storage (Google Drive, OneDrive)
+- Data (Apify, scrapers)
+- Anything else you think would be useful
+
+For each proposal, state: what it does, what API/auth it needs, and how complex it would be to implement as a `tools/<name>/` module.
+
+Save your proposals to: `D:\projects\open-browser\tool-proposals.md`
+
 ---
 
 ## After all tests
@@ -136,6 +160,11 @@ Date: ...
 | G4 | PASS/FAIL | ... |
 | P1 | PASS/FAIL | ... |
 | P2 | PASS/FAIL | ... |
+| R1 | PASS/FAIL | ... |
+| R2 | PASS/FAIL | ... |
+| R3 | PASS/FAIL | ... |
 
-Summary: X PASS, Y FAIL.
+Research task: proposals saved to `D:\projects\open-browser\tool-proposals.md`
+
+Summary: X PASS, Y FAIL. X proposals submitted.
 ```
