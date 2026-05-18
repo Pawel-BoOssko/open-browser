@@ -37,24 +37,25 @@ Two methods. Use whichever fits your content.
 
 **Method 1 — RAW block (for long or special-char-heavy text):**
 
-Wrap your text between RAW markers INSIDE the envelope. The system automatically converts it to base64 before processing.
+Place the RAW markers INSIDE the `payload64` JSON string value. The system replaces the RAW section with base64 before JSON validation, then decodes it before execution.
 
 ```
 @@OPENBRIDGE_EXEC_BEGIN@@
 {
   "version": "001",
   "command": "PS",
-  "payload": "python -c"
-}
-@@OPENBRIDGE_RAW_BEGIN@@
+  "payload64": "@@OPENBRIDGE_RAW_BEGIN@@
 print('hello world')
 for i in range(10):
     print(i)
-@@OPENBRIDGE_RAW_END@@
+@@OPENBRIDGE_RAW_END@@"
+}
 @@OPENBRIDGE_EXEC_END@@
 ```
 
-The system converts the RAW block content to base64 and stores it as `payload64`. The executor receives the DECODED text. You write plain text — the system handles encoding.
+Flow: RAW block content → base64-encoded → replaces RAW section in JSON → JSON parsed with `payload64` field → mapper decodes base64 → executor receives plain text: `print('hello world')\nfor i in range(10):\n    print(i)`
+
+**Critical:** The RAW markers must be INSIDE the `payload64` JSON string — NOT after the closing `}` and NOT inside `payload`. Putting them outside the JSON produces invalid JSON. Putting them in `payload` instead of `payload64` sends raw base64 to the executor instead of the decoded text.
 
 **Method 2 — payload64 directly in JSON (for pre-encoded content):**
 
