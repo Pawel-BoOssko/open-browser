@@ -9,10 +9,10 @@ Usage:
 Config: config/local/linkedin/linkedin_client.json (client_id, client_secret)
         config/local/linkedin/linkedin_tokens.json (auto-managed)
 """
-import base64
 import json
 import sys
 import urllib.error
+import urllib.parse
 import urllib.request
 from pathlib import Path
 
@@ -44,14 +44,10 @@ def refresh_access_token(refresh_token):
         }
     ).encode("ascii")
 
-    credentials = base64.b64encode(f"{CLIENT_ID}:{CLIENT_SECRET}".encode()).decode()
     req = urllib.request.Request(
         "https://www.linkedin.com/oauth/v2/accessToken",
         data=body,
-        headers={
-            "Content-Type": "application/x-www-form-urlencoded",
-            "Authorization": f"Basic {credentials}",
-        },
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
         method="POST",
     )
     try:
@@ -61,7 +57,6 @@ def refresh_access_token(refresh_token):
         print("REFRESH_ERROR", e.code, e.read().decode("utf-8", errors="replace")[:1000])
         raise SystemExit(1)
 
-    # Preserve refresh_token if not included in response
     if "refresh_token" not in new_tokens:
         new_tokens["refresh_token"] = refresh_token
     TOKEN_PATH.write_text(json.dumps(new_tokens, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
@@ -89,7 +84,6 @@ try:
         person_urn = f"urn:li:person:{user_info['sub']}"
         print("AUTHOR", user_info.get("name", user_info.get("sub")))
 except urllib.error.HTTPError as e:
-    # Try refreshing and retry once
     refresh_token = tokens.get("refresh_token")
     if refresh_token and e.code == 401:
         print("Token expired, refreshing...")
@@ -165,7 +159,6 @@ post_id = result.get("id", "unknown")
 post_urn = f"urn:li:post:{post_id}"
 print("POST_OK", post_urn)
 
-# Save result
 out = Path(f"tools/linkedin/exports/post_{post_id}.json")
 out.parent.mkdir(parents=True, exist_ok=True)
 out.write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")

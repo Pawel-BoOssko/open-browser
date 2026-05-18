@@ -141,14 +141,10 @@ body = urllib.parse.urlencode(
     }
 ).encode("ascii")
 
-credentials = base64.b64encode(f"{CLIENT_ID}:{CLIENT_SECRET}".encode()).decode()
 req = urllib.request.Request(
     TOKEN_ENDPOINT,
     data=body,
-    headers={
-        "Content-Type": "application/x-www-form-urlencoded",
-        "Authorization": f"Basic {credentials}",
-    },
+    headers={"Content-Type": "application/x-www-form-urlencoded"},
     method="POST",
 )
 
