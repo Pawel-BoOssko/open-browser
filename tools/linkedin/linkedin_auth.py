@@ -81,18 +81,22 @@ class CallbackHandler(BaseHTTPRequestHandler):
         qs = urllib.parse.parse_qs(parsed.query)
 
         if parsed.path == "/callback":
-            _callback_result["auth_code"] = qs.get("code", [None])[0]
-            _callback_result["received_state"] = qs.get("state", [None])[0]
-            error = qs.get("error", [None])[0]
-
-            if error:
-                body = f"<h1>Authorization failed</h1><p>{error}</p><p>You can close this window.</p>"
-                print("AUTH_ERROR", error, qs.get("error_description", [""])[0])
-            elif _callback_result["auth_code"]:
-                body = "<h1>Authorization successful!</h1><p>You can close this window.</p>"
-                print("AUTH_CODE_RECEIVED")
+            callback_state = qs.get("state", [None])[0]
+            if callback_state != state:
+                body = "<h1>Invalid request</h1>"
             else:
-                body = "<h1>No authorization code</h1><p>Something went wrong.</p>"
+                _callback_result["auth_code"] = qs.get("code", [None])[0]
+                _callback_result["received_state"] = callback_state
+                error = qs.get("error", [None])[0]
+
+                if error:
+                    body = f"<h1>Authorization failed</h1><p>{error}</p><p>You can close this window.</p>"
+                    print("AUTH_ERROR", error, qs.get("error_description", [""])[0])
+                elif _callback_result["auth_code"]:
+                    body = "<h1>Authorization successful!</h1><p>You can close this window.</p>"
+                    print("AUTH_CODE_RECEIVED")
+                else:
+                    body = "<h1>No authorization code</h1><p>Something went wrong.</p>"
 
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
@@ -121,10 +125,6 @@ server.server_close()
 
 if not _callback_result["auth_code"]:
     print("NO_AUTH_CODE")
-    raise SystemExit(1)
-
-if _callback_result["received_state"] != state:
-    print("STATE_MISMATCH")
     raise SystemExit(1)
 
 auth_code = _callback_result["auth_code"]
