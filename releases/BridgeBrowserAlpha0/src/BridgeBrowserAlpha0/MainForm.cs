@@ -121,6 +121,7 @@ public sealed partial class MainForm : Form
         if (_cycleClosed) return;
         try
         {
+            text = Humanizer.Wrap(text);
             var delayMs = ComputeHumanDelayMs();
             _log.WriteRun("runtime_approval", "human_delay", "ok", $"Delaying {delayMs}ms before inject");
             await Task.Delay(delayMs);
