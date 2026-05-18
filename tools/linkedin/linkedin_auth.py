@@ -6,7 +6,7 @@ authorization code for tokens and saves them locally.
 
 Prerequisites:
 - Register an app at https://www.linkedin.com/developers/apps
-- Add http://localhost:8787/callback to the app's redirect URLs
+- Add http://127.0.0.1:8787/callback to the app's redirect URLs
 - Request scopes: openid, profile, email, w_member_social
 - Save client_id and client_secret to config/local/linkedin/linkedin_client.json
 
@@ -28,7 +28,7 @@ from pathlib import Path
 
 CLIENT_CONFIG = Path("config/local/linkedin/linkedin_client.json")
 TOKEN_PATH = Path("config/local/linkedin/linkedin_tokens.json")
-REDIRECT_URI = "http://localhost:8787/callback"
+REDIRECT_URI = "http://127.0.0.1:8787/callback"
 AUTH_ENDPOINT = "https://www.linkedin.com/oauth/v2/authorization"
 TOKEN_ENDPOINT = "https://www.linkedin.com/oauth/v2/accessToken"
 SCOPE = "openid profile email w_member_social"
@@ -110,11 +110,11 @@ class CallbackHandler(BaseHTTPRequestHandler):
         pass  # silence server logs
 
 
-server = HTTPServer(("localhost", PORT), CallbackHandler)
+server = HTTPServer(("127.0.0.1", PORT), CallbackHandler)
 server.timeout = 5  # per-request timeout
 deadline = 180  # total 3 minutes
 elapsed = 0
-print(f"Waiting for authorization on http://localhost:{PORT}/callback ...")
+print(f"Waiting for authorization on http://127.0.0.1:{PORT}/callback ...")
 while not _callback_result["auth_code"] and elapsed < deadline:
     try:
         server.handle_request()

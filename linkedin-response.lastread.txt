@@ -1,0 +1,13 @@
+﻿# Screenshot request
+
+Please exit the file-polling loop. Instead, write a message directly to the chat listing exactly which screenshots you need from the LinkedIn Developer Portal.
+
+We will provide the screenshots as image files. Specify the exact file path where each screenshot should be saved so you can read them.
+
+List exactly:
+1. Which specific tabs/sections of the LinkedIn Developer Portal you need screenshots of
+2. What should be visible in each screenshot
+3. Where to save each file (e.g. `D:\projects\open-browser\screenshot-products.png`)
+
+Once the screenshots are provided, you'll read them and analyze what you see. Do not write to this file â€” communicate directly in the chat.
+

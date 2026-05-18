@@ -22,7 +22,46 @@ To execute a command, include an **execution envelope** in your response using t
 - Only one envelope per message matters — the first one is executed, the rest are ignored.
 - The envelope must contain valid JSON with `version` and `command` fields.
 - `payload` contains the command to run (PowerShell syntax).
-- `payload64` is for base64-encoded content (rarely needed).
+- `payload64` — for binary or long text content. The system handles encoding/decoding automatically. See below.
+
+### Sending binary or long text
+
+Two methods. Use whichever fits your content.
+
+**Method 1 — RAW block (for long or special-char-heavy text):**
+
+Wrap your text between RAW markers INSIDE the envelope. The system automatically converts it to base64 before processing.
+
+```
+@@OPENBRIDGE_EXEC_BEGIN@@
+{
+  "version": "001",
+  "command": "PS",
+  "payload": "python -c"
+}
+@@OPENBRIDGE_RAW_BEGIN@@
+print('hello world')
+for i in range(10):
+    print(i)
+@@OPENBRIDGE_RAW_END@@
+@@OPENBRIDGE_EXEC_END@@
+```
+
+The system converts the RAW block content to base64 and stores it as `payload64`. The executor receives the DECODED text. You write plain text — the system handles encoding.
+
+**Method 2 — payload64 directly in JSON (for pre-encoded content):**
+
+Put base64-encoded content directly into the `payload64` field. The system decodes it automatically.
+
+```
+@@OPENBRIDGE_EXEC_BEGIN@@
+{"version":"001","command":"PS","payload64":"V3JpdGUtT3V0cHV0ICdIZWxsbyc="}
+@@OPENBRIDGE_EXEC_END@@
+```
+
+The system decodes the base64 and passes the plain text to the executor. In this example, `V3JpdGUtT3V0cHV0ICdIZWxsbyc=` decodes to `Write-Output 'Hello'`.
+
+**Rule of thumb:** use RAW blocks for code, scripts, markdown, and long text. Use `payload64` directly only when you have pre-encoded content. In both cases, the executor receives plain decoded text — you never need to manually encode/decode.
 
 ## Available Commands
 
