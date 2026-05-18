@@ -130,29 +130,37 @@ if _callback_result["received_state"] != state:
 auth_code = _callback_result["auth_code"]
 
 # --- Exchange code for tokens ---
-body = urllib.parse.urlencode(
-    {
-        "grant_type": "authorization_code",
-        "code": auth_code,
-        "redirect_uri": REDIRECT_URI,
-        "client_id": CLIENT_ID,
-        "client_secret": CLIENT_SECRET,
-        "code_verifier": code_verifier,
-    }
-).encode("ascii")
+import subprocess
 
-req = urllib.request.Request(
-    TOKEN_ENDPOINT,
-    data=body,
-    headers={"Content-Type": "application/x-www-form-urlencoded"},
-    method="POST",
+token_body = (
+    f"grant_type=authorization_code"
+    f"&code={urllib.parse.quote(auth_code, safe='')}"
+    f"&redirect_uri={urllib.parse.quote(REDIRECT_URI, safe='')}"
+    f"&client_id={urllib.parse.quote(CLIENT_ID, safe='')}"
+    f"&client_secret={urllib.parse.quote(CLIENT_SECRET, safe='')}"
+    f"&code_verifier={urllib.parse.quote(code_verifier, safe='')}"
 )
 
-try:
-    with urllib.request.urlopen(req, timeout=30) as resp:
-        tokens = json.loads(resp.read().decode("utf-8"))
-except urllib.error.HTTPError as e:
-    print("TOKEN_ERROR", e.code, e.read().decode("utf-8", errors="replace")[:1000])
+print("Exchanging code for tokens...")
+result = subprocess.run(
+    ["curl", "-s", "-w", "\n%{http_code}", "-X", "POST",
+     TOKEN_ENDPOINT,
+     "-H", "Content-Type: application/x-www-form-urlencoded",
+     "-d", token_body],
+    capture_output=True, text=True, timeout=30
+)
+
+output = result.stdout.strip()
+lines = output.rsplit("\n", 1)
+if len(lines) == 2:
+    response_body, http_code = lines
+else:
+    response_body, http_code = output, "?"
+
+if http_code == "200":
+    tokens = json.loads(response_body)
+else:
+    print("TOKEN_ERROR", http_code, response_body[:1000])
     raise SystemExit(1)
 
 TOKEN_PATH.parent.mkdir(parents=True, exist_ok=True)
