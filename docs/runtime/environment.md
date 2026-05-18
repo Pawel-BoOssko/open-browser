@@ -196,6 +196,21 @@ Quick operations:
 - `python tools\github\github_check_manifest.py` — verify manifest
 - `python tools\github\github_publish_manifest.py [--dry-run]` — batch publish
 
+## Claude Code (DeepSeek)
+
+A launcher for Claude Code via the DeepSeek API is in `tools/claude/`. Use it to delegate complex reasoning, code analysis, or multi-step tasks.
+
+**Session management is critical:**
+- First run starts a new session — save the session ID
+- Subsequent runs use `--resume <session-id>` to continue the same context
+
+```
+D:\projects\open-browser\tools\claude\claude-deepseek.ps1 -p "Analyze this code"
+D:\projects\open-browser\tools\claude\claude-deepseek.ps1 --resume <id> -p "Follow-up"
+```
+
+Full guide: `Get-Content tools\claude\CLAUDE_WORKING_GUIDE.md`
+
 ## Running Tests
 ```
 Get-Content D:\projects\open-browser\test-plan.md
