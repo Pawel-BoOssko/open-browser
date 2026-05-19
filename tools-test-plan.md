@@ -131,6 +131,32 @@ Write-Output "SHOULD_NOT_RUN"
 ```
 Expected: error message — invalid JSON. RAW block placed outside JSON object.
 
+## Part 4: Polish characters (UTF-8)
+
+### Test U1 — Write Polish text to file (PS)
+```
+@@OPENBRIDGE_EXEC_BEGIN@@
+{"version":"001","command":"PS","payload":"Write-Output 'Zażółć gęślą jaźń — ąćęłńóśźż ĄĆĘŁŃÓŚŹŻ' | Out-File -FilePath 'D:\\projects\\open-browser\\utf8-test.txt' -Encoding UTF8; Get-Content 'D:\\projects\\open-browser\\utf8-test.txt'"}
+@@OPENBRIDGE_EXEC_END@@
+```
+Expected: output contains `Zażółć gęślą jaźń — ąćęłńóśźż ĄĆĘŁŃÓŚŹŻ` exactly.
+
+### Test U2 — Write Polish text via PY
+```
+@@OPENBRIDGE_EXEC_BEGIN@@
+{"version":"001","command":"PY","payload":"import sys; text = 'Zażółć gęślą jaźń'; print(text); assert 'żółć' in text, 'FAIL: diacritics lost'; print('UTF8_OK')"}
+@@OPENBRIDGE_EXEC_END@@
+```
+Expected: output contains `Zażółć gęślą jaźń` and `UTF8_OK`.
+
+### Test U3 — PY write and read file
+```
+@@OPENBRIDGE_EXEC_BEGIN@@
+{"version":"001","command":"PY","payload":"path = r'D:\\projects\\open-browser\\utf8-py-test.txt'; text = 'Żółw je zielone żdźbło trawy.'; open(path, 'w', encoding='utf-8').write(text); result = open(path, 'r', encoding='utf-8').read(); print(result); assert text == result, f'MISMATCH: {text!r} vs {result!r}'; print('UTF8_FILE_OK')"}
+@@OPENBRIDGE_EXEC_END@@
+```
+Expected: output contains `Żółw je zielone żdźbło trawy.` and `UTF8_FILE_OK`.
+
 ## Part 5: Research — propose new tools
 
 Do a broad research exercise. Think about what external services, APIs, or automation would be useful from inside Open Browser.
@@ -183,6 +209,9 @@ Date: ...
 | R1 | PASS/FAIL | ... |
 | R2 | PASS/FAIL | ... |
 | R3 | PASS/FAIL | ... |
+| U1 | PASS/FAIL | ... |
+| U2 | PASS/FAIL | ... |
+| U3 | PASS/FAIL | ... |
 
 Research task: proposals saved to `D:\projects\open-browser\tool-proposals.md`
 
