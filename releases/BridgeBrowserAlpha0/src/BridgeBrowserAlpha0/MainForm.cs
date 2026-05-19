@@ -198,7 +198,12 @@ public sealed partial class MainForm : Form
                 var safeUrl = System.Text.Json.JsonSerializer.Serialize(sandboxUrl);
                 var js = "(function(){" +
                     "var links=document.querySelectorAll('a');" +
-                    $"for(var i=0;i<links.length;i++){{if(links[i].href==={safeUrl}){{links[i].click();console.log('OpenBridge: sandbox clicked:'+{safeUrl});return;}}}}" +
+                    $"for(var i=0;i<links.length;i++){{if(links[i].href==={safeUrl}){{" +
+                    "var ev=new MouseEvent('click',{{bubbles:true,cancelable:true,view:window,button:0}});" +
+                    "links[i].dispatchEvent(new MouseEvent('mousedown',{{bubbles:true,cancelable:true}}));" +
+                    "links[i].dispatchEvent(new MouseEvent('mouseup',{{bubbles:true,cancelable:true}}));" +
+                    "links[i].dispatchEvent(ev);" +
+                    $"console.log('OpenBridge: sandbox clicked:'+{safeUrl});return;}}}}" +
                     "console.log('OpenBridge: sandbox link not found');})();";
                 await _webView.CoreWebView2.ExecuteScriptAsync(js);
 
