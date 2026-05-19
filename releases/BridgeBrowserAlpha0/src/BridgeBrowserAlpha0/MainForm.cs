@@ -124,8 +124,13 @@ public sealed partial class MainForm : Form
             text = Humanizer.Wrap(text);
             var delayMs = ComputeHumanDelayMs();
             _log.WriteRun("runtime_approval", "human_delay", "ok", $"Delaying {delayMs}ms before inject");
-            await Task.Delay(delayMs);
-            if (_cycleClosed) return;
+            for (int remaining = delayMs / 1000; remaining > 0; remaining--)
+            {
+                SetStatus($"Response in {remaining}s...");
+                await Task.Delay(1000);
+                if (_cycleClosed) return;
+            }
+            SetStatus("Sending...");
             var safeText = System.Text.Json.JsonSerializer.Serialize(text);
             var js = "var el=document.querySelector('#prompt-textarea,.ProseMirror,[contenteditable=true]');" +
                 $"if(el){{el.focus();el.textContent={safeText};el.dispatchEvent(new Event('input',{{bubbles:true}}));" +
