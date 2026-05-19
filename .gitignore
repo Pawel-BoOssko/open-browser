@@ -34,3 +34,5 @@ test-plan.md
 $null
 downloads/*
 !downloads/.gitkeep
+tools/web/exports/*.html
+test-results-v4.md
