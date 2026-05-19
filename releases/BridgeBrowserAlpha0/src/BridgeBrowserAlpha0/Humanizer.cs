@@ -8,7 +8,12 @@ public static class Humanizer
     {
         "Dobra,", "OK,", "Okej,", "No dobra,", "No to,", "Dobrze,", "Jasne,",
         "W porządku,", "Gotowe,", "Tak,", "Jest,", "Mam,", "Zrobione,",
-        "Działa,", "Wróciło,", "To teraz,"
+        "Działa,", "Wróciło,", "To teraz,", "Już jest,", "Jest zwrotka,",
+        "Mam już zwrot,", "System odpowiedział,", "Odpowiedź wróciła,",
+        "Wynik jest dostępny,", "Wszystko wróciło,", "Mam odpowiedź,",
+        "Już to mam,", "Przyszła odpowiedź,", "Wrócił rezultat,", "Zakończone,",
+        "Operacja zakończona,", "Wynik już jest,", "Mam to już z powrotem,",
+        "Można iść dalej,",
     };
 
     private static readonly string[] Slot2 =
@@ -18,7 +23,15 @@ public static class Humanizer
         "już system odpowiedział", "odpowiedź już wróciła", "już wróciła odpowiedź",
         "wynik już wrócił", "już wrócił wynik", "mam to z powrotem",
         "już mogę to przekazać", "już mogę to pokazać", "już mogę to wkleić",
-        "wykonanie już się zakończyło"
+        "wykonanie już się zakończyło", "dostałem już odpowiedź z powrotem",
+        "mam już pełny zwrot z systemu", "wynik wykonania jest już dostępny",
+        "odpowiedź przyszła poprawnie", "system zwrócił już dane",
+        "proces zwrócił odpowiedź", "odpowiedź jest już gotowa",
+        "zwrotka z systemu już jest", "mam już to, co przyszło",
+        "przyszło już to, na co czekaliśmy", "wykonanie dobiegło końca",
+        "odpowiedź została zwrócona", "rezultat jest już po stronie zwrotnej",
+        "system zakończył działanie", "mam już surową odpowiedź",
+        "wszystko wróciło z wykonania",
     };
 
     private static readonly string[] Slot3 =
@@ -26,7 +39,13 @@ public static class Humanizer
         "daję", "podaję", "wklejam", "wrzucam", "przesyłam", "pokazuję",
         "przekazuję", "wstawiam", "podaję poniżej", "poniżej daję",
         "wklejam poniżej", "wrzucam poniżej", "podaję bez zmian",
-        "wklejam bez zmian", "przesyłam bez zmian", "zostawiam poniżej"
+        "wklejam bez zmian", "przesyłam bez zmian", "zostawiam poniżej",
+        "wstawiam dokładnie", "przekazuję dalej", "zostawiam w oryginale",
+        "daję dokładnie to", "podaję dokładnie to", "wklejam dokładnie to",
+        "wrzucam dalej", "przekazuję w tej postaci", "podaję wprost",
+        "zostawiam tak, jak przyszło", "wklejam tak, jak wróciło",
+        "przesyłam wprost", "podaję bez obróbki", "wrzucam bez edycji",
+        "pokazuję w niezmienionej formie", "przekazuję jako wynik",
     };
 
     private static readonly string[] Slot4 =
@@ -35,7 +54,13 @@ public static class Humanizer
         "wynik wykonania", "odpowiedź systemu", "odpowiedź zwrotną",
         "pełną odpowiedź", "treść odpowiedzi", "to, co przyszło",
         "to, co wróciło", "to, co zwrócił system", "to, co dostałem z powrotem",
-        "komunikat zwrotny", "surowy wynik"
+        "komunikat zwrotny", "surowy wynik", "pełny wynik działania",
+        "zwrot z systemu", "surową odpowiedź", "dokładny output",
+        "wynik bez zmian", "odpowiedź bez edycji", "rezultat wykonania",
+        "końcowy wynik", "treść zwrotki", "dane zwrócone przez system",
+        "komunikat z wykonania", "odpowiedź w oryginalnej postaci",
+        "wynik dokładnie w tej formie", "to, co system odesłał",
+        "pełną treść zwróconą przez system", "surowy komunikat zwrotny",
     };
 
     private static string? _lastPrefix;
