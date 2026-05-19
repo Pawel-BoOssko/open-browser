@@ -207,8 +207,6 @@ public sealed partial class MainForm : Form
                     "console.log('OpenBridge: sandbox link not found');})();";
                 await _webView.CoreWebView2.ExecuteScriptAsync(js);
 
-                await Task.Delay(5_000);
-
                 var userDownloads = Path.Combine(
                     Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
                     "Downloads");
@@ -216,8 +214,9 @@ public sealed partial class MainForm : Form
                 Directory.CreateDirectory(targetDir);
                 var targetFile = Path.Combine(targetDir, Path.GetFileName(filename));
 
+                // Wait for the exact file to appear in Downloads (poll 20x, 1s each)
                 var psi = new System.Diagnostics.ProcessStartInfo("powershell.exe",
-                    $"-NoProfile -Command \"$dl=Get-ChildItem '{userDownloads}' | Sort-Object LastWriteTime -Descending | Select-Object -First 1; if($dl){{ Move-Item -Path $dl.FullName -Destination '{targetFile}' -Force; Write-Output ('MOVED '+$dl.Name+' '+$dl.Length) }}else{{ Write-Output 'NOFILE' }}\"")
+                    $"-NoProfile -Command \"$n='{Path.GetFileName(filename)}'; for($i=0;$i -lt 20;$i++){{ $f=Get-ChildItem '{userDownloads}' -Filter $n -ErrorAction SilentlyContinue | Select-Object -First 1; if($f){{ Move-Item -Path $f.FullName -Destination '{targetFile}' -Force; Write-Output ('MOVED '+$f.Name+' '+$f.Length); exit 0 }}; Start-Sleep 1 }}; Write-Output 'TIMEOUT'\"")
                 {
                     RedirectStandardOutput = true,
                     UseShellExecute = false,
