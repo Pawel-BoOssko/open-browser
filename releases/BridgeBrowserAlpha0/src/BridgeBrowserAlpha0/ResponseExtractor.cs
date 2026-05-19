@@ -46,6 +46,7 @@ public sealed class ResponseExtractor
     private int _emptyDeltaValues;
     private string? _currentAssistantMessageId;
     private string _currentEventTsUtc = DateTime.UtcNow.ToString("O");
+    private string? _currentRawMessageId;
     private volatile int _pendingFinishCount;
     private readonly HashSet<string> _observedMessageIds = new(StringComparer.Ordinal);
 
@@ -65,6 +66,7 @@ public sealed class ResponseExtractor
             _framesById.Clear();
             _sawPageStream = false;
             _currentAssistantMessageId = null;
+            _currentRawMessageId = null;
             _currentEventTsUtc = DateTime.UtcNow.ToString("O");
             _rawEvents = 0;
             _pageStreamEvents = 0;
@@ -131,6 +133,17 @@ public sealed class ResponseExtractor
 
             var before = GetCurrentAnswerText();
             ProcessRaw(raw, flushTail: false);
+
+            // Rotate raw file per message
+            var newMsgId = _currentAssistantMessageId;
+            if (newMsgId != null && newMsgId != _currentRawMessageId)
+            {
+                _rawWriter?.Dispose();
+                _currentRawMessageId = newMsgId;
+                var perMsgPath = Path.Combine(AppPaths.Extracted, $"run_{_log.RunId}_msg_{newMsgId[..8]}_raw.ndjson");
+                _rawWriter = new StreamWriter(new FileStream(perMsgPath, FileMode.Append, FileAccess.Write, FileShare.ReadWrite), Encoding.UTF8) { AutoFlush = true };
+            }
+
             var after = GetCurrentAnswerText();
             if (!string.Equals(before, after, StringComparison.Ordinal) && _answerPath != null)
             {
