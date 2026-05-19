@@ -217,15 +217,15 @@ public sealed partial class MainForm : Form
 
                 // Diagnostic: snapshot Downloads before click, then poll every 2s for 20s
                 var diagScript = $"-NoProfile -Command \"" +
-                    $"$dir='{userDownloads}'; $n='{exactName}'; $t='{targetFile}';\n" +
-                    $"Write-Output ('DIAG_BEFORE '+((Get-ChildItem $dir -ErrorAction SilentlyContinue | Measure-Object).Count)+' files');\n" +
-                    $"Write-Output ('DIAG_TARGET '+$n);\n" +
-                    $"for(`$i=1;`$i -le 10;`$i++){{ Start-Sleep 2;\n" +
-                    $"  `$all=(Get-ChildItem `$dir -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 3 | ForEach-Object {{ `$_.Name+' ('+`$_.Length+'b)' }} ) -join ' | ';\n" +
-                    $"  Write-Output ('DIAG_SNAP '+`$i+' ['+`$all+']');\n" +
-                    $"  `$f=Get-ChildItem `$dir -Filter `$n -ErrorAction SilentlyContinue | Select-Object -First 1;\n" +
-                    $"  if(`$f){{ Move-Item -Path `$f.FullName -Destination `$t -Force; Write-Output ('MOVED '+`$f.Name+' '+`$f.Length); exit 0 }}\n" +
-                    $"}}\n" +
+                    $"$dir='{userDownloads}'; $n='{exactName}'; $t='{targetFile}';" +
+                    $"Write-Output ('DIAG_BEFORE '+((Get-ChildItem $dir -ErrorAction SilentlyContinue | Measure-Object).Count)+' files');" +
+                    $"Write-Output ('DIAG_TARGET '+$n);" +
+                    $"for($i=1;$i -le 10;$i++){{ Start-Sleep 2;" +
+                    $"  $all=(Get-ChildItem $dir -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 3 | ForEach-Object {{ $_.Name+' ('+$_.Length+'b)' }} ) -join ' | ';" +
+                    $"  Write-Output ('DIAG_SNAP '+$i+' ['+$all+']');" +
+                    $"  $f=Get-ChildItem $dir -Filter $n -ErrorAction SilentlyContinue | Select-Object -First 1;" +
+                    $"  if($f){{ Move-Item -Path $f.FullName -Destination $t -Force; Write-Output ('MOVED '+$f.Name+' '+$f.Length); exit 0 }}" +
+                    $"}}" +
                     $"Write-Output 'TIMEOUT_20s'\"";
 
                 var psi = new System.Diagnostics.ProcessStartInfo("powershell.exe", diagScript)
