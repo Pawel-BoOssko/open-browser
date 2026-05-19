@@ -2,6 +2,24 @@
 
 Run these tests from inside Open Browser. After each test, record pass/fail. Save results to `D:\projects\open-browser\tools-test-results.md`.
 
+## Part 0: System discovery
+
+### Test S1 — HST_STATUS
+```
+@@OPENBRIDGE_EXEC_BEGIN@@
+{"version":"001","command":"HST_STATUS"}
+@@OPENBRIDGE_EXEC_END@@
+```
+Expected: output contains `Your ID:`, `Build`, `Working directory`, `Tools:`.
+
+### Test S2 — HST_TOOLS
+```
+@@OPENBRIDGE_EXEC_BEGIN@@
+{"version":"001","command":"HST_TOOLS"}
+@@OPENBRIDGE_EXEC_END@@
+```
+Expected: output lists all available tools with README descriptions.
+
 ## Part 1: n8n tools
 
 ### Test N1 — List scripts
@@ -150,6 +168,8 @@ Date: ...
 
 | Test | Result | Details |
 |------|--------|---------|
+| S1 | PASS/FAIL | ... |
+| S2 | PASS/FAIL | ... |
 | N1 | PASS/FAIL | ... |
 | N2 | PASS/FAIL | ... |
 | N3 | PASS/FAIL | ... |
