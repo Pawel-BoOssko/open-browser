@@ -22,7 +22,7 @@ public class OpenBridgeRuntimeApproval
         _workingDirectory = workingDirectory;
         _log = log;
         _pythonHost = new OpenBridgeHost(
-            new GeneralCommand.GeneralCommandExecutor("python", "-c \"{prompt}\""));
+            new GeneralCommand.GeneralCommandExecutor("python", "-X utf8 -c \"{prompt}\""));
     }
 
     public bool TrySetPending(OpenBridgeEnvelopeParseResult parseResult, out string? error)
