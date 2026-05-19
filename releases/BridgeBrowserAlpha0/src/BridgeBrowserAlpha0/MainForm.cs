@@ -172,6 +172,8 @@ public sealed partial class MainForm : Form
         }
     }
 
+    private bool _sandboxDiagInjected;
+
     private async Task HandleSandboxLinksAsync()
     {
         try
@@ -183,59 +185,28 @@ public sealed partial class MainForm : Form
                 text, @"sandbox:/mnt/data/([^\s\)]+)");
             if (matches.Count == 0) return;
 
-            var rng = System.Security.Cryptography.RandomNumberGenerator.Create();
-            var bytes = new byte[4]; rng.GetBytes(bytes);
-            int delayMs = 2_000 + (int)(BitConverter.ToUInt32(bytes) & 0x7FFFFFFF) % 3_000;
-            await Task.Delay(delayMs);
-
-            foreach (System.Text.RegularExpressions.Match m in matches)
+            // Inject diagnostic JS once
+            if (!_sandboxDiagInjected && _webView.CoreWebView2 != null)
             {
-                var filename = m.Groups[1].Value;
-                var sandboxUrl = m.Value;
-                _log.WriteRun("runtime_approval", "sandbox_click", "ok",
-                    "Clicking sandbox link", new { filename, sandboxUrl });
-
-                var safeUrl = System.Text.Json.JsonSerializer.Serialize(sandboxUrl);
-                var js = "(function(){" +
-                    "var links=document.querySelectorAll('a');" +
-                    $"for(var i=0;i<links.length;i++){{if(links[i].href==={safeUrl}){{" +
-                    "var ev=new MouseEvent('click',{{bubbles:true,cancelable:true,view:window,button:0}});" +
-                    "links[i].dispatchEvent(new MouseEvent('mousedown',{{bubbles:true,cancelable:true}}));" +
-                    "links[i].dispatchEvent(new MouseEvent('mouseup',{{bubbles:true,cancelable:true}}));" +
-                    "links[i].dispatchEvent(ev);" +
-                    $"console.log('OpenBridge: sandbox clicked:'+{safeUrl});return;}}}}" +
-                    "console.log('OpenBridge: sandbox link not found');})();";
-                await _webView.CoreWebView2.ExecuteScriptAsync(js);
-
-                var userDownloads = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-                    "Downloads");
-                var targetDir = AppConstants.DownloadsPath;
-                Directory.CreateDirectory(targetDir);
-                var targetFile = Path.Combine(targetDir, Path.GetFileName(filename));
-                var exactName = Path.GetFileName(filename);
-
-                // Diagnostic: snapshot Downloads before click, then poll every 2s for 20s
-                var diagScript = $"-NoProfile -Command \"" +
-                    $"$dir='{userDownloads}'; $n='{exactName}'; $t='{targetFile}';" +
-                    $"Write-Output ('DIAG_BEFORE '+((Get-ChildItem $dir -ErrorAction SilentlyContinue | Measure-Object).Count)+' files');" +
-                    $"Write-Output ('DIAG_TARGET '+$n);" +
-                    $"for($i=1;$i -le 10;$i++){{ Start-Sleep 2;" +
-                    $"  $all=(Get-ChildItem $dir -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 3 | ForEach-Object {{ $_.Name+' ('+$_.Length+'b)' }} ) -join ' | ';" +
-                    $"  Write-Output ('DIAG_SNAP '+$i+' ['+$all+']');" +
-                    $"  $f=Get-ChildItem $dir -Filter $n -ErrorAction SilentlyContinue | Select-Object -First 1;" +
-                    $"  if($f){{ Move-Item -Path $f.FullName -Destination $t -Force; Write-Output ('MOVED '+$f.Name+' '+$f.Length); exit 0 }}" +
-                    $"}}" +
-                    $"Write-Output 'TIMEOUT_20s'\"";
-
-                var psi = new System.Diagnostics.ProcessStartInfo("powershell.exe", diagScript)
+                var diagPath = Path.GetFullPath(Path.Combine(
+                    AppDomain.CurrentDomain.BaseDirectory, "SandboxDiagnostic.js"));
+                if (File.Exists(diagPath))
                 {
-                    RedirectStandardOutput = true,
-                    UseShellExecute = false,
-                    CreateNoWindow = true
-                };
-                var p = System.Diagnostics.Process.Start(psi);
-                if (p != null) { var output = await p.StandardOutput.ReadToEndAsync(); _log.WriteRun("runtime_approval", "sandbox_diag", "ok", output.Trim()); p.Dispose(); }
+                    var js = File.ReadAllText(diagPath);
+                    await _webView.CoreWebView2.ExecuteScriptAsync(js);
+                    _sandboxDiagInjected = true;
+                    _log.WriteRun("runtime_approval", "sandbox_diag", "ok",
+                        "Diagnostic JS injected — click sandbox link manually");
+                }
+            }
+
+            // Read results from previous manual click
+            if (_sandboxDiagInjected && _webView.CoreWebView2 != null)
+            {
+                var result = await _webView.CoreWebView2.ExecuteScriptAsync(
+                    "JSON.stringify(window.__sandboxDiag||[])");
+                if (!string.IsNullOrEmpty(result) && result != "[]" && result != "null")
+                    _log.WriteRun("runtime_approval", "sandbox_diag_result", "ok", result);
             }
         }
         catch (Exception ex)

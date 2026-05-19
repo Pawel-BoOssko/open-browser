@@ -16,6 +16,9 @@
     <None Update="PageTap.js">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <None Update="SandboxDiagnostic.js">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <None Include="..\..\..\..\config\humanizer.json">
       <Link>config\humanizer.json</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
