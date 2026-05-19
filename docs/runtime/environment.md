@@ -83,6 +83,8 @@ payload: any PowerShell expression
 - Don't wrap a value in a variable if you use it only once. Pass it directly.
 - For scripts longer than 3 lines or containing quotes/backslashes — use a RAW block. The system handles encoding automatically. This avoids JSON escaping problems entirely.
 
+**File encoding rule:** Always use `-Encoding UTF8` with `Get-Content` and `Out-File`. Without it, PowerShell uses the system code page (CP1250 on Polish Windows), which mangles UTF-8 text. Correct: `Get-Content path -Encoding UTF8`.
+
 **What you get back:**
 - `stdout` — standard output of the command (truncated at 50,000 characters)
 - `stderr` — standard error (also truncated)
