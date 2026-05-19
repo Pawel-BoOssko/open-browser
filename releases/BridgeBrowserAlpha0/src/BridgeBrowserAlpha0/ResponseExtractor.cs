@@ -168,6 +168,7 @@ public sealed class ResponseExtractor
 
             if (hasNewFrames)
             {
+                AppConstants.LastAssistantMessageId = newFrames[^1].MessageId;
                 var newAnswer = GetCurrentAnswerTextForFrames(newFrames);
                 var parseResult = _observer.Observe(newAnswer);
                 if (parseResult?.HasEnvelope == true)

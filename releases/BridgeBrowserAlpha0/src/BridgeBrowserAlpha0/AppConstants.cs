@@ -8,6 +8,7 @@ public static class AppConstants
 
     public static string? ConversationId { get; set; }
     public static string? LastAssistantResponseText { get; set; }
+    public static string? LastAssistantMessageId { get; set; }
 
     private static string? _downloadsPath;
     public static string DownloadsPath

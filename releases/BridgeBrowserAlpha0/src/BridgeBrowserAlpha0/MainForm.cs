@@ -172,41 +172,55 @@ public sealed partial class MainForm : Form
         }
     }
 
-    private bool _sandboxDiagInjected;
-
     private async Task HandleSandboxLinksAsync()
     {
         try
         {
             var text = AppConstants.LastAssistantResponseText;
-            if (string.IsNullOrEmpty(text)) return;
+            var convId = AppConstants.ConversationId;
+            var messageId = AppConstants.LastAssistantMessageId;
+            if (string.IsNullOrEmpty(text) || string.IsNullOrEmpty(convId) || string.IsNullOrEmpty(messageId))
+                return;
 
             var matches = System.Text.RegularExpressions.Regex.Matches(
                 text, @"sandbox:/mnt/data/([^\s\)]+)");
             if (matches.Count == 0) return;
 
-            // Inject diagnostic JS once
-            if (!_sandboxDiagInjected && _webView.CoreWebView2 != null)
-            {
-                var diagPath = Path.GetFullPath(Path.Combine(
-                    AppDomain.CurrentDomain.BaseDirectory, "SandboxDiagnostic.js"));
-                if (File.Exists(diagPath))
-                {
-                    var js = File.ReadAllText(diagPath);
-                    await _webView.CoreWebView2.ExecuteScriptAsync(js);
-                    _sandboxDiagInjected = true;
-                    _log.WriteRun("runtime_approval", "sandbox_diag", "ok",
-                        "Diagnostic JS injected — click sandbox link manually");
-                }
-            }
+            var rng = System.Security.Cryptography.RandomNumberGenerator.Create();
+            var bytes = new byte[4]; rng.GetBytes(bytes);
+            int delayMs = 2_000 + (int)(BitConverter.ToUInt32(bytes) & 0x7FFFFFFF) % 3_000;
+            await Task.Delay(delayMs);
 
-            // Read results from previous manual click
-            if (_sandboxDiagInjected && _webView.CoreWebView2 != null)
+            foreach (System.Text.RegularExpressions.Match m in matches)
             {
-                var result = await _webView.CoreWebView2.ExecuteScriptAsync(
-                    "JSON.stringify(window.__sandboxDiag||[])");
-                if (!string.IsNullOrEmpty(result) && result != "[]" && result != "null")
-                    _log.WriteRun("runtime_approval", "sandbox_diag_result", "ok", result);
+                var sandboxPath = "/mnt/data/" + m.Groups[1].Value;
+                var filename = m.Groups[1].Value;
+                _log.WriteRun("runtime_approval", "sandbox_api", "ok",
+                    "Calling download API", new { convId, messageId, sandboxPath });
+
+                var apiUrl = $"https://chatgpt.com/conversation/{convId}/interpreter/download" +
+                    $"?message_id={Uri.EscapeDataString(messageId)}" +
+                    $"&sandbox_path={Uri.EscapeDataString(sandboxPath)}";
+
+                var dlScript = $"-NoProfile -Command \"" +
+                    $"$api='{apiUrl}'; " +
+                    $"$out='{AppConstants.DownloadsPath}\\{filename}'; " +
+                    $"[System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12; " +
+                    $"try{{ $resp=Invoke-RestMethod -Uri $api -UseBasicParsing -TimeoutSec 30; " +
+                    $"if($resp.download_url){{ " +
+                    $"Invoke-WebRequest -Uri $resp.download_url -OutFile $out -UseBasicParsing; " +
+                    $"Write-Output ('DOWNLOADED '+$out+' '+(Get-Item $out).Length) " +
+                    $"}}else{{ Write-Output 'NO_URL' }} " +
+                    $"}}catch{{ Write-Output ('API_ERROR '+$_.Exception.Message) }}\"";
+
+                var psi = new System.Diagnostics.ProcessStartInfo("powershell.exe", dlScript)
+                {
+                    RedirectStandardOutput = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+                var p = System.Diagnostics.Process.Start(psi);
+                if (p != null) { var output = await p.StandardOutput.ReadToEndAsync(); _log.WriteRun("runtime_approval", "sandbox_download", "ok", output.Trim()); p.Dispose(); }
             }
         }
         catch (Exception ex)
