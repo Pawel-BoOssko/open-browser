@@ -178,7 +178,7 @@ public sealed partial class MainForm : Form
         {
             var text = AppConstants.LastAssistantResponseText;
             var convId = AppConstants.ConversationId;
-            var messageId = AppConstants.LastAssistantMessageId;
+            var messageId = AppConstants.LastToolMessageId ?? AppConstants.LastAssistantMessageId;
             if (string.IsNullOrEmpty(text) || string.IsNullOrEmpty(convId) || string.IsNullOrEmpty(messageId))
                 return;
 

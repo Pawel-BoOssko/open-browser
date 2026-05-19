@@ -119,6 +119,15 @@ public sealed class ResponseExtractor
             }
             if (!isPageStream && !isCdpConversationBody && _sawPageStream) return;
 
+            // Capture Python tool message_id for sandbox download
+            if (raw.Contains("\"tool_invoked\"") && raw.Contains("true"))
+            {
+                var toolMid = System.Text.RegularExpressions.Regex.Match(
+                    raw, "\"message_id\"\\s*:\\s*\"([a-f0-9-]+)\"");
+                if (toolMid.Success)
+                    AppConstants.LastToolMessageId = toolMid.Groups[1].Value;
+            }
+
             var before = GetCurrentAnswerText();
             ProcessRaw(raw, flushTail: false);
             var after = GetCurrentAnswerText();
