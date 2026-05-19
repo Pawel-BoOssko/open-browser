@@ -133,17 +133,6 @@ public sealed class ResponseExtractor
 
             var before = GetCurrentAnswerText();
             ProcessRaw(raw, flushTail: false);
-
-            // Rotate raw file per message
-            var newMsgId = _currentAssistantMessageId;
-            if (newMsgId != null && newMsgId != _currentRawMessageId)
-            {
-                _rawWriter?.Dispose();
-                _currentRawMessageId = newMsgId;
-                var perMsgPath = Path.Combine(AppPaths.Extracted, $"run_{_log.RunId}_msg_{newMsgId[..8]}_raw.ndjson");
-                _rawWriter = new StreamWriter(new FileStream(perMsgPath, FileMode.Append, FileAccess.Write, FileShare.ReadWrite), Encoding.UTF8) { AutoFlush = true };
-            }
-
             var after = GetCurrentAnswerText();
             if (!string.Equals(before, after, StringComparison.Ordinal) && _answerPath != null)
             {
@@ -444,6 +433,15 @@ public sealed class ResponseExtractor
         var frame = GetOrCreateFrame(id);
         frame.MessageObjectCount++;
         _currentAssistantMessageId = id;
+
+        // New message — switch to a separate raw file
+        if (id != _currentRawMessageId)
+        {
+            _rawWriter?.Dispose();
+            _currentRawMessageId = id;
+            var perMsgPath = Path.Combine(AppPaths.Extracted, $"run_{_log.RunId}_msg_{id}_raw.ndjson");
+            _rawWriter = new StreamWriter(new FileStream(perMsgPath, FileMode.Append, FileAccess.Write, FileShare.ReadWrite), Encoding.UTF8) { AutoFlush = true };
+        }
 
         if (!content.TryGetProperty("parts", out var parts) || parts.ValueKind != JsonValueKind.Array) return;
         var text = string.Concat(parts.EnumerateArray().Where(x => x.ValueKind == JsonValueKind.String).Select(x => x.GetString() ?? ""));
