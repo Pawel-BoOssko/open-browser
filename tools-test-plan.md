@@ -78,13 +78,13 @@ Expected: output contains `Python 3.`.
 
 ## Part 4: RAW block
 
-### Test R1 — RAW block with Python (multi-line)
+### Test R1 — RAW block inside payload (multi-line)
 ```
 @@OPENBRIDGE_EXEC_BEGIN@@
 {
   "version": "001",
   "command": "PY",
-  "payload64": "@@OPENBRIDGE_RAW_BEGIN@@
+  "payload": "@@OPENBRIDGE_RAW_BEGIN@@
 import sys
 print(f'Python {sys.version}')
 print('RAW_TEST_OK')
@@ -94,15 +94,15 @@ print('RAW_TEST_OK')
 ```
 Expected: output contains `RAW_TEST_OK`.
 
-### Test R2 — RAW block placed outside JSON (must fail)
+### Test R2 — RAW block inside payload (single line)
 ```
 @@OPENBRIDGE_EXEC_BEGIN@@
-{"version":"001","command":"PY","payload64":"@@OPENBRIDGE_RAW_BEGIN@@print('OK')@@OPENBRIDGE_RAW_END@@"}
+{"version":"001","command":"PY","payload":"@@OPENBRIDGE_RAW_BEGIN@@print('OK')@@OPENBRIDGE_RAW_END@@"}
 @@OPENBRIDGE_EXEC_END@@
 ```
-Expected: output contains `RAW_TEST_OK` (RAW inside payload64 string — correct placement).
+Expected: output contains `OK` (RAW inside payload string — correct placement).
 
-### Test R3 — RAW block outside JSON braces (must fail)
+### Test R3 — RAW block outside JSON (must fail)
 ```
 @@OPENBRIDGE_EXEC_BEGIN@@
 {"version":"001","command":"PS"}

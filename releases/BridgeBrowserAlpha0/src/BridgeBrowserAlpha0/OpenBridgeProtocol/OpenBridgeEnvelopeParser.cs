@@ -66,8 +66,15 @@ public static class OpenBridgeEnvelopeParser
 
             string serialized = System.Text.Json.JsonSerializer.Serialize(rawContent);
 
-            string beforeRaw = envelopeContent.Substring(0, rawBeginIndex).Trim();
-            string afterRaw = envelopeContent.Substring(rawEndIndex + RawEnd.Length).Trim();
+            string beforeRaw = envelopeContent.Substring(0, rawBeginIndex).TrimEnd();
+            string afterRaw = envelopeContent.Substring(rawEndIndex + RawEnd.Length).TrimStart();
+
+            // Serialize adds its own quotes. Trim the adjacent quotes from the split
+            // points so we don't get double quotes: "payload64":""content""
+            if (beforeRaw.EndsWith('\"'))
+                beforeRaw = beforeRaw[..^1];
+            if (afterRaw.StartsWith('\"'))
+                afterRaw = afterRaw[1..];
 
             jsonToParse = beforeRaw + serialized + afterRaw;
         }

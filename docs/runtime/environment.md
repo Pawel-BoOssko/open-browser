@@ -40,7 +40,7 @@ Place the RAW markers inside the envelope:
 {
   "version": "001",
   "command": "PS",
-  "payload64": "@@OPENBRIDGE_RAW_BEGIN@@
+  "payload": "@@OPENBRIDGE_RAW_BEGIN@@
 print('hello world')
 for i in range(10):
     print(i)
@@ -56,7 +56,7 @@ for i in range(10):
     print(i)
 ```
 
-**Critical rule for RAW placement:** The RAW markers must be INSIDE the `payload64` JSON string — NOT after the closing `}` of the JSON object. Putting them outside the JSON produces invalid JSON and the command will not execute.
+**Critical rule for RAW placement:** The RAW markers must be INSIDE the `payload` JSON string — NOT after the closing `}` of the JSON object. Putting them outside the JSON produces invalid JSON and the command will not execute.
 
 ## Available Commands
 
