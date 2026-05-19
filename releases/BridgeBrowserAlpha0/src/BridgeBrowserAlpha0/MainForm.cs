@@ -213,17 +213,29 @@ public sealed partial class MainForm : Form
                 var targetDir = AppConstants.DownloadsPath;
                 Directory.CreateDirectory(targetDir);
                 var targetFile = Path.Combine(targetDir, Path.GetFileName(filename));
+                var exactName = Path.GetFileName(filename);
 
-                // Wait for the exact file to appear in Downloads (poll 20x, 1s each)
-                var psi = new System.Diagnostics.ProcessStartInfo("powershell.exe",
-                    $"-NoProfile -Command \"$n='{Path.GetFileName(filename)}'; for($i=0;$i -lt 20;$i++){{ $f=Get-ChildItem '{userDownloads}' -Filter $n -ErrorAction SilentlyContinue | Select-Object -First 1; if($f){{ Move-Item -Path $f.FullName -Destination '{targetFile}' -Force; Write-Output ('MOVED '+$f.Name+' '+$f.Length); exit 0 }}; Start-Sleep 1 }}; Write-Output 'TIMEOUT'\"")
+                // Diagnostic: snapshot Downloads before click, then poll every 2s for 20s
+                var diagScript = $"-NoProfile -Command \"" +
+                    $"$dir='{userDownloads}'; $n='{exactName}'; $t='{targetFile}';\n" +
+                    $"Write-Output ('DIAG_BEFORE '+((Get-ChildItem $dir -ErrorAction SilentlyContinue | Measure-Object).Count)+' files');\n" +
+                    $"Write-Output ('DIAG_TARGET '+$n);\n" +
+                    $"for(`$i=1;`$i -le 10;`$i++){{ Start-Sleep 2;\n" +
+                    $"  `$all=(Get-ChildItem `$dir -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 3 | ForEach-Object {{ `$_.Name+' ('+`$_.Length+'b)' }} ) -join ' | ';\n" +
+                    $"  Write-Output ('DIAG_SNAP '+`$i+' ['+`$all+']');\n" +
+                    $"  `$f=Get-ChildItem `$dir -Filter `$n -ErrorAction SilentlyContinue | Select-Object -First 1;\n" +
+                    $"  if(`$f){{ Move-Item -Path `$f.FullName -Destination `$t -Force; Write-Output ('MOVED '+`$f.Name+' '+`$f.Length); exit 0 }}\n" +
+                    $"}}\n" +
+                    $"Write-Output 'TIMEOUT_20s'\"";
+
+                var psi = new System.Diagnostics.ProcessStartInfo("powershell.exe", diagScript)
                 {
                     RedirectStandardOutput = true,
                     UseShellExecute = false,
                     CreateNoWindow = true
                 };
                 var p = System.Diagnostics.Process.Start(psi);
-                if (p != null) { var output = await p.StandardOutput.ReadToEndAsync(); _log.WriteRun("runtime_approval", "sandbox_move", "ok", output.Trim()); p.Dispose(); }
+                if (p != null) { var output = await p.StandardOutput.ReadToEndAsync(); _log.WriteRun("runtime_approval", "sandbox_diag", "ok", output.Trim()); p.Dispose(); }
             }
         }
         catch (Exception ex)
