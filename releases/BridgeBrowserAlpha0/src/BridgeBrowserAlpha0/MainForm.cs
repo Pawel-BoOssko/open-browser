@@ -202,23 +202,24 @@ public sealed partial class MainForm : Form
                     "console.log('OpenBridge: sandbox link not found');})();";
                 await _webView.CoreWebView2.ExecuteScriptAsync(js);
 
-                await Task.Delay(2_000);
+                await Task.Delay(5_000);
 
                 var userDownloads = Path.Combine(
                     Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
                     "Downloads");
                 var targetDir = AppConstants.DownloadsPath;
                 Directory.CreateDirectory(targetDir);
+                var targetFile = Path.Combine(targetDir, Path.GetFileName(filename));
 
                 var psi = new System.Diagnostics.ProcessStartInfo("powershell.exe",
-                    $"-NoProfile -Command \"Get-ChildItem '{userDownloads}' -Filter '*{Path.GetFileNameWithoutExtension(filename)}*' | Sort-Object LastWriteTime -Descending | Select-Object -First 1 | Move-Item -Destination '{targetDir}\\{Path.GetFileName(filename)}' -Force; Write-Output 'MOVED'\"")
+                    $"-NoProfile -Command \"$dl=Get-ChildItem '{userDownloads}' | Sort-Object LastWriteTime -Descending | Select-Object -First 1; if($dl){{ Move-Item -Path $dl.FullName -Destination '{targetFile}' -Force; Write-Output ('MOVED '+$dl.Name+' '+$dl.Length) }}else{{ Write-Output 'NOFILE' }}\"")
                 {
                     RedirectStandardOutput = true,
                     UseShellExecute = false,
                     CreateNoWindow = true
                 };
                 var p = System.Diagnostics.Process.Start(psi);
-                if (p != null) { await p.WaitForExitAsync(); p.Dispose(); }
+                if (p != null) { var output = await p.StandardOutput.ReadToEndAsync(); _log.WriteRun("runtime_approval", "sandbox_move", "ok", output.Trim()); p.Dispose(); }
             }
         }
         catch (Exception ex)
