@@ -17,3 +17,4 @@
 | `github/` | GitHub file publishing via Contents API (no local git) |
 | `linkedin/` | LinkedIn posting via OAuth 2.0 + REST API |
 | `claude/` | Claude Code launcher via DeepSeek API — delegate complex tasks |
+| `web/` | Browser automation — form filling, data extraction, screenshots |

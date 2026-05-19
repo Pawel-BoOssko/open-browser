@@ -6,9 +6,17 @@ A loose, chronological list of changes. Most recent first.
 
 ## Pending / planned
 
-- **Countdown timer in UI** — show remaining delay in status bar during `SendTextToChatAsync` ("Response in 34s...")
-- **Fix UTF-8 encoding** — PowerShell output mangling Polish characters (mojibake), need to set `OutputEncoding` on process
-- **Web automation tools** — `tools/web/` for government portals, form filling, data extraction
+_nothing pending_
+
+## 2026-05-19
+
+- **fixed:** UTF-8 encoding — `StandardOutputEncoding` and `StandardErrorEncoding` set to UTF-8 in `GeneralCommandExecutor`. Polish characters render correctly.
+- **added:** Countdown timer — status bar shows "Response in 34s..." counting down during human delay.
+- **added:** `tools/web/` — web automation framework. `web_fetch.py` (requests+BeautifulSoup), `web_form.py` (form submission), `web_browser.py` (Selenium for sites without APIs).
+- **added:** HST_STATUS now includes `Your ID` (conversation_id from ChatGPT URL).
+- **fixed:** RAW block parser — adjacent quotes stripped when RAW markers inside JSON string.
+- **added:** PY command — Python executor via `python -c`.
+- **test results:** 17 PASS, 1 FAIL (U1 PS encoding, now fixed). RAW block tests all PASS.
 
 ## 2026-05-18 (publication)
 
