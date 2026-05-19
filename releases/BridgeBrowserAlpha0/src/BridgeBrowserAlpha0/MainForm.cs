@@ -22,7 +22,7 @@ public sealed partial class MainForm : Form
         _messageHandler = new WebViewMessageHandler(_log, _extractor, () => { });
 
         var psExecutor = new BridgeBrowserAlpha0.OpenBridgeHost.GeneralCommand.GeneralCommandExecutor(
-            "powershell.exe", "-NoProfile -Command \"{prompt}\"");
+            "powershell.exe", "-NoProfile -Command \"chcp 65001 >`$null; $OutputEncoding=[System.Text.Encoding]::UTF8; {prompt}\"");
         var host = new OpenBridgeHost.OpenBridgeHost(psExecutor);
         _runtimeApproval = new OpenBridgeHost.OpenBridgeRuntimeApproval(host, @"D:\projects\open-browser", _log);
 
