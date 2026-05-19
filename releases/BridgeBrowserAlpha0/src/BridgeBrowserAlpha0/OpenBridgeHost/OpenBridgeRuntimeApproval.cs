@@ -297,7 +297,7 @@ public class OpenBridgeRuntimeApproval
             // Recent downloads
             try
             {
-                var downloadsDir = Path.Combine(_workingDirectory, "downloads");
+                var downloadsDir = AppConstants.DownloadsPath;
                 if (Directory.Exists(downloadsDir))
                 {
                     var files = Directory.GetFiles(downloadsDir)

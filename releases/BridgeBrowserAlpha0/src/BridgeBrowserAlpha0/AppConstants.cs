@@ -9,6 +9,34 @@ public static class AppConstants
     public static string? ConversationId { get; set; }
     public static string? LastAssistantResponseText { get; set; }
 
+    private static string? _downloadsPath;
+    public static string DownloadsPath
+    {
+        get
+        {
+            if (_downloadsPath != null) return _downloadsPath;
+            try
+            {
+                var configPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory,
+                    "config", "local", "downloads-path.json");
+                if (!File.Exists(configPath))
+                {
+                    configPath = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,
+                        "..", "..", "..", "..", "..", "config", "local", "downloads-path.json"));
+                }
+                if (File.Exists(configPath))
+                {
+                    using var json = System.Text.Json.JsonDocument.Parse(File.ReadAllText(configPath));
+                    if (json.RootElement.TryGetProperty("path", out var prop))
+                        _downloadsPath = Path.GetFullPath(prop.GetString() ?? "");
+                }
+            }
+            catch { }
+            _downloadsPath ??= @"D:\downloads-open-browser";
+            return _downloadsPath;
+        }
+    }
+
     public static readonly string BuildNumber = GetGitCount() ?? "?";
     public static readonly string CommitHash = GetGitHash() ?? "unknown";
     public static readonly string BuildStamp =

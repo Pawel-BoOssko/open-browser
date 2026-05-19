@@ -204,17 +204,14 @@ public sealed partial class MainForm : Form
 
                 await Task.Delay(2_000);
 
-                // Move from Downloads to downloads/
-                var downloadsDir = Path.Combine(
+                var userDownloads = Path.Combine(
                     Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
                     "Downloads");
-                var targetDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory,
-                    "..", "..", "..", "..", "..", "downloads");
-                targetDir = Path.GetFullPath(targetDir);
+                var targetDir = AppConstants.DownloadsPath;
                 Directory.CreateDirectory(targetDir);
 
                 var psi = new System.Diagnostics.ProcessStartInfo("powershell.exe",
-                    $"-NoProfile -Command \"Get-ChildItem '{downloadsDir}' -Filter '*{Path.GetFileNameWithoutExtension(filename)}*' | Sort-Object LastWriteTime -Descending | Select-Object -First 1 | Move-Item -Destination '{targetDir}\\{Path.GetFileName(filename)}' -Force; Write-Output 'MOVED'\"")
+                    $"-NoProfile -Command \"Get-ChildItem '{userDownloads}' -Filter '*{Path.GetFileNameWithoutExtension(filename)}*' | Sort-Object LastWriteTime -Descending | Select-Object -First 1 | Move-Item -Destination '{targetDir}\\{Path.GetFileName(filename)}' -Force; Write-Output 'MOVED'\"")
                 {
                     RedirectStandardOutput = true,
                     UseShellExecute = false,
