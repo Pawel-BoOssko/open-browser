@@ -256,6 +256,7 @@ public class OpenBridgeRuntimeApproval
             sb.AppendLine($"Build: {AppConstants.BuildInfo}");
             sb.AppendLine($"Started: {AppConstants.BuildStamp}");
             sb.AppendLine($"Working directory: {_workingDirectory}");
+            sb.AppendLine($"Your ID: {AppConstants.ConversationId ?? "(not yet detected)"}");
             sb.AppendLine();
 
             // Git status

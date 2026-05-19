@@ -6,6 +6,8 @@ public static class AppConstants
 {
     public const string AppTitle = "Open Browser";
 
+    public static string? ConversationId { get; set; }
+
     public static readonly string BuildNumber = GetGitCount() ?? "?";
     public static readonly string CommitHash = GetGitHash() ?? "unknown";
     public static readonly string BuildStamp =

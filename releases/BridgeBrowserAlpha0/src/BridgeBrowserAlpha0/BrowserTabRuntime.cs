@@ -65,6 +65,21 @@ public sealed class BrowserTabRuntime
         StartNewRun();
         await _networkLogger.InitializeAsync();
 
+        _core.SourceChanged += (_, _) =>
+        {
+            try
+            {
+                var url = _core.Source;
+                if (!string.IsNullOrEmpty(url))
+                {
+                    var match = System.Text.RegularExpressions.Regex.Match(url, @"/c/([a-f0-9-]+)");
+                    if (match.Success)
+                        AppConstants.ConversationId = match.Groups[1].Value;
+                }
+            }
+            catch { }
+        };
+
         _log.WriteRun("webview", "webview_ready", "ok", "WebView2 ready");
         _core.Navigate("https://chatgpt.com/");
     }
