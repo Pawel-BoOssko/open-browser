@@ -196,24 +196,45 @@ public sealed partial class MainForm : Form
                 var sandboxPath = "/mnt/data/" + m.Groups[1].Value;
                 var filename = m.Groups[1].Value;
                 _log.WriteRun("runtime_approval", "sandbox_api", "ok",
-                    "Calling download API", new { convId, messageId, sandboxPath });
+                    "Calling download API via WebView JS", new { convId, messageId, sandboxPath });
 
-                var apiUrl = $"https://chatgpt.com/conversation/{convId}/interpreter/download" +
-                    $"?message_id={Uri.EscapeDataString(messageId)}" +
-                    $"&sandbox_path={Uri.EscapeDataString(sandboxPath)}";
+                // 1. Call API from WebView context (has cookies) → get download_url
+                var jsCallApi = "(async function(){" +
+                    $"var url='/conversation/{convId}/interpreter/download?message_id={Uri.EscapeDataString(messageId)}&sandbox_path={Uri.EscapeDataString(sandboxPath)}';" +
+                    "try{var r=await fetch(url);var d=await r.json();" +
+                    "if(d.download_url){window.__sandboxDownloadUrl=d.download_url;console.log('OpenBridge: got download_url');}" +
+                    "else{window.__sandboxDownloadUrl='ERROR:no_url:'+JSON.stringify(d);}" +
+                    "}catch(e){window.__sandboxDownloadUrl='ERROR:fetch:'+e.message;}" +
+                    "})();";
+                await _webView.CoreWebView2.ExecuteScriptAsync(jsCallApi);
 
-                var dlScript = $"-NoProfile -Command \"" +
-                    $"$api='{apiUrl}'; " +
-                    $"$out='{AppConstants.DownloadsPath}\\{filename}'; " +
+                // 2. Wait for JS to complete, then read download_url
+                await Task.Delay(3_000);
+                var dlUrl = await _webView.CoreWebView2.ExecuteScriptAsync(
+                    "window.__sandboxDownloadUrl||'TIMEOUT'");
+                dlUrl = dlUrl?.Trim('"') ?? "";
+
+                _log.WriteRun("runtime_approval", "sandbox_dl_url", "ok", dlUrl?.Length > 200 ? dlUrl[..200] : dlUrl);
+
+                if (string.IsNullOrEmpty(dlUrl) || dlUrl.StartsWith("ERROR") || dlUrl == "TIMEOUT" || dlUrl == "undefined")
+                {
+                    _log.WriteRun("runtime_approval", "sandbox_download", "error", dlUrl ?? "null");
+                    continue;
+                }
+
+                // 3. Download file via PS (estuary URL has signature, no cookies needed)
+                var safeUrl = dlUrl.Replace("'", "'\\''");
+                var targetDir = AppConstants.DownloadsPath;
+                Directory.CreateDirectory(targetDir);
+                var targetFile = Path.Combine(targetDir, filename);
+                var safeTarget = targetFile.Replace("'", "'\\''");
+
+                var dlCmd = $"-NoProfile -Command \"" +
                     $"[System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12; " +
-                    $"try{{ $resp=Invoke-RestMethod -Uri $api -UseBasicParsing -TimeoutSec 30; " +
-                    $"if($resp.download_url){{ " +
-                    $"Invoke-WebRequest -Uri $resp.download_url -OutFile $out -UseBasicParsing; " +
-                    $"Write-Output ('DOWNLOADED '+$out+' '+(Get-Item $out).Length) " +
-                    $"}}else{{ Write-Output 'NO_URL' }} " +
-                    $"}}catch{{ Write-Output ('API_ERROR '+$_.Exception.Message) }}\"";
+                    $"Invoke-WebRequest -Uri '{safeUrl}' -OutFile '{safeTarget}' -UseBasicParsing; " +
+                    $"Write-Output ('DOWNLOADED '+'{safeTarget}'+' '+(Get-Item '{safeTarget}').Length)\"";
 
-                var psi = new System.Diagnostics.ProcessStartInfo("powershell.exe", dlScript)
+                var psi = new System.Diagnostics.ProcessStartInfo("powershell.exe", dlCmd)
                 {
                     RedirectStandardOutput = true,
                     UseShellExecute = false,
