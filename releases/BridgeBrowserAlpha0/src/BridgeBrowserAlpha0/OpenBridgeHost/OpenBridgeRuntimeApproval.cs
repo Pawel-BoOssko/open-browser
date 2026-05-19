@@ -254,6 +254,7 @@ public class OpenBridgeRuntimeApproval
             sb.AppendLine("=================");
             sb.AppendLine();
             sb.AppendLine($"Build: {AppConstants.BuildInfo}");
+            sb.AppendLine($"Time: {DateTime.Now:yyyy.MM.dd HH:mm:ss}");
             sb.AppendLine($"Started: {AppConstants.BuildStamp}");
             sb.AppendLine($"Working directory: {_workingDirectory}");
             sb.AppendLine($"Your ID: {AppConstants.ConversationId ?? "(not yet detected)"}");
@@ -291,6 +292,28 @@ public class OpenBridgeRuntimeApproval
                 var toolFolders = Directory.GetDirectories(toolsDir).Select(Path.GetFileName).ToArray();
                 sb.AppendLine($"Tools: {string.Join(", ", toolFolders)}");
             }
+            sb.AppendLine();
+
+            // Recent downloads
+            try
+            {
+                var downloadsDir = Path.Combine(_workingDirectory, "downloads");
+                if (Directory.Exists(downloadsDir))
+                {
+                    var files = Directory.GetFiles(downloadsDir)
+                        .Select(f => new FileInfo(f))
+                        .OrderByDescending(f => f.LastWriteTime)
+                        .Take(3)
+                        .ToArray();
+                    if (files.Length > 0)
+                    {
+                        sb.AppendLine("Recent downloads:");
+                        foreach (var f in files)
+                            sb.AppendLine($"  {f.Name}  ({f.Length} bytes  {f.LastWriteTime:HH:mm:ss})");
+                    }
+                }
+            }
+            catch { }
             sb.AppendLine();
 
             // Current command

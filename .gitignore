@@ -32,3 +32,5 @@ test-output.txt
 test-results.md
 test-plan.md
 $null
+downloads/*
+!downloads/.gitkeep

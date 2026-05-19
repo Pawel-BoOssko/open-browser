@@ -152,6 +152,7 @@ public sealed class ResponseExtractor
             CloseOpenFrames("page_fetch_done_or_finish");
 
             var answer = GetCurrentAnswerText();
+            AppConstants.LastAssistantResponseText = answer;
             PipelineRawDump.Write("04_ResponseExtractor_Finish.txt", answer);
 
             var hasNewFrames = false;

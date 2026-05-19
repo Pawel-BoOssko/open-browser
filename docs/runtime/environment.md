@@ -170,6 +170,29 @@ The tools read secrets automatically — you don't need to pass credentials by h
 
 Your working directory is: `D:\projects\open-browser`
 
+## Working with Files (Sandbox)
+
+You can create files in ChatGPT's sandbox (Code Interpreter / Python). This is a great pattern — generate data, code, or configuration on the server and bring it locally.
+
+**How it works:**
+1. You create a file in the sandbox — a download link appears in your response as `[filename](sandbox:/mnt/data/...)`
+2. Open Bridge automatically clicks the link (after a brief human-like pause), the browser downloads the file
+3. The file is moved to the `downloads/` folder in the working directory
+4. `HST_STATUS` shows the 3 most recent files in `downloads/`
+
+**Pattern — always add a loop command when you create a sandbox file:**
+When you create a sandbox file, add a command to the SAME response. The command keeps the loop alive so Open Bridge can tell you the file has been handled:
+
+```
+@@OPENBRIDGE_EXEC_BEGIN@@
+{"version":"001","command":"PS","payload":"Write-Output 'checking'"}
+@@OPENBRIDGE_EXEC_END@@
+```
+
+After receiving the result, check `HST_STATUS` to see your file in the downloads list.
+
+**Note:** `HST_STATUS` now also shows the current time, so you can compare timestamps.
+
 ## Limits
 
 - Output is truncated at 50,000 characters per stream (stdout/stderr).

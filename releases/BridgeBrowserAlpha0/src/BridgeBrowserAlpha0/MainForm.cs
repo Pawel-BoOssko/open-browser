@@ -172,6 +172,64 @@ public sealed partial class MainForm : Form
         }
     }
 
+    private async Task HandleSandboxLinksAsync()
+    {
+        try
+        {
+            var text = AppConstants.LastAssistantResponseText;
+            if (string.IsNullOrEmpty(text)) return;
+
+            var matches = System.Text.RegularExpressions.Regex.Matches(
+                text, @"sandbox:/mnt/data/([^\s\)]+)");
+            if (matches.Count == 0) return;
+
+            var rng = System.Security.Cryptography.RandomNumberGenerator.Create();
+            var bytes = new byte[4]; rng.GetBytes(bytes);
+            int delayMs = 2_000 + (int)(BitConverter.ToUInt32(bytes) & 0x7FFFFFFF) % 3_000;
+            await Task.Delay(delayMs);
+
+            foreach (System.Text.RegularExpressions.Match m in matches)
+            {
+                var filename = m.Groups[1].Value;
+                var sandboxUrl = m.Value;
+                _log.WriteRun("runtime_approval", "sandbox_click", "ok",
+                    "Clicking sandbox link", new { filename, sandboxUrl });
+
+                var safeUrl = System.Text.Json.JsonSerializer.Serialize(sandboxUrl);
+                var js = "(function(){" +
+                    "var links=document.querySelectorAll('a');" +
+                    $"for(var i=0;i<links.length;i++){{if(links[i].href==={safeUrl}){{links[i].click();console.log('OpenBridge: sandbox clicked:'+{safeUrl});return;}}}}" +
+                    "console.log('OpenBridge: sandbox link not found');})();";
+                await _webView.CoreWebView2.ExecuteScriptAsync(js);
+
+                await Task.Delay(2_000);
+
+                // Move from Downloads to downloads/
+                var downloadsDir = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                    "Downloads");
+                var targetDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory,
+                    "..", "..", "..", "..", "..", "downloads");
+                targetDir = Path.GetFullPath(targetDir);
+                Directory.CreateDirectory(targetDir);
+
+                var psi = new System.Diagnostics.ProcessStartInfo("powershell.exe",
+                    $"-NoProfile -Command \"Get-ChildItem '{downloadsDir}' -Filter '*{Path.GetFileNameWithoutExtension(filename)}*' | Sort-Object LastWriteTime -Descending | Select-Object -First 1 | Move-Item -Destination '{targetDir}\\{Path.GetFileName(filename)}' -Force; Write-Output 'MOVED'\"")
+                {
+                    RedirectStandardOutput = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+                var p = System.Diagnostics.Process.Start(psi);
+                if (p != null) { await p.WaitForExitAsync(); p.Dispose(); }
+            }
+        }
+        catch (Exception ex)
+        {
+            _log.WriteRun("runtime_approval", "sandbox_error", "error", ex.Message);
+        }
+    }
+
     private async Task SendWithDeadlineAsync(string text)
     {
         const int cycleTimeoutMs = 360_000;
@@ -211,6 +269,7 @@ public sealed partial class MainForm : Form
             _log.WriteRun("runtime_approval", "webview_inject", "ok", "Injecting result into chat input", new { outputLength = msg.Length });
             await SendTextToChatAsync(msg);
             SetStatus(result.Status == HostExecutionStatus.Ok ? "OK" : "Failed: " + result.ErrorCode);
+            _ = HandleSandboxLinksAsync();
         }
 
         try
