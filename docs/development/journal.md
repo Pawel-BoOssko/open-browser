@@ -4,6 +4,12 @@ A loose, chronological list of changes. Most recent first.
 
 ---
 
+## Pending / planned
+
+- **Countdown timer in UI** — show remaining delay in status bar during `SendTextToChatAsync` ("Response in 34s...")
+- **Fix UTF-8 encoding** — PowerShell output mangling Polish characters (mojibake), need to set `OutputEncoding` on process
+- **Web automation tools** — `tools/web/` for government portals, form filling, data extraction
+
 ## 2026-05-18 (publication)
 
 - **published:** Repository pushed to GitHub — https://github.com/Pawel-BoOssko/open-browser
