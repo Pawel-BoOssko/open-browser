@@ -31,7 +31,6 @@ public sealed class ResponseExtractor
     public Action<BridgeBrowserAlpha0.OpenBridgeProtocol.OpenBridgeEnvelopeParseResult>? OnEnvelopeDetected;
     private StreamWriter? _rawWriter;
     private string? _answerPath;
-    private string? _rawPath;
     private string? _messagesPath;
     private bool _sawPageStream;
     private int _rawEvents;
@@ -46,7 +45,6 @@ public sealed class ResponseExtractor
     private int _emptyDeltaValues;
     private string? _currentAssistantMessageId;
     private string _currentEventTsUtc = DateTime.UtcNow.ToString("O");
-    private string? _currentRawMessageId;
     private volatile int _pendingFinishCount;
     private readonly HashSet<string> _observedMessageIds = new(StringComparer.Ordinal);
 
@@ -66,7 +64,6 @@ public sealed class ResponseExtractor
             _framesById.Clear();
             _sawPageStream = false;
             _currentAssistantMessageId = null;
-            _currentRawMessageId = null;
             _currentEventTsUtc = DateTime.UtcNow.ToString("O");
             _rawEvents = 0;
             _pageStreamEvents = 0;
@@ -79,13 +76,13 @@ public sealed class ResponseExtractor
             _lastTokenForUnknownMessage = 0;
             _emptyDeltaValues = 0;
             _answerPath = Path.Combine(AppPaths.Extracted, $"run_{_log.RunId}_answer.txt");
-            _rawPath = Path.Combine(AppPaths.Extracted, $"run_{_log.RunId}_raw.ndjson");
             _messagesPath = Path.Combine(AppPaths.Extracted, $"run_{_log.RunId}_messages.ndjson");
-            _rawWriter = new StreamWriter(new FileStream(_rawPath, FileMode.Create, FileAccess.Write, FileShare.ReadWrite), Encoding.UTF8) { AutoFlush = true };
+            var pendingPath = Path.Combine(AppPaths.Extracted, $"run_{_log.RunId}_pending.ndjson");
+            _rawWriter = new StreamWriter(new FileStream(pendingPath, FileMode.Create, FileAccess.Write, FileShare.ReadWrite), Encoding.UTF8) { AutoFlush = true };
             _log.WriteRun("extractor", "extraction_update", "started", "Extractor initialized", new
             {
                 answerPath = _answerPath,
-                rawPath = _rawPath,
+                rawPath = "per-message",
                 messagesPath = _messagesPath,
                 mode = "message_id_framed_sse_with_diagnostics_v_alpha06"
             });
@@ -203,7 +200,7 @@ public sealed class ResponseExtractor
             {
                 chars = answer.Length,
                 answerPath = _answerPath,
-                rawPath = _rawPath,
+                rawPath = "per-message",
                 messagesPath = _messagesPath,
                 summary = diagnostics.Summary,
                 frames = _frames.Select(f => new
@@ -434,15 +431,6 @@ public sealed class ResponseExtractor
         frame.MessageObjectCount++;
         _currentAssistantMessageId = id;
 
-        // New message — switch to a separate raw file
-        if (id != _currentRawMessageId)
-        {
-            _rawWriter?.Dispose();
-            _currentRawMessageId = id;
-            var perMsgPath = Path.Combine(AppPaths.Extracted, $"run_{_log.RunId}_msg_{id}_raw.ndjson");
-            _rawWriter = new StreamWriter(new FileStream(perMsgPath, FileMode.Append, FileAccess.Write, FileShare.ReadWrite), Encoding.UTF8) { AutoFlush = true };
-        }
-
         if (!content.TryGetProperty("parts", out var parts) || parts.ValueKind != JsonValueKind.Array) return;
         var text = string.Concat(parts.EnumerateArray().Where(x => x.ValueKind == JsonValueKind.String).Select(x => x.GetString() ?? ""));
         if (text.Length == 0) return;
@@ -524,7 +512,19 @@ public sealed class ResponseExtractor
         if (string.Equals(_currentAssistantMessageId, messageId, StringComparison.Ordinal))
             _currentAssistantMessageId = null;
         if (reason == "last_token" && frame.Text.Length > 0)
+        {
+            // Close pending raw file as message-specific
+            if (_rawWriter != null)
+            {
+                _rawWriter.Dispose();
+                var pendingPath = Path.Combine(AppPaths.Extracted, $"run_{_log.RunId}_pending.ndjson");
+                var finalPath = Path.Combine(AppPaths.Extracted, $"run_{_log.RunId}_msg_{messageId}_raw.ndjson");
+                try { File.Move(pendingPath, finalPath); } catch { }
+                // Start new pending for next message
+                _rawWriter = new StreamWriter(new FileStream(pendingPath, FileMode.Create, FileAccess.Write, FileShare.ReadWrite), Encoding.UTF8) { AutoFlush = true };
+            }
             Interlocked.Increment(ref _pendingFinishCount);
+        }
     }
 
     private void CloseOpenFrames(string reason)
