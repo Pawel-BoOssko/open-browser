@@ -201,7 +201,9 @@ public sealed partial class MainForm : Form
                 // 1. Call API from WebView context (has cookies) → get download_url
                 var jsCallApi = "(async function(){" +
                     $"var url='/conversation/{convId}/interpreter/download?message_id={Uri.EscapeDataString(messageId)}&sandbox_path={Uri.EscapeDataString(sandboxPath)}';" +
-                    "try{var r=await fetch(url);var d=await r.json();" +
+                    "try{var r=await fetch(url,{credentials:'include'});" +
+                    "if(!r.ok){window.__sandboxDownloadUrl='ERROR:http_'+r.status;return;}" +
+                    "var d=await r.json();" +
                     "if(d.download_url){window.__sandboxDownloadUrl=d.download_url;console.log('OpenBridge: got download_url');}" +
                     "else{window.__sandboxDownloadUrl='ERROR:no_url:'+JSON.stringify(d);}" +
                     "}catch(e){window.__sandboxDownloadUrl='ERROR:fetch:'+e.message;}" +
