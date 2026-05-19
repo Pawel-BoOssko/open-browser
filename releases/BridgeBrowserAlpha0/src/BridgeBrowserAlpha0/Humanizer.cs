@@ -1,79 +1,80 @@
+using System.IO;
 using System.Security.Cryptography;
+using System.Text.Json;
 
 namespace BridgeBrowserAlpha0;
 
 public static class Humanizer
 {
-    private static readonly string[] Slot1 =
-    {
-        "Dobra,", "OK,", "Okej,", "No dobra,", "No to,", "Dobrze,", "Jasne,",
-        "W porządku,", "Gotowe,", "Tak,", "Jest,", "Mam,", "Zrobione,",
-        "Działa,", "Wróciło,", "To teraz,", "Już jest,", "Jest zwrotka,",
-        "Mam już zwrot,", "System odpowiedział,", "Odpowiedź wróciła,",
-        "Wynik jest dostępny,", "Wszystko wróciło,", "Mam odpowiedź,",
-        "Już to mam,", "Przyszła odpowiedź,", "Wrócił rezultat,", "Zakończone,",
-        "Operacja zakończona,", "Wynik już jest,", "Mam to już z powrotem,",
-        "Można iść dalej,",
-    };
-
-    private static readonly string[] Slot2 =
-    {
-        "już dostałem odpowiedź", "już mam odpowiedź", "już mam wynik",
-        "mam już odpowiedź", "mam już wynik", "system już odpowiedział",
-        "już system odpowiedział", "odpowiedź już wróciła", "już wróciła odpowiedź",
-        "wynik już wrócił", "już wrócił wynik", "mam to z powrotem",
-        "już mogę to przekazać", "już mogę to pokazać", "już mogę to wkleić",
-        "wykonanie już się zakończyło", "dostałem już odpowiedź z powrotem",
-        "mam już pełny zwrot z systemu", "wynik wykonania jest już dostępny",
-        "odpowiedź przyszła poprawnie", "system zwrócił już dane",
-        "proces zwrócił odpowiedź", "odpowiedź jest już gotowa",
-        "zwrotka z systemu już jest", "mam już to, co przyszło",
-        "przyszło już to, na co czekaliśmy", "wykonanie dobiegło końca",
-        "odpowiedź została zwrócona", "rezultat jest już po stronie zwrotnej",
-        "system zakończył działanie", "mam już surową odpowiedź",
-        "wszystko wróciło z wykonania",
-    };
-
-    private static readonly string[] Slot3 =
-    {
-        "daję", "podaję", "wklejam", "wrzucam", "przesyłam", "pokazuję",
-        "przekazuję", "wstawiam", "podaję poniżej", "poniżej daję",
-        "wklejam poniżej", "wrzucam poniżej", "podaję bez zmian",
-        "wklejam bez zmian", "przesyłam bez zmian", "zostawiam poniżej",
-        "wstawiam dokładnie", "przekazuję dalej", "zostawiam w oryginale",
-        "daję dokładnie to", "podaję dokładnie to", "wklejam dokładnie to",
-        "wrzucam dalej", "przekazuję w tej postaci", "podaję wprost",
-        "zostawiam tak, jak przyszło", "wklejam tak, jak wróciło",
-        "przesyłam wprost", "podaję bez obróbki", "wrzucam bez edycji",
-        "pokazuję w niezmienionej formie", "przekazuję jako wynik",
-    };
-
-    private static readonly string[] Slot4 =
-    {
-        "wynik", "output", "rezultat", "odpowiedź", "wynik działania",
-        "wynik wykonania", "odpowiedź systemu", "odpowiedź zwrotną",
-        "pełną odpowiedź", "treść odpowiedzi", "to, co przyszło",
-        "to, co wróciło", "to, co zwrócił system", "to, co dostałem z powrotem",
-        "komunikat zwrotny", "surowy wynik", "pełny wynik działania",
-        "zwrot z systemu", "surową odpowiedź", "dokładny output",
-        "wynik bez zmian", "odpowiedź bez edycji", "rezultat wykonania",
-        "końcowy wynik", "treść zwrotki", "dane zwrócone przez system",
-        "komunikat z wykonania", "odpowiedź w oryginalnej postaci",
-        "wynik dokładnie w tej formie", "to, co system odesłał",
-        "pełną treść zwróconą przez system", "surowy komunikat zwrotny",
-    };
-
+    private static string[] _slot1 = Array.Empty<string>();
+    private static string[] _slot2 = Array.Empty<string>();
+    private static string[] _slot3 = Array.Empty<string>();
+    private static string[] _slot4 = Array.Empty<string>();
     private static string? _lastPrefix;
+    private static bool _loaded;
+
+    private static void Load()
+    {
+        if (_loaded) return;
+        _loaded = true;
+
+        var baseDir = AppDomain.CurrentDomain.BaseDirectory;
+        var paths = new[]
+        {
+            // Local override (git-ignored, for custom language)
+            Path.Combine(baseDir, "config", "local", "humanizer.json"),
+            // Shipped with the app (copied to output by build)
+            Path.Combine(baseDir, "config", "humanizer.json"),
+            // Project root for dotnet run
+            Path.GetFullPath(Path.Combine(baseDir, "..", "..", "..", "..", "..", "config", "humanizer.json")),
+        };
+
+        foreach (var path in paths)
+        {
+            try
+            {
+                var resolved = Path.GetFullPath(path);
+                if (!File.Exists(resolved)) continue;
+
+                using var doc = JsonDocument.Parse(File.ReadAllText(resolved, System.Text.Encoding.UTF8));
+                var root = doc.RootElement;
+
+                _slot1 = ReadArray(root, "slot1");
+                _slot2 = ReadArray(root, "slot2");
+                _slot3 = ReadArray(root, "slot3");
+                _slot4 = ReadArray(root, "slot4");
+
+                if (_slot1.Length > 0 && _slot2.Length > 0 && _slot3.Length > 0 && _slot4.Length > 0)
+                    return;
+            }
+            catch { }
+        }
+    }
+
+    private static string[] ReadArray(JsonElement root, string name)
+    {
+        if (!root.TryGetProperty(name, out var prop) || prop.ValueKind != JsonValueKind.Array)
+            return Array.Empty<string>();
+        var list = new System.Collections.Generic.List<string>();
+        foreach (var item in prop.EnumerateArray())
+            if (item.ValueKind == JsonValueKind.String)
+                list.Add(item.GetString() ?? "");
+        return list.ToArray();
+    }
 
     public static string Wrap(string content)
     {
+        Load();
+        if (_slot1.Length == 0)
+            return content; // no humanizer config — pass through unchanged
+
         string prefix;
         do
         {
-            var s1 = Slot1[RandomIndex(Slot1.Length)];
-            var s2 = Slot2[RandomIndex(Slot2.Length)];
-            var s3 = Slot3[RandomIndex(Slot3.Length)];
-            var s4 = Slot4[RandomIndex(Slot4.Length)];
+            var s1 = _slot1[RandomIndex(_slot1.Length)];
+            var s2 = _slot2[RandomIndex(_slot2.Length)];
+            var s3 = _slot3[RandomIndex(_slot3.Length)];
+            var s4 = _slot4[RandomIndex(_slot4.Length)];
             prefix = $"{s1} {s2}, {s3} {s4}:";
         } while (prefix == _lastPrefix);
 
