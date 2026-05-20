@@ -37,6 +37,8 @@ Every trace of a removed feature must be erased from the entire project. No ghos
 
 ## Prohibitions
 
+12. **OVERRIDING RULE** — **NEVER** add new functionality or change existing functionality without explicit user approval. Even if a change seems obviously correct or trivial. No new features, no behavior changes, no new buttons, no new scripts, no new handlers. Bug fixes and cleanup are fine. When in doubt, ask.
+
 13. **NEVER** run `git push` — under no circumstances.
 14. **NEVER** install packages (`dotnet add package`) without explicit user approval.
 15. **NEVER** restore the old `BridgeBrowserHelper` or Cloud Code connector.
