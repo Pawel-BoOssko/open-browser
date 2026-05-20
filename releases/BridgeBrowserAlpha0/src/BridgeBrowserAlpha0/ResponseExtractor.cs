@@ -118,20 +118,6 @@ public sealed class ResponseExtractor
             }
             if (!isPageStream && !isCdpConversationBody && _sawPageStream) return;
 
-            // Capture Python tool message_id for sandbox download (only tool_invoked: true)
-            if (raw.Contains("tool_invoked"))
-            {
-                var toolTrue = System.Text.RegularExpressions.Regex.Match(
-                    raw, @"tool_invoked[^a-z]*true");
-                if (toolTrue.Success)
-                {
-                    var toolMid = System.Text.RegularExpressions.Regex.Match(
-                        raw, @"message_id[^a-f0-9-]*([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})");
-                    if (toolMid.Success)
-                        AppConstants.LastToolMessageId = toolMid.Groups[1].Value;
-                }
-            }
-
             var before = GetCurrentAnswerText();
             ProcessRaw(raw, flushTail: false);
             var after = GetCurrentAnswerText();

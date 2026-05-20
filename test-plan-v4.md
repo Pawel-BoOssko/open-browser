@@ -32,7 +32,7 @@ Expected: output contains `Zażółć gęślą jaźń` exactly, no replacement c
 ```
 Expected: output contains `Zażółć gęślą jaźń` exactly.
 
-### F1 — Create sandbox file with loop command
+### F1 — [NOT YET IMPLEMENTED] Create sandbox file with loop command
 Ask me to create a file in the sandbox. Tell me: "Create a small text file in the sandbox with a short Polish poem. Include a PS command in the same response to keep the loop alive."
 
 ```
@@ -40,9 +40,9 @@ Ask me to create a file in the sandbox. Tell me: "Create a small text file in th
 {"version":"001","command":"PS","payload":"Write-Output 'waiting_for_file'"}
 @@OPENBRIDGE_EXEC_END@@
 ```
-Expected: sandbox download link appears, Open Bridge auto-clicks, file appears in downloads.
+Expected: sandbox download link appears, file downloads automatically.
 
-### F2 — Verify file in HST_STATUS
+### F2 — [NOT YET IMPLEMENTED] Verify file in HST_STATUS
 ```
 @@OPENBRIDGE_EXEC_BEGIN@@
 {"version":"001","command":"HST_STATUS"}
@@ -50,7 +50,7 @@ Expected: sandbox download link appears, Open Bridge auto-clicks, file appears i
 ```
 Expected: `Recent downloads:` lists the file from F1.
 
-### F3 — Verify file content
+### F3 — [NOT YET IMPLEMENTED] Verify file content
 ```
 @@OPENBRIDGE_EXEC_BEGIN@@
 {"version":"001","command":"PS","payload":"Get-Content downloads\\*.txt -Encoding UTF8 | Select-Object -First 5"}

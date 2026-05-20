@@ -294,28 +294,6 @@ public class OpenBridgeRuntimeApproval
             }
             sb.AppendLine();
 
-            // Recent downloads
-            try
-            {
-                var downloadsDir = AppConstants.DownloadsPath;
-                if (Directory.Exists(downloadsDir))
-                {
-                    var files = Directory.GetFiles(downloadsDir)
-                        .Select(f => new FileInfo(f))
-                        .OrderByDescending(f => f.LastWriteTime)
-                        .Take(3)
-                        .ToArray();
-                    if (files.Length > 0)
-                    {
-                        sb.AppendLine("Recent downloads:");
-                        foreach (var f in files)
-                            sb.AppendLine($"  {f.Name}  ({f.Length} bytes  {f.LastWriteTime:HH:mm:ss})");
-                    }
-                }
-            }
-            catch { }
-            sb.AppendLine();
-
             // Current command
             lock (_gate)
             {

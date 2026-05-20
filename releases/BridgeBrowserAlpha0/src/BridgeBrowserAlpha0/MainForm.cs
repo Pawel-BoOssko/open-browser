@@ -172,86 +172,6 @@ public sealed partial class MainForm : Form
         }
     }
 
-    private async Task HandleSandboxLinksAsync()
-    {
-        try
-        {
-            var text = AppConstants.LastAssistantResponseText;
-            var convId = AppConstants.ConversationId;
-            var messageId = AppConstants.LastToolMessageId ?? AppConstants.LastAssistantMessageId;
-            if (string.IsNullOrEmpty(text) || string.IsNullOrEmpty(convId) || string.IsNullOrEmpty(messageId))
-                return;
-
-            var matches = System.Text.RegularExpressions.Regex.Matches(
-                text, @"sandbox:/mnt/data/([^\s\)]+)");
-            if (matches.Count == 0) return;
-
-            var rng = System.Security.Cryptography.RandomNumberGenerator.Create();
-            var bytes = new byte[4]; rng.GetBytes(bytes);
-            int delayMs = 2_000 + (int)(BitConverter.ToUInt32(bytes) & 0x7FFFFFFF) % 3_000;
-            await Task.Delay(delayMs);
-
-            foreach (System.Text.RegularExpressions.Match m in matches)
-            {
-                var sandboxPath = "/mnt/data/" + m.Groups[1].Value;
-                var filename = m.Groups[1].Value;
-                _log.WriteRun("runtime_approval", "sandbox_api", "ok",
-                    "Calling download API via WebView JS", new { convId, messageId, sandboxPath });
-
-                // 1. Call API from WebView context (has cookies) → get download_url
-                var jsCallApi = "(async function(){" +
-                    $"var url='/conversation/{convId}/interpreter/download?message_id={Uri.EscapeDataString(messageId)}&sandbox_path={Uri.EscapeDataString(sandboxPath)}';" +
-                    "try{var r=await fetch(url,{credentials:'include'});" +
-                    "if(!r.ok){window.__sandboxDownloadUrl='ERROR:http_'+r.status;return;}" +
-                    "var d=await r.json();" +
-                    "if(d.download_url){window.__sandboxDownloadUrl=d.download_url;console.log('OpenBridge: got download_url');}" +
-                    "else{window.__sandboxDownloadUrl='ERROR:no_url:'+JSON.stringify(d);}" +
-                    "}catch(e){window.__sandboxDownloadUrl='ERROR:fetch:'+e.message;}" +
-                    "})();";
-                await _webView.CoreWebView2.ExecuteScriptAsync(jsCallApi);
-
-                // 2. Wait for JS to complete, then read download_url
-                await Task.Delay(3_000);
-                var dlUrl = await _webView.CoreWebView2.ExecuteScriptAsync(
-                    "window.__sandboxDownloadUrl||'TIMEOUT'");
-                dlUrl = dlUrl?.Trim('"') ?? "";
-
-                _log.WriteRun("runtime_approval", "sandbox_dl_url", "ok", dlUrl?.Length > 200 ? dlUrl[..200] : dlUrl);
-
-                if (string.IsNullOrEmpty(dlUrl) || dlUrl.StartsWith("ERROR") || dlUrl == "TIMEOUT" || dlUrl == "undefined")
-                {
-                    _log.WriteRun("runtime_approval", "sandbox_download", "error", dlUrl ?? "null");
-                    continue;
-                }
-
-                // 3. Download file via PS (estuary URL has signature, no cookies needed)
-                var safeUrl = dlUrl.Replace("'", "'\\''");
-                var targetDir = AppConstants.DownloadsPath;
-                Directory.CreateDirectory(targetDir);
-                var targetFile = Path.Combine(targetDir, filename);
-                var safeTarget = targetFile.Replace("'", "'\\''");
-
-                var dlCmd = $"-NoProfile -Command \"" +
-                    $"[System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12; " +
-                    $"Invoke-WebRequest -Uri '{safeUrl}' -OutFile '{safeTarget}' -UseBasicParsing; " +
-                    $"Write-Output ('DOWNLOADED '+'{safeTarget}'+' '+(Get-Item '{safeTarget}').Length)\"";
-
-                var psi = new System.Diagnostics.ProcessStartInfo("powershell.exe", dlCmd)
-                {
-                    RedirectStandardOutput = true,
-                    UseShellExecute = false,
-                    CreateNoWindow = true
-                };
-                var p = System.Diagnostics.Process.Start(psi);
-                if (p != null) { var output = await p.StandardOutput.ReadToEndAsync(); _log.WriteRun("runtime_approval", "sandbox_download", "ok", output.Trim()); p.Dispose(); }
-            }
-        }
-        catch (Exception ex)
-        {
-            _log.WriteRun("runtime_approval", "sandbox_error", "error", ex.Message);
-        }
-    }
-
     private async Task SendWithDeadlineAsync(string text)
     {
         const int cycleTimeoutMs = 360_000;
@@ -291,7 +211,6 @@ public sealed partial class MainForm : Form
             _log.WriteRun("runtime_approval", "webview_inject", "ok", "Injecting result into chat input", new { outputLength = msg.Length });
             await SendTextToChatAsync(msg);
             SetStatus(result.Status == HostExecutionStatus.Ok ? "OK" : "Failed: " + result.ErrorCode);
-            _ = HandleSandboxLinksAsync();
         }
 
         try
