@@ -127,13 +127,12 @@ public sealed partial class MainForm : Form
         if (_cycleClosed) return;
         try
         {
-            _skipWait = false;
             text = Humanizer.Wrap(text);
             var delayMs = ComputeHumanDelayMs();
             _log.WriteRun("runtime_approval", "human_delay", "ok", $"Delaying {delayMs}ms before inject");
             for (int remaining = delayMs / 1000; remaining > 0; remaining--)
             {
-                if (_skipWait) break;
+                if (_skipWait) { _skipWait = false; break; }
                 SetStatus($"Response in {remaining}s...");
                 await Task.Delay(1000);
                 if (_cycleClosed) return;
@@ -146,7 +145,7 @@ public sealed partial class MainForm : Form
                 _log.WriteRun("runtime_approval", "rhythm_pause", "ok", $"Session rhythm pause {pauseMs / 1000}s");
                 for (int remaining = pauseMs / 1000; remaining > 0; remaining--)
                 {
-                    if (_skipWait) break;
+                    if (_skipWait) { _skipWait = false; break; }
                     SetStatus($"Pause {remaining / 60}m {remaining % 60:D2}s...");
                     await Task.Delay(1000);
                     if (_cycleClosed) return;
@@ -161,6 +160,7 @@ public sealed partial class MainForm : Form
                 if (_cycleClosed) { _paused = false; return; }
             }
 
+            _skipWait = false;
             SetStatus("Sending...");
             var safeText = System.Text.Json.JsonSerializer.Serialize(text);
             var js = "var el=document.querySelector('#prompt-textarea,.ProseMirror,[contenteditable=true]');" +

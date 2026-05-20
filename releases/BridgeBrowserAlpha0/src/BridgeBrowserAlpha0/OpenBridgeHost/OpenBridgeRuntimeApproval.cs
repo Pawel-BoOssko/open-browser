@@ -290,23 +290,37 @@ private HostCommandResult ExecuteStatusCommand()
             sb.AppendLine("OpenBridge Host Commands");
             sb.AppendLine("=======================");
             sb.AppendLine();
+            sb.AppendLine("How to send a command:");
+            sb.AppendLine("  Include this exact block in your response. The markers must be exactly as shown:");
+            sb.AppendLine();
+            sb.AppendLine("  @@OPENBRIDGE_EXEC_BEGIN@@");
+            sb.AppendLine("  {\"version\":\"001\",\"command\":\"HST_HELP\"}");
+            sb.AppendLine("  @@OPENBRIDGE_EXEC_END@@");
+            sb.AppendLine();
+            sb.AppendLine("  - version is always \"001\".");
+            sb.AppendLine("  - command is one of the names listed below.");
+            sb.AppendLine("  - payload is the code or text to pass to the command (not needed for HST commands).");
+            sb.AppendLine("  - The first valid block in your response is executed. The rest are ignored.");
+            sb.AppendLine("  - If you write the markers without intending to execute — they WILL execute anyway.");
+            sb.AppendLine("  - To stay in the loop: end your response with a command block. No block = loop stops.");
+            sb.AppendLine();
             sb.AppendLine("HST commands (ask the system directly):");
             sb.AppendLine("  HST_HELP    — this list");
             sb.AppendLine("  HST_STATUS  — system status, working directory, conversation ID, recent downloads");
             sb.AppendLine();
             sb.AppendLine("Available executors:");
-            sb.AppendLine("  PS — PowerShell  (PS_HELP for details)");
-            sb.AppendLine("  PY — Python 3    (PY_HELP for details)");
+            sb.AppendLine("  PS — PowerShell  (send PS_HELP for details)");
+            sb.AppendLine("  PY — Python 3    (send PY_HELP for details)");
+            sb.AppendLine();
+            sb.AppendLine("Example — to get PS help:");
+            sb.AppendLine("  @@OPENBRIDGE_EXEC_BEGIN@@");
+            sb.AppendLine("  {\"version\":\"001\",\"command\":\"PS_HELP\"}");
+            sb.AppendLine("  @@OPENBRIDGE_EXEC_END@@");
             sb.AppendLine();
             sb.AppendLine("Automatic bridge features:");
             sb.AppendLine("  - Files created in the ChatGPT sandbox are auto-detected and downloaded.");
             sb.AppendLine("  - Downloads go to the Downloads directory (see HST_STATUS for recent files).");
-            sb.AppendLine("  - Each command has a timeout. If exceeded, the system sends a timeout message.");
-            sb.AppendLine("  - To stay in the loop: end your response with a command block. No command block = loop stops.");
-            sb.AppendLine();
-            sb.AppendLine("How to learn more:");
-            sb.AppendLine("  Send PS_HELP or PY_HELP to get full details about each executor.");
-            sb.AppendLine("  Send HST_STATUS to see your working directory and conversation ID.");
+            sb.AppendLine("  - Each command has a timeout. If exceeded, the system sends a timeout message to chat.");
 
             return new HostCommandResult
             {

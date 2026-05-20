@@ -106,23 +106,16 @@ payload: any Python expression
 
 For multi-line scripts, use a RAW block (see above). The executor uses `python -c` with your code. Keep scripts short and single-purpose.
 
-### HST_HELP — Help
+### HST_HELP — Command list
 
-Returns this document. Use it to discover available commands and the runtime environment.
+Returns the list of available HST commands, executors (PS, PY), and bridge features. Use this first to discover the environment.
 
 ```
 command: "HST_HELP"
 payload: (not needed)
 ```
 
-### HST_TOOLS — Tool catalog
-
-Returns a catalog of all available tools in `tools/`. Each tool is discovered automatically from its README. Use this to find out what external services are available (n8n, GitHub, LinkedIn, etc.) and whether they're configured.
-
-```
-command: "HST_TOOLS"
-payload: (not needed)
-```
+After HST_HELP, use PS_HELP or PY_HELP for full executor documentation.
 
 ### HST_STATUS — Environment status
 
@@ -174,13 +167,13 @@ Your working directory is: `D:\projects\open-browser`
 
 You can create files in ChatGPT's sandbox (Code Interpreter / Python). When you create a file, a download link appears in your response as `[filename](sandbox:/mnt/data/...)`.
 
-**Note:** Automatic download of sandbox files is not yet implemented. The links appear in the response but must be handled manually for now.
+The download links are automatically detected by OpenBrowser and the file is saved to `AppPaths.Downloads`. Use `HST_STATUS` to see recent downloads.
 
 ## Limits
 
 - Output is truncated at 50,000 characters per stream (stdout/stderr).
 - Only one command runs at a time. If a command is already running, new envelopes are rejected.
-- Only the `PS` command is available for execution. Other commands will be rejected with a message.
+- `PS` and `PY` commands are available for execution. Other commands will be rejected.
 
 ## n8n Workflow Management
 
@@ -242,4 +235,4 @@ After completing all tests, save the results to:
 D:\projects\open-browser\test-results.md
 ```
 
-Use `HST_HELP` to re-discover this document. Use `HST_TOOLS` to see available tools. Use `HST_STATUS` to check the current environment state.
+Use `HST_HELP` to re-discover available commands. Use `HST_STATUS` to check the current environment state.
