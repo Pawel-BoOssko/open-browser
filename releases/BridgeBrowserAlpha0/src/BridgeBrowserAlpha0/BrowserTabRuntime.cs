@@ -67,18 +67,40 @@ public sealed class BrowserTabRuntime
             var targetPath = System.IO.Path.Combine(AppPaths.Downloads, safeName);
             e.ResultFilePath = targetPath;
             _log.WriteRun("webview", "download_starting", "ok", $"Downloading '{originalName}' to {targetPath}", new { uri, originalName, targetPath });
+
+            var completed = new System.Threading.Tasks.TaskCompletionSource<bool>();
             e.DownloadOperation.StateChanged += (s, args) =>
             {
                 if (e.DownloadOperation.State == Microsoft.Web.WebView2.Core.CoreWebView2DownloadState.Completed)
                 {
                     _log.WriteRun("webview", "download_completed", "ok", $"Downloaded: {targetPath}", new { bytes = e.DownloadOperation.BytesReceived });
+                    completed.TrySetResult(true);
                 }
                 else if (e.DownloadOperation.State == Microsoft.Web.WebView2.Core.CoreWebView2DownloadState.Interrupted)
                 {
                     _log.WriteRun("webview", "download_error", "error", $"Download interrupted: {targetPath}", new { reason = e.DownloadOperation.InterruptReason });
+                    completed.TrySetResult(false);
                 }
             };
+
+            _ = TimeoutDownloadAsync(e.DownloadOperation, targetPath, completed);
         };
+
+        static async System.Threading.Tasks.Task TimeoutDownloadAsync(
+            Microsoft.Web.WebView2.Core.CoreWebView2DownloadOperation op,
+            string targetPath,
+            System.Threading.Tasks.TaskCompletionSource<bool> completed)
+        {
+            const int timeoutMs = 60_000;
+            var timeout = System.Threading.Tasks.Task.Delay(timeoutMs);
+            var finished = await System.Threading.Tasks.Task.WhenAny(completed.Task, timeout);
+            if (finished == timeout)
+            {
+                try { op.Cancel(); } catch { }
+                System.IO.File.Delete(targetPath);
+            }
+        }
+        ;
 
         await _core.AddScriptToExecuteOnDocumentCreatedAsync(PageTap.Script);
         await _moduleManager.InitializeAsync(_core);
