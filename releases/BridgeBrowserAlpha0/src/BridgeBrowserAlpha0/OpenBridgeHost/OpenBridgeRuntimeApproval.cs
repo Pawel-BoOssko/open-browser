@@ -285,12 +285,37 @@ public class OpenBridgeRuntimeApproval
             }
             sb.AppendLine();
 
-            // Tools available
             var toolsDir = Path.Combine(_workingDirectory, "tools");
             if (Directory.Exists(toolsDir))
             {
                 var toolFolders = Directory.GetDirectories(toolsDir).Select(Path.GetFileName).ToArray();
                 sb.AppendLine($"Tools: {string.Join(", ", toolFolders)}");
+            }
+            sb.AppendLine();
+
+            // Recent downloads
+            var downloadsDir = AppPaths.Downloads;
+            if (Directory.Exists(downloadsDir))
+            {
+                var recentDownloads = new DirectoryInfo(downloadsDir)
+                    .GetFiles()
+                    .OrderByDescending(f => f.CreationTimeUtc)
+                    .Take(3)
+                    .Select(f => f.Name)
+                    .ToArray();
+                
+                if (recentDownloads.Length > 0)
+                {
+                    sb.AppendLine("Recent downloads:");
+                    foreach (var d in recentDownloads)
+                    {
+                        sb.AppendLine($"  {d}");
+                    }
+                }
+                else
+                {
+                    sb.AppendLine("Recent downloads: (none)");
+                }
             }
             sb.AppendLine();
 

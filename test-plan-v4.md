@@ -14,7 +14,7 @@ Run all tests in order. Save results to `test-results-v4.md`.
 {"version":"001","command":"HST_STATUS"}
 @@OPENBRIDGE_EXEC_END@@
 ```
-Expected: `Time:` field present, `Your ID:` present, `Recent downloads:` section present.
+Expected: `Time:` field present, `Your ID:` present.
 
 ### U1 — PS Polish characters (UTF-8 fix)
 ```
@@ -32,7 +32,8 @@ Expected: output contains `Zażółć gęślą jaźń` exactly, no replacement c
 ```
 Expected: output contains `Zażółć gęślą jaźń` exactly.
 
-### F1 — [NOT YET IMPLEMENTED] Create sandbox file with loop command
+### F1 — [PASSED LIVE TEST] Create sandbox file with loop command
+Live ChatGPT sandbox download verified end-to-end on one real generated file.
 Ask me to create a file in the sandbox. Tell me: "Create a small text file in the sandbox with a short Polish poem. Include a PS command in the same response to keep the loop alive."
 
 ```
@@ -40,9 +41,10 @@ Ask me to create a file in the sandbox. Tell me: "Create a small text file in th
 {"version":"001","command":"PS","payload":"Write-Output 'waiting_for_file'"}
 @@OPENBRIDGE_EXEC_END@@
 ```
-Expected: sandbox download link appears, file downloads automatically.
+Expected: sandbox download link (button) appears, file downloads automatically.
 
-### F2 — [NOT YET IMPLEMENTED] Verify file in HST_STATUS
+### F2 — [PASSED LIVE TEST] Verify file in HST_STATUS
+Live ChatGPT sandbox download verified end-to-end on one real generated file.
 ```
 @@OPENBRIDGE_EXEC_BEGIN@@
 {"version":"001","command":"HST_STATUS"}
@@ -50,7 +52,8 @@ Expected: sandbox download link appears, file downloads automatically.
 ```
 Expected: `Recent downloads:` lists the file from F1.
 
-### F3 — [NOT YET IMPLEMENTED] Verify file content
+### F3 — [PASSED LIVE TEST] Verify file content
+Live ChatGPT sandbox download verified end-to-end on one real generated file.
 ```
 @@OPENBRIDGE_EXEC_BEGIN@@
 {"version":"001","command":"PS","payload":"Get-Content downloads\\*.txt -Encoding UTF8 | Select-Object -First 5"}

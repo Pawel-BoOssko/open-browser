@@ -58,6 +58,28 @@ public sealed class BrowserTabRuntime
         };
         _core.WebMessageReceived += (_, e) => _messageHandler.HandleWebMessage(e);
 
+        _core.DownloadStarting += (_, e) =>
+        {
+            e.Handled = true;
+            var originalName = System.IO.Path.GetFileName(e.ResultFilePath) ?? "downloaded_file.bin";
+            var uri = e.DownloadOperation.Uri ?? "unknown_uri";
+            var safeName = string.Join("_", originalName.Split(System.IO.Path.GetInvalidFileNameChars()));
+            var targetPath = System.IO.Path.Combine(AppPaths.Downloads, safeName);
+            e.ResultFilePath = targetPath;
+            _log.WriteRun("webview", "download_starting", "ok", $"Downloading '{originalName}' to {targetPath}", new { uri, originalName, targetPath });
+            e.DownloadOperation.StateChanged += (s, args) =>
+            {
+                if (e.DownloadOperation.State == Microsoft.Web.WebView2.Core.CoreWebView2DownloadState.Completed)
+                {
+                    _log.WriteRun("webview", "download_completed", "ok", $"Downloaded: {targetPath}", new { bytes = e.DownloadOperation.BytesReceived });
+                }
+                else if (e.DownloadOperation.State == Microsoft.Web.WebView2.Core.CoreWebView2DownloadState.Interrupted)
+                {
+                    _log.WriteRun("webview", "download_error", "error", $"Download interrupted: {targetPath}", new { reason = e.DownloadOperation.InterruptReason });
+                }
+            };
+        };
+
         await _core.AddScriptToExecuteOnDocumentCreatedAsync(PageTap.Script);
         await _moduleManager.InitializeAsync(_core);
 

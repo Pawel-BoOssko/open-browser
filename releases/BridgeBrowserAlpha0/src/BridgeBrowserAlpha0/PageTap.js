@@ -213,6 +213,49 @@
 
   window.__BRIDGE_LOADED_TURNS_MONITOR__ = window.__BRIDGE_LOADED_TURNS_MONITOR__ || null;
 
+  setInterval(() => {
+    try {
+      const allAssistants = document.querySelectorAll('[data-message-author-role="assistant"]');
+      const latestMessage = allAssistants.length > 0 ? allAssistants[allAssistants.length - 1] : null;
+      const root = latestMessage || document;
+      
+      // Query standard <a> download links
+      const links = Array.from(root.querySelectorAll("a[href*='mnt/data'], a[href*='backend-api/files'], a[href*='sandbox:']"));
+      
+      // Query ChatGPT React button-style download elements
+      const buttons = Array.from(root.querySelectorAll("button.behavior-btn"));
+      const fileButtons = buttons.filter(btn => {
+        const text = (btn.textContent || "").trim();
+        // Match standard file extensions (e.g. .txt, .csv, .zip, .png, etc.)
+        return /\.[a-zA-Z0-9]{2,5}$/.test(text);
+      });
+      
+      // Combine candidates
+      const candidates = [...links, ...fileButtons];
+      
+      candidates.forEach(element => {
+        if (!element.dataset.openbridgeDownloadAttempted) {
+          element.dataset.openbridgeDownloadAttempted = '1';
+          
+          const urlOrName = element.href || element.textContent || "unknown";
+          post("page_sandbox_download_candidate", { url: urlOrName }, "ok");
+          
+          // Dispatch full user-like event sequence
+          const evts = ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click'];
+          evts.forEach(evName => {
+            element.dispatchEvent(new MouseEvent(evName, {
+              view: window,
+              bubbles: true,
+              cancelable: true,
+              buttons: 1
+            }));
+          });
+          post("page_sandbox_download_click", { url: urlOrName }, "ok");
+        }
+      });
+    } catch (_) {}
+  }, 2000);
+
   post("page_tap_installed", {
     version: "page-tap-alpha13",
     trimmingMode: "page_fetch_wrapper"

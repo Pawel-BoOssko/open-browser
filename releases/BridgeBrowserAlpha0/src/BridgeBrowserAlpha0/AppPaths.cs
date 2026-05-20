@@ -13,6 +13,7 @@ public static class AppPaths
     public static string Releases => Path.Combine(Root, "releases");
     public static string GithubExport => Path.Combine(Root, "github_export");
     public static string GithubExportZips => Path.Combine(Root, "github_export_zips");
+    public static string Downloads => Path.Combine(Root, "downloads");
     public static string Modules => Path.Combine(Root, "modules");
     public static string ConversationTrimmerModuleRoot => Path.Combine(Modules, "conversation-trimmer");
     public static string ConversationTrimmerVersions => Path.Combine(ConversationTrimmerModuleRoot, "versions");
@@ -47,6 +48,7 @@ public static class AppPaths
         Directory.CreateDirectory(Releases);
         Directory.CreateDirectory(GithubExport);
         Directory.CreateDirectory(GithubExportZips);
+        Directory.CreateDirectory(Downloads);
         Directory.CreateDirectory(Modules);
         Directory.CreateDirectory(ConversationTrimmerModuleRoot);
         Directory.CreateDirectory(ConversationTrimmerVersions);
