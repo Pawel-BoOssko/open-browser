@@ -57,6 +57,7 @@ public sealed partial class MainForm : Form
         _pauseButton.Click += (_, _) => TogglePause();
         _skipWaitButton.Click += (_, _) => SkipWait();
         _startPromptButton.Click += async (_, _) => await StartPromptInjectAsync();
+        _navigatePortalButton.Click += (_, _) => NavigateToPortal();
         _testInjectButton.Click += async (_, _) => await TestInjectAsync();
         _copyOutputButton.Click += (_, _) => CopyOutput();
 
@@ -322,6 +323,14 @@ public sealed partial class MainForm : Form
     {
         _skipWait = true;
         _log.WriteRun("app", "skip_wait", "ok", "User skipped current wait");
+    }
+
+    private void NavigateToPortal()
+    {
+        if (_webView.CoreWebView2 == null) { SetStatus("WebView not ready"); return; }
+        _webView.CoreWebView2.Navigate("https://portal.wroclaw.sa.gov.pl");
+        _log.WriteRun("app", "navigate_portal", "ok", "Navigating to Portal Informacyjny Sądów Powszechnych");
+        SetStatus("Navigating to Portal Sądów...");
     }
 
     private async Task StartPromptInjectAsync()
