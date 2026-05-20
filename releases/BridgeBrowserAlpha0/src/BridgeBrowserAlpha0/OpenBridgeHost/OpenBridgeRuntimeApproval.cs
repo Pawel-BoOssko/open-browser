@@ -363,7 +363,12 @@ private HostCommandResult ExecuteStatusCommand()
             sb.AppendLine("  Working directory: the project root");
             sb.AppendLine();
             sb.AppendLine("Encoding:");
-            sb.AppendLine("  Output is UTF-8. Polish and all Unicode characters work correctly.");
+            sb.AppendLine("  Output is captured as UTF-8. Console is forced to UTF-8 (chcp 65001).");
+            sb.AppendLine("  CRITICAL: Get-Content and Out-File default to the system code page");
+            sb.AppendLine("  (CP1250 on Polish Windows), NOT UTF-8. Always use -Encoding UTF8:");
+            sb.AppendLine("    Get-Content path -Encoding UTF8");
+            sb.AppendLine("    ... | Out-File path -Encoding UTF8");
+            sb.AppendLine("  Without -Encoding UTF8, Polish characters WILL be mangled.");
             sb.AppendLine();
             sb.AppendLine("Error handling:");
             sb.AppendLine("  - Non-zero exit code: output is still returned, exit code is reported.");
