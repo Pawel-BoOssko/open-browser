@@ -54,6 +54,9 @@ public sealed partial class MainForm : Form
         InitializeUi();
 
         _hideWebButton.Click += (_, _) => ToggleWebVisibility();
+        _pauseButton.Click += (_, _) => TogglePause();
+        _skipWaitButton.Click += (_, _) => SkipWait();
+        _startPromptButton.Click += async (_, _) => await StartPromptInjectAsync();
         _testInjectButton.Click += async (_, _) => await TestInjectAsync();
         _copyOutputButton.Click += (_, _) => CopyOutput();
 
@@ -114,6 +117,9 @@ public sealed partial class MainForm : Form
     }
 
     private volatile bool _cycleClosed;
+    private volatile bool _paused;
+    private volatile bool _skipWait;
+    private readonly SessionRhythm _rhythm = new();
 
     private async Task SendTextToChatAsync(string text)
     {
@@ -121,15 +127,40 @@ public sealed partial class MainForm : Form
         if (_cycleClosed) return;
         try
         {
+            _skipWait = false;
             text = Humanizer.Wrap(text);
             var delayMs = ComputeHumanDelayMs();
             _log.WriteRun("runtime_approval", "human_delay", "ok", $"Delaying {delayMs}ms before inject");
             for (int remaining = delayMs / 1000; remaining > 0; remaining--)
             {
+                if (_skipWait) break;
                 SetStatus($"Response in {remaining}s...");
                 await Task.Delay(1000);
                 if (_cycleClosed) return;
             }
+
+            _rhythm.RecordCycle();
+            var pauseMs = _rhythm.MaybeGetPauseMs();
+            if (pauseMs > 0)
+            {
+                _log.WriteRun("runtime_approval", "rhythm_pause", "ok", $"Session rhythm pause {pauseMs / 1000}s");
+                for (int remaining = pauseMs / 1000; remaining > 0; remaining--)
+                {
+                    if (_skipWait) break;
+                    SetStatus($"Pause {remaining / 60}m {remaining % 60:D2}s...");
+                    await Task.Delay(1000);
+                    if (_cycleClosed) return;
+                }
+                _rhythm.RecordPauseEnded();
+            }
+
+            while (_paused)
+            {
+                SetStatus("PAUSED — click RESUME to continue");
+                await Task.Delay(1000);
+                if (_cycleClosed) { _paused = false; return; }
+            }
+
             SetStatus("Sending...");
             var safeText = System.Text.Json.JsonSerializer.Serialize(text);
             var js = "var el=document.querySelector('#prompt-textarea,.ProseMirror,[contenteditable=true]');" +
@@ -273,6 +304,55 @@ public sealed partial class MainForm : Form
         {
             Clipboard.SetText(text);
             SetStatus("Output copied.");
+        }
+    }
+
+    private void TogglePause()
+    {
+        _paused = !_paused;
+        _skipWait = false;
+        _pauseButton.Text = _paused ? "RESUME" : "PAUSE";
+        _pauseButton.BackColor = _paused ? Color.LightGreen : SystemColors.Control;
+        _log.WriteRun("app", _paused ? "paused" : "resumed", "ok", _paused ? "Execution paused" : "Execution resumed");
+        if (!_paused)
+            SetStatus("Resuming...");
+    }
+
+    private void SkipWait()
+    {
+        _skipWait = true;
+        _log.WriteRun("app", "skip_wait", "ok", "User skipped current wait");
+    }
+
+    private async Task StartPromptInjectAsync()
+    {
+        if (_webView.CoreWebView2 == null) { SetStatus("WebView not ready"); return; }
+        try
+        {
+            string prompt;
+            var promptPath = Path.Combine(AppPaths.Root, "config", "start-prompt.txt");
+            if (File.Exists(promptPath))
+                prompt = File.ReadAllText(promptPath, System.Text.Encoding.UTF8);
+            else
+                prompt = "You are running inside OpenBrowser (OpenBridge). Use HST_HELP to discover your environment.";
+
+            var safeText = JsonSerializer.Serialize(prompt);
+            var js = "var el=document.querySelector('#prompt-textarea,.ProseMirror,[contenteditable=true]');" +
+                $"if(el){{el.focus();el.textContent={safeText};el.dispatchEvent(new Event('input',{{bubbles:true}}));" +
+                "setTimeout(function(){" +
+                "var btn=document.querySelector('[data-testid=\\'send-button\\']')||document.querySelector('button[aria-label*=\\'Send\\'] i')||document.querySelector('button svg');" +
+                "if(btn&&btn.tagName!=='svg'){btn.click();}" +
+                "else if(btn&&btn.tagName==='svg'){btn.closest('button')?.click();}" +
+                "},500);" +
+                "}";
+            await _webView.CoreWebView2.ExecuteScriptAsync(js);
+            SetStatus("Start prompt sent.");
+            _log.WriteRun("app", "start_prompt_sent", "ok", "Start prompt injected into chat");
+        }
+        catch (Exception ex)
+        {
+            SetStatus("Start prompt error: " + ex.Message);
+            _log.WriteRun("app", "start_prompt_error", "error", ex.Message);
         }
     }
 }
