@@ -37,8 +37,47 @@ public static partial class Redactor
         s = JsonSensitiveStringRegex().Replace(s, "$1\"[REDACTED]\"");
         s = HeaderSensitiveRegex().Replace(s, "$1[REDACTED]");
         s = TokenLikeRegex().Replace(s, "$1[REDACTED]");
+        s = RedactLongBase64(s);
+        s = StripBinaryChars(s);
         return s;
     }
+
+    private static string StripBinaryChars(string input)
+    {
+        // Replace control characters (except common whitespace) with a placeholder.
+        // Keeps: tab, newline, carriage return, and printable characters.
+        if (input.All(c => c >= ' ' || c == '\t' || c == '\n' || c == '\r'))
+            return input;
+        var result = new System.Text.StringBuilder(input.Length);
+        foreach (var c in input)
+        {
+            if (c >= ' ' || c == '\t' || c == '\n' || c == '\r')
+                result.Append(c);
+            else
+                result.Append('�'); // Unicode replacement character
+        }
+        return result.ToString();
+    }
+
+    private static string RedactLongBase64(string input)
+    {
+        // Replace long base64-like blobs (>500 chars) with a placeholder.
+        // Base64 alphabet: A-Za-z0-9+/= with optional whitespace.
+        return LongBase64Regex().Replace(input, m =>
+        {
+            var blob = m.Value;
+            var stripped = WhitespaceRegex().Replace(blob, "");
+            if (stripped.Length > 500)
+                return $" [base64 blob {stripped.Length}B] ";
+            return blob;
+        });
+    }
+
+    [GeneratedRegex(@"[A-Za-z0-9+/=\s]{500,}")]
+    private static partial Regex LongBase64Regex();
+
+    [GeneratedRegex(@"\s+")]
+    private static partial Regex WhitespaceRegex();
 
     private static object? RedactElement(JsonElement e)
     {
