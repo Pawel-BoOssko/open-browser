@@ -48,6 +48,18 @@ for line in lines:
         body = re.sub(r'\\u([0-9a-fA-F]{4})', lambda m: chr(int(m.group(1), 16)), body)
         body = body.replace('\\"', '"').replace("\\\\", "\\")
 
+        # Redact resume_conversation_token (Fernet — 100KB+ of useless base64)
+        body = re.sub(
+            r'"persona":\s*"[^"]*"',
+            '"persona": "[REDACTED]"',
+            body
+        )
+        body = re.sub(
+            r'"token":\s*"gAAAAAB[a-zA-Z0-9+/=_-]{100,}"',
+            '"token": "[REDACTED_TOKEN]"',
+            body
+        )
+
     record["raw"] = body
     out.append(json.dumps(record, ensure_ascii=False))
 
