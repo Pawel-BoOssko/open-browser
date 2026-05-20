@@ -1,21 +1,55 @@
-"""Clean a raw NDJSON file: unescape Unicode, remove double-escaping, make readable.
+"""Clean a raw NDJSON file: decode SSE body, make readable.
 
 Usage:
   python tools\clean-raw.py <input.ndjson> [output.txt]
-  python tools\clean-raw.py extracted\run_X_msg_Y_raw.ndjson clean.txt
 """
+import json
+import re
 import sys
 from pathlib import Path
 
 src = Path(sys.argv[1])
 dst = Path(sys.argv[2]) if len(sys.argv) > 2 else src.with_suffix(".clean.txt")
 
-text = src.read_text(encoding="utf-8-sig")
+with open(src, "r", encoding="utf-8-sig") as f:
+    lines = f.readlines()
 
-# Three passes for readability
-text = text.replace("\\u0022", '"')
-text = text.replace("\\n", "\n")
-text = text.replace("\\\\", "")
+out = []
+for line in lines:
+    line = line.strip()
+    if not line:
+        continue
+    try:
+        record = json.loads(line)
+    except json.JSONDecodeError:
+        out.append(line)
+        continue
 
-dst.write_text(text, encoding="utf-8")
-print(f"Cleaned: {dst} ({len(text)} chars)")
+    raw = record.get("raw", "")
+    if not raw:
+        out.append(json.dumps(record, ensure_ascii=False))
+        continue
+
+    # Decode CDP body: {"base64Encoded":false,"body":"<SSE data>"}
+    body = raw
+    try:
+        cdp = json.loads(raw) if isinstance(raw, str) else raw
+        if isinstance(cdp, dict):
+            body = cdp.get("body", raw)
+            if cdp.get("base64Encoded"):
+                import base64
+                body = base64.b64decode(body).decode("utf-8", errors="replace")
+    except Exception:
+        body = raw
+
+    # Unescape JSON inside body (SSE data lines)
+    if isinstance(body, str):
+        body = body.replace("\\n", "\n").replace("\\t", "\t")
+        body = re.sub(r'\\u([0-9a-fA-F]{4})', lambda m: chr(int(m.group(1), 16)), body)
+        body = body.replace('\\"', '"').replace("\\\\", "\\")
+
+    record["raw"] = body
+    out.append(json.dumps(record, ensure_ascii=False))
+
+dst.write_text("\n".join(out), encoding="utf-8")
+print(f"Cleaned: {dst} ({len(out)} records)")

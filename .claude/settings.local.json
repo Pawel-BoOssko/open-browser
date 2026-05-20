@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(rm -rf \"D:/analysis-sandbox\")",
+      "Bash(mkdir -p \"D:/analysis-sandbox\")",
+      "Bash(python \"D:/projects/open-browser/tools/clean-raw.py\" \"D:/projects/open-browser/releases/BridgeBrowserAlpha0/extracted/run_20260519_195940_813_msg_b0e8d3dc-237c-4b9c-b1c5-65cbd11f2101_raw.ndjson\" \"D:/analysis-sandbox/2_msg_b0e8d3dc_clean.txt\")",
+      "Bash(python \"D:/projects/open-browser/tools/clean-raw.py\" \"D:/projects/open-browser/releases/BridgeBrowserAlpha0/extracted/run_20260519_195940_813_msg_50aa7c4e-02bb-44bc-8d96-e5d99d719a7e_raw.ndjson\" \"D:/analysis-sandbox/3_msg_50aa7c4e_clean.txt\")",
+      "Bash(python \"D:/projects/open-browser/tools/clean-raw.py\" \"D:/projects/open-browser/releases/BridgeBrowserAlpha0/extracted/run_20260519_195940_813_msg_1f5ba4ef-003f-4142-87d3-c8cc67e44bbb_raw.ndjson\" \"D:/analysis-sandbox/4_msg_1f5ba4ef_clean.txt\")"
+    ]
+  }
+}
