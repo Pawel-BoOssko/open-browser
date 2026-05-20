@@ -58,6 +58,7 @@ public sealed partial class MainForm : Form
         _skipWaitButton.Click += (_, _) => SkipWait();
         _startPromptButton.Click += async (_, _) => await StartPromptInjectAsync();
         _navigatePortalButton.Click += (_, _) => NavigateToPortal();
+        _dumpDomButton.Click += async (_, _) => await DumpDomAsync();
         _testInjectButton.Click += async (_, _) => await TestInjectAsync();
         _copyOutputButton.Click += (_, _) => CopyOutput();
 
@@ -323,6 +324,25 @@ public sealed partial class MainForm : Form
     {
         _skipWait = true;
         _log.WriteRun("app", "skip_wait", "ok", "User skipped current wait");
+    }
+
+    private async Task DumpDomAsync()
+    {
+        if (_webView.CoreWebView2 == null) { SetStatus("WebView not ready"); return; }
+        try
+        {
+            var json = await _webView.CoreWebView2.ExecuteScriptAsync(DomDumper.Script);
+            var unescaped = System.Text.Json.JsonSerializer.Deserialize<string>(json) ?? json;
+            var outPath = System.IO.Path.Combine(AppPaths.Logs, "dom_dump.json");
+            System.IO.File.WriteAllText(outPath, unescaped, System.Text.Encoding.UTF8);
+            SetStatus("DOM dump saved to logs/dom_dump.json");
+            _log.WriteRun("app", "dom_dump_saved", "ok", $"DOM dump written to {outPath}");
+        }
+        catch (Exception ex)
+        {
+            SetStatus("DOM dump error: " + ex.Message);
+            _log.WriteRun("app", "dom_dump_error", "error", ex.Message);
+        }
     }
 
     private void NavigateToPortal()
