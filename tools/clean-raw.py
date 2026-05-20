@@ -59,6 +59,12 @@ for line in lines:
             r'"\1": "[REDACTED_TOKEN]"',
             body
         )
+        # Redact long base64 blobs (fonts, styles, embedded assets)
+        body = re.sub(
+            r'"[a-zA-Z0-9+/=_-]{500,}"',
+            '"[REDACTED_BASE64]"',
+            body
+        )
 
     record["raw"] = body
     out.append(json.dumps(record, ensure_ascii=False))
