@@ -55,8 +55,8 @@ for line in lines:
             body
         )
         body = re.sub(
-            r'"token":\s*"gAAAAAB[a-zA-Z0-9+/=_-]{100,}"',
-            '"token": "[REDACTED_TOKEN]"',
+            r'"(token|prepare_token)":\s*"gAAAAAB[a-zA-Z0-9+/=_-]{100,}"',
+            r'"\1": "[REDACTED_TOKEN]"',
             body
         )
 
