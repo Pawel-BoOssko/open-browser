@@ -19,6 +19,9 @@
     <None Update="DomDumper.js">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <None Update="PortalScanner.js">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
 
     <None Include="..\..\..\..\config\humanizer.json">
       <Link>config\humanizer.json</Link>

@@ -58,6 +58,7 @@ public sealed partial class MainForm : Form
         _skipWaitButton.Click += (_, _) => SkipWait();
         _startPromptButton.Click += async (_, _) => await StartPromptInjectAsync();
         _navigatePortalButton.Click += (_, _) => NavigateToPortal();
+        _scanPortalButton.Click += async (_, _) => await ScanPortalAsync();
         _dumpDomButton.Click += async (_, _) => await DumpDomAsync();
         _testInjectButton.Click += async (_, _) => await TestInjectAsync();
         _copyOutputButton.Click += (_, _) => CopyOutput();
@@ -342,6 +343,22 @@ public sealed partial class MainForm : Form
         {
             SetStatus("DOM dump error: " + ex.Message);
             _log.WriteRun("app", "dom_dump_error", "error", ex.Message);
+        }
+    }
+
+    private async Task ScanPortalAsync()
+    {
+        if (_webView.CoreWebView2 == null) { SetStatus("WebView not ready"); return; }
+        try
+        {
+            SetStatus("Scanning Portal page...");
+            await _webView.CoreWebView2.ExecuteScriptAsync(PortalScanner.Script);
+            _log.WriteRun("app", "portal_scan_executed", "ok", "PortalScanner script executed");
+        }
+        catch (Exception ex)
+        {
+            SetStatus("Portal scan error: " + ex.Message);
+            _log.WriteRun("app", "portal_scan_error", "error", ex.Message);
         }
     }
 

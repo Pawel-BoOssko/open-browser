@@ -11,6 +11,7 @@ public sealed partial class MainForm
     private readonly Button _skipWaitButton = new() { Text = "Skip wait", Width = 110, BackColor = Color.LightYellow };
     private readonly Button _startPromptButton = new() { Text = "Start prompt", Width = 110 };
     private readonly Button _navigatePortalButton = new() { Text = "Navigate to Portal", Width = 140, BackColor = Color.LightBlue };
+    private readonly Button _scanPortalButton = new() { Text = "Scan Portal", Width = 110, BackColor = Color.LightGreen };
     private readonly Button _dumpDomButton = new() { Text = "Dump DOM", Width = 110, BackColor = Color.LightCoral };
     private readonly Button _testInjectButton = new() { Text = "Test inject", Width = 110, BackColor = Color.LightYellow };
     private readonly Label _status = new() { AutoSize = true, Text = "..." };
@@ -49,6 +50,7 @@ public sealed partial class MainForm
         panel.Controls.Add(_skipWaitButton);
         panel.Controls.Add(_startPromptButton);
         panel.Controls.Add(_navigatePortalButton);
+        panel.Controls.Add(_scanPortalButton);
         panel.Controls.Add(_dumpDomButton);
         panel.Controls.Add(_testInjectButton);
         panel.Controls.Add(_status);
