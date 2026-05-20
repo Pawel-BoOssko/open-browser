@@ -23,6 +23,18 @@ These rules apply to all agents (Claude Code, ChatGPT, Opus, and others) working
 11. Do not amend other people's commits. Do not use `--no-verify`.
 12. Do not commit files from `config/local/`.
 
+## Feature removal — HARD RULE
+
+Every trace of a removed feature must be erased from the entire project. No ghosts.
+
+- Every file: `.cs`, `.js`, `.md`, `.txt`, `.json`, config, comments, variable names, file names.
+- Every reference: docs, handoffs, journals, test plans, design docs, README files.
+- Every artifact: if a feature is removed, the word for it must not appear anywhere in the repo.
+- No "deprecated" comments, no "removed in vX" notes, no commented-out code, no `_old` suffixes, no `// was:` lines.
+- The git history is the only record of what was removed. Nothing in the working tree may reference it.
+
+**Why:** stale references pollute agent context and cause agents to hallucinate nonexistent features (e.g. `payload64` appearing in a new prompt because an old handoff or parser comment mentioned it).
+
 ## Prohibitions
 
 13. **NEVER** run `git push` — under no circumstances.
@@ -32,6 +44,7 @@ These rules apply to all agents (Claude Code, ChatGPT, Opus, and others) working
 17. **NEVER** design for unapproved future mechanisms (watchdog, cross-tab, multi-tab registry) unless the task explicitly requires it.
 18. **NEVER** work outside `D:\projects\open-browser`.
 19. **NEVER** insert emoji into code.
+20. **NEVER** leave traces of removed features in any file.
 
 ## Decisions
 

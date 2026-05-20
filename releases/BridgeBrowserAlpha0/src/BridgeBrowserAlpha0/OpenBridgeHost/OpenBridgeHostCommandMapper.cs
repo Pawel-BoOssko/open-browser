@@ -12,8 +12,9 @@ public static class OpenBridgeHostCommandMapper
         error = null;
 
         if (string.Equals(envelope.Command, "HST_HELP", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(envelope.Command, "HST_TOOLS", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(envelope.Command, "HST_STATUS", StringComparison.OrdinalIgnoreCase))
+            || string.Equals(envelope.Command, "HST_STATUS", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(envelope.Command, "PS_HELP", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(envelope.Command, "PY_HELP", StringComparison.OrdinalIgnoreCase))
         {
             request = new HostCommandRequest
             {
@@ -29,7 +30,7 @@ public static class OpenBridgeHostCommandMapper
         if (!string.Equals(envelope.Command, "PS", StringComparison.OrdinalIgnoreCase)
             && !string.Equals(envelope.Command, "PY", StringComparison.OrdinalIgnoreCase))
         {
-            error = $"Command not supported: {envelope.Command}. Only PS, PY, HST_HELP, HST_TOOLS, and HST_STATUS are accepted.";
+            error = $"Command not supported: {envelope.Command}. Use HST_HELP to see available commands.";
             return false;
         }
 

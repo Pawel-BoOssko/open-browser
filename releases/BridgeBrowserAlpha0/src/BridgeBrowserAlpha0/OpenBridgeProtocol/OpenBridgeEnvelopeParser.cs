@@ -70,7 +70,7 @@ public static class OpenBridgeEnvelopeParser
             string afterRaw = envelopeContent.Substring(rawEndIndex + RawEnd.Length).TrimStart();
 
             // Serialize adds its own quotes. Trim the adjacent quotes from the split
-            // points so we don't get double quotes: "payload64":""content""
+            // points so we don't get double quotes around the encoded content
             if (beforeRaw.EndsWith('\"'))
                 beforeRaw = beforeRaw[..^1];
             if (afterRaw.StartsWith('\"'))

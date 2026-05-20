@@ -77,18 +77,25 @@ public class OpenBridgeRuntimeApproval
             return helpResult;
         }
 
-        if (string.Equals(request.Command, "HST_TOOLS", StringComparison.OrdinalIgnoreCase))
-        {
-            var toolsResult = ExecuteToolsCommand();
-            lock (_gate) { LastResult = toolsResult; }
-            return toolsResult;
-        }
-
         if (string.Equals(request.Command, "HST_STATUS", StringComparison.OrdinalIgnoreCase))
         {
             var statusResult = ExecuteStatusCommand();
             lock (_gate) { LastResult = statusResult; }
             return statusResult;
+        }
+
+        if (string.Equals(request.Command, "PS_HELP", StringComparison.OrdinalIgnoreCase))
+        {
+            var helpResult = ExecutePsHelp();
+            lock (_gate) { LastResult = helpResult; }
+            return helpResult;
+        }
+
+        if (string.Equals(request.Command, "PY_HELP", StringComparison.OrdinalIgnoreCase))
+        {
+            var helpResult = ExecutePyHelp();
+            lock (_gate) { LastResult = helpResult; }
+            return helpResult;
         }
 
         if (string.Equals(request.Command, "PY", StringComparison.OrdinalIgnoreCase))
@@ -171,81 +178,7 @@ public class OpenBridgeRuntimeApproval
         }
     }
 
-    private HostCommandResult ExecuteToolsCommand()
-    {
-        try
-        {
-            var toolsDir = Path.Combine(_workingDirectory, "tools");
-            if (!Directory.Exists(toolsDir))
-            {
-                return new HostCommandResult
-                {
-                    Status = HostExecutionStatus.Error,
-                    OperationId = Guid.NewGuid().ToString("N")[..12],
-                    DurationMs = 0,
-                    ErrorCode = HostErrorCodes.ExecutorError,
-                    Message = "Tools directory not found."
-                };
-            }
-
-            var sb = new System.Text.StringBuilder();
-            sb.AppendLine("Available tools:");
-            sb.AppendLine();
-
-            foreach (var dir in Directory.GetDirectories(toolsDir))
-            {
-                var name = Path.GetFileName(dir);
-                var readme = Path.Combine(dir, "README.md");
-                if (File.Exists(readme))
-                {
-                    var firstLine = File.ReadLines(readme).FirstOrDefault() ?? "";
-                    sb.AppendLine($"tools/{name}/ — {firstLine.TrimStart('#', ' ')}");
-                }
-                else
-                {
-                    sb.AppendLine($"tools/{name}/");
-                }
-
-                var pyFiles = Directory.GetFiles(dir, "*.py").Select(Path.GetFileNameWithoutExtension);
-                if (pyFiles.Any())
-                {
-                    sb.AppendLine($"  Scripts: {string.Join(", ", pyFiles)}");
-                }
-
-                var tokensPath = Path.Combine(_workingDirectory, "config", "local", name, $"{name}_tokens.json");
-                var altTokensPath = Path.Combine(_workingDirectory, "config", "local", name, "linkedin_tokens.json");
-                if (File.Exists(tokensPath) || File.Exists(altTokensPath))
-                {
-                    sb.AppendLine("  Status: configured (tokens present)");
-                }
-
-                sb.AppendLine();
-            }
-
-            return new HostCommandResult
-            {
-                Status = HostExecutionStatus.Ok,
-                OperationId = Guid.NewGuid().ToString("N")[..12],
-                DurationMs = 0,
-                StdoutPreview = sb.ToString(),
-                ExitCode = 0,
-                Message = "HST_TOOLS completed."
-            };
-        }
-        catch (Exception ex)
-        {
-            return new HostCommandResult
-            {
-                Status = HostExecutionStatus.Error,
-                OperationId = Guid.NewGuid().ToString("N")[..12],
-                DurationMs = 0,
-                ErrorCode = HostErrorCodes.ExecutorError,
-                Message = $"Failed to scan tools: {ex.Message}"
-            };
-        }
-    }
-
-    private HostCommandResult ExecuteStatusCommand()
+private HostCommandResult ExecuteStatusCommand()
     {
         try
         {
@@ -353,27 +286,36 @@ public class OpenBridgeRuntimeApproval
     {
         try
         {
-            var runtimeDoc = Path.Combine(_workingDirectory, "docs", "runtime", "environment.md");
-            if (File.Exists(runtimeDoc))
-            {
-                var content = File.ReadAllText(runtimeDoc);
-                return new HostCommandResult
-                {
-                    Status = HostExecutionStatus.Ok,
-                    OperationId = Guid.NewGuid().ToString("N")[..12],
-                    DurationMs = 0,
-                    StdoutPreview = content,
-                    ExitCode = 0,
-                    Message = "HST_HELP completed."
-                };
-            }
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine("OpenBridge Host Commands");
+            sb.AppendLine("=======================");
+            sb.AppendLine();
+            sb.AppendLine("HST commands (ask the system directly):");
+            sb.AppendLine("  HST_HELP    — this list");
+            sb.AppendLine("  HST_STATUS  — system status, working directory, conversation ID, recent downloads");
+            sb.AppendLine();
+            sb.AppendLine("Available executors:");
+            sb.AppendLine("  PS — PowerShell  (PS_HELP for details)");
+            sb.AppendLine("  PY — Python 3    (PY_HELP for details)");
+            sb.AppendLine();
+            sb.AppendLine("Automatic bridge features:");
+            sb.AppendLine("  - Files created in the ChatGPT sandbox are auto-detected and downloaded.");
+            sb.AppendLine("  - Downloads go to the Downloads directory (see HST_STATUS for recent files).");
+            sb.AppendLine("  - Each command has a timeout. If exceeded, the system sends a timeout message.");
+            sb.AppendLine("  - To stay in the loop: end your response with a command block. No command block = loop stops.");
+            sb.AppendLine();
+            sb.AppendLine("How to learn more:");
+            sb.AppendLine("  Send PS_HELP or PY_HELP to get full details about each executor.");
+            sb.AppendLine("  Send HST_STATUS to see your working directory and conversation ID.");
+
             return new HostCommandResult
             {
-                Status = HostExecutionStatus.Error,
+                Status = HostExecutionStatus.Ok,
                 OperationId = Guid.NewGuid().ToString("N")[..12],
                 DurationMs = 0,
-                ErrorCode = HostErrorCodes.ExecutorError,
-                Message = "Runtime documentation not found."
+                StdoutPreview = sb.ToString(),
+                ExitCode = 0,
+                Message = "HST_HELP completed."
             };
         }
         catch (Exception ex)
@@ -384,7 +326,122 @@ public class OpenBridgeRuntimeApproval
                 OperationId = Guid.NewGuid().ToString("N")[..12],
                 DurationMs = 0,
                 ErrorCode = HostErrorCodes.ExecutorError,
-                Message = $"Failed to read runtime docs: {ex.Message}"
+                Message = $"Help failed: {ex.Message}"
+            };
+        }
+    }
+
+    private HostCommandResult ExecutePsHelp()
+    {
+        try
+        {
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine("PS — PowerShell Executor");
+            sb.AppendLine("========================");
+            sb.AppendLine();
+            sb.AppendLine("Usage:");
+            sb.AppendLine("  Command: PS");
+            sb.AppendLine("  Payload: PowerShell code (UTF-8)");
+            sb.AppendLine();
+            sb.AppendLine("Limits:");
+            sb.AppendLine("  Timeout: 720 seconds (12 minutes)");
+            sb.AppendLine("  Max output: 50,000 characters (truncated with [... truncated ...] marker)");
+            sb.AppendLine("  Working directory: the project root");
+            sb.AppendLine();
+            sb.AppendLine("Encoding:");
+            sb.AppendLine("  Output is UTF-8. Polish and all Unicode characters work correctly.");
+            sb.AppendLine();
+            sb.AppendLine("Error handling:");
+            sb.AppendLine("  - Non-zero exit code: output is still returned, exit code is reported.");
+            sb.AppendLine("  - Timeout: system sends a timeout message to chat. Check if the command executed before retrying.");
+            sb.AppendLine("  - No output: [OpenBridge] Process exited with code N. No output.");
+            sb.AppendLine("  - Empty prompt: command is rejected. Provide a payload.");
+            sb.AppendLine();
+            sb.AppendLine("Staying in the loop:");
+            sb.AppendLine("  End your response with a @@OPENBRIDGE_EXEC_BEGIN@@...@@OPENBRIDGE_EXEC_END@@ block.");
+            sb.AppendLine("  Without a command block, the loop stops and no further response arrives.");
+            sb.AppendLine();
+            sb.AppendLine("Example:");
+            sb.AppendLine("  @@OPENBRIDGE_EXEC_BEGIN@@");
+            sb.AppendLine("  {\"version\":\"001\",\"command\":\"PS\",\"payload\":\"Get-ChildItem downloads\\\\\"}");
+            sb.AppendLine("  @@OPENBRIDGE_EXEC_END@@");
+
+            return new HostCommandResult
+            {
+                Status = HostExecutionStatus.Ok,
+                OperationId = Guid.NewGuid().ToString("N")[..12],
+                DurationMs = 0,
+                StdoutPreview = sb.ToString(),
+                ExitCode = 0,
+                Message = "PS_HELP completed."
+            };
+        }
+        catch (Exception ex)
+        {
+            return new HostCommandResult
+            {
+                Status = HostExecutionStatus.Error,
+                OperationId = Guid.NewGuid().ToString("N")[..12],
+                DurationMs = 0,
+                ErrorCode = HostErrorCodes.ExecutorError,
+                Message = $"PS_HELP failed: {ex.Message}"
+            };
+        }
+    }
+
+    private HostCommandResult ExecutePyHelp()
+    {
+        try
+        {
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine("PY — Python 3 Executor");
+            sb.AppendLine("=======================");
+            sb.AppendLine();
+            sb.AppendLine("Usage:");
+            sb.AppendLine("  Command: PY");
+            sb.AppendLine("  Payload: Python 3 code (UTF-8)");
+            sb.AppendLine();
+            sb.AppendLine("Limits:");
+            sb.AppendLine("  Timeout: 720 seconds (12 minutes)");
+            sb.AppendLine("  Max output: 50,000 characters (truncated with [... truncated ...] marker)");
+            sb.AppendLine("  Working directory: the project root");
+            sb.AppendLine();
+            sb.AppendLine("Encoding:");
+            sb.AppendLine("  Output is UTF-8. Polish and all Unicode characters work correctly.");
+            sb.AppendLine();
+            sb.AppendLine("Error handling:");
+            sb.AppendLine("  - Non-zero exit code: output and stderr are still returned.");
+            sb.AppendLine("  - Timeout: system sends a timeout message to chat. Check if the command executed before retrying.");
+            sb.AppendLine("  - No output: [OpenBridge] Process exited with code N. No output.");
+            sb.AppendLine("  - Empty prompt: command is rejected. Provide a payload.");
+            sb.AppendLine();
+            sb.AppendLine("Staying in the loop:");
+            sb.AppendLine("  End your response with a @@OPENBRIDGE_EXEC_BEGIN@@...@@OPENBRIDGE_EXEC_END@@ block.");
+            sb.AppendLine();
+            sb.AppendLine("Example:");
+            sb.AppendLine("  @@OPENBRIDGE_EXEC_BEGIN@@");
+            sb.AppendLine("  {\"version\":\"001\",\"command\":\"PY\",\"payload\":\"import os; print(os.getcwd())\"}");
+            sb.AppendLine("  @@OPENBRIDGE_EXEC_END@@");
+
+            return new HostCommandResult
+            {
+                Status = HostExecutionStatus.Ok,
+                OperationId = Guid.NewGuid().ToString("N")[..12],
+                DurationMs = 0,
+                StdoutPreview = sb.ToString(),
+                ExitCode = 0,
+                Message = "PY_HELP completed."
+            };
+        }
+        catch (Exception ex)
+        {
+            return new HostCommandResult
+            {
+                Status = HostExecutionStatus.Error,
+                OperationId = Guid.NewGuid().ToString("N")[..12],
+                DurationMs = 0,
+                ErrorCode = HostErrorCodes.ExecutorError,
+                Message = $"PY_HELP failed: {ex.Message}"
             };
         }
     }
