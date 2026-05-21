@@ -25,10 +25,10 @@ public static class AppPaths
         var dir = AppContext.BaseDirectory;
         while (!string.IsNullOrEmpty(dir))
         {
-            // 1. If we are in the development repository, find the repo root
+            // 1. If we are in the development repository, find the repo root and point to the release directory
             if (File.Exists(Path.Combine(dir, "releases", "BridgeBrowserAlpha0", "src", "BridgeBrowserAlpha0", "BridgeBrowserAlpha0.csproj")))
             {
-                return dir;
+                return Path.Combine(dir, "releases", "BridgeBrowserAlpha0");
             }
             // 2. If we are traversing inside the releases folder of the repo
             if (dir.EndsWith("releases\\BridgeBrowserAlpha0", StringComparison.OrdinalIgnoreCase) || 
@@ -37,7 +37,7 @@ public static class AppPaths
                 var parent = Path.GetDirectoryName(dir);
                 if (parent != null && File.Exists(Path.Combine(parent, "releases", "BridgeBrowserAlpha0", "src", "BridgeBrowserAlpha0", "BridgeBrowserAlpha0.csproj")))
                 {
-                    return parent;
+                    return dir;
                 }
             }
             // 3. Packaged standalone release fallback (where src does not exist)
