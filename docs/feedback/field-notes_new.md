@@ -147,3 +147,16 @@ Status:
 - needs-architect-decision
 - done
 - rejected
+
+<!-- COMPLETE_DOC_UPDATE_FIELD_NOTES_20260521 -->
+## 2026-05-21 | Model help, feedback, and text transport observations
+
+Observed issues to keep visible:
+- model operators need explicit command frame examples, not only command names;
+- HST_HELP must explain OpenBridge, HST commands, tool help commands, and RAW/Base64 framing;
+- tool help commands should display tools/<tool>/README.md and state the displayed path;
+- executor-specific anti-patterns belong in executor help files;
+- old README files and legacy documents can mislead models if not routed through help;
+- text transport and encoding must be treated as an architecture issue in both directions: model to executor and executor to model;
+- models need one factual place for operational observations after tasks.
+<!-- /COMPLETE_DOC_UPDATE_FIELD_NOTES_20260521 -->

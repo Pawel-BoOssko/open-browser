@@ -1,68 +1,48 @@
-# PY Executor Help
+# PY Help
 
-Purpose:
-Defines operational help for using the Python executor through OpenBridge.
+Purpose: Defines model-facing help for the Python executor.
 
 Depends on:
-- docs/templates/document-header-template_new.md
-- docs/executors/PY/index_new.md
+- docs/runtime/hst-help_new.md
 - docs/executors/PY/rules_new.md
-- docs/templates/executor-docs-template_new.md
-- docs/runtime/environment.md
+- docs/agent/coding-invariants_new.md
 
 Impacts:
-- docs/runtime/hst-help_new.md
-- docs/executors/PY/index_new.md
-- docs/executors/PY/rules_new.md
-- model self-discovery inside OpenBrowser
+- PY_HELP output
+- Python command usage
+- text and data processing
+- Unicode-sensitive verification
 
-Update rule:
-Update this file when PY command usage, payload expectations, output conventions, RAW payload guidance, examples, or PY-specific constraints change.
+Update rule: Update this file when PY executor behavior, command usage, encoding behavior, RAW guidance, or Python anti-patterns change.
 
 Latest:
-- Source migration from docs/runtime/environment.md is reflected here.
-- PY executes Python 3 payloads.
-- Use PY for JSON validation, structured text processing, NDJSON analysis, small data transformations, and precise file operations.
-- Use RAW payload for multi-line Python or quote-heavy code.
-- For executor-specific constraints, read docs/executors/PY/rules_new.md.
+- PY is useful when it gives a concrete advantage.
+- PY is not the default replacement for PS.
+- PY is preferred for parsing, structured data, larger text operations, and Unicode-sensitive checks.
+- For long or fragile payloads, use RAW as described in HST_HELP.
 
-## Command
+## What PY is for
 
-PY:
-Executes a Python 3 payload in the OpenBrowser working environment.
+Use PY when Python gives a clear advantage:
+- parsing JSON, CSV, HTML, logs, or NDJSON;
+- text processing;
+- structured data transformation;
+- report generation;
+- Unicode-sensitive file verification;
+- operations that are clearer in Python than in PowerShell.
 
-PY_HELP:
-Shows help for the Python executor.
+Use PS for simple Windows/filesystem/process operations.
 
-## Payload
+## Text and Unicode
 
-The payload is Python code. The executor uses Python 3 execution for supplied code.
+For Unicode-sensitive verification, Python is often safer than returned PS stdout.
 
-Use PY for:
-- validating JSON;
-- parsing structured logs;
-- processing NDJSON;
-- transforming text precisely;
-- checking generated files;
-- creating small diagnostic scripts;
-- operations where PowerShell escaping would be fragile.
+Use explicit encoding when reading and writing text files, for example UTF-8.
 
-## RAW payload guidance
+A bad-looking PS return does not automatically mean the file is bad. Verify the file with a controlled method when content integrity matters.
 
-Use RAW payload for multi-line Python, JSON-heavy scripts, markdown processing, quote-heavy code, or OpenBridge-sensitive text.
+## RAW
 
-RAW is preferred over manual JSON escaping for complex Python payloads.
+For multi-line Python, long text, JSON-heavy code, markdown-heavy code, quote-heavy code, Polish text, or OpenBridge-sensitive payloads, use RAW as described in `HST_HELP`.
 
-## Output expectations
-
-PY should return:
-- printed output;
-- exceptions or errors if present;
-- enough information to verify whether the operation succeeded.
-
-For large outputs, write the full output to a file and return a short preview plus path.
-
-## Practical rule
-
-Use Python when it is the right tool for precise parsing, encoding-sensitive processing, or structured validation.
-Do not use Python as a way to hide many unrelated operations in one command.
+RAW is the OpenBridge transport mechanism for fragile payloads. Do not replace it with manual escaping unless the payload is simple.

@@ -1,4 +1,4 @@
-﻿# Documentation Update Checklist
+# Documentation Update Checklist
 
 Purpose:
 Defines the mandatory documentation impact check for developer agents after any change to code, behavior, commands, modules, executors, paths, logs, tests, or project rules.
@@ -71,3 +71,28 @@ The common structure is defined in:
 - docs/templates/executor-docs-template_new.md
 
 The registry is only a registry. It must not contain the documentation rules.
+
+<!-- COMPLETE_DOC_UPDATE_DOC_CHECKLIST_20260521 -->
+## Additional documentation update checks
+
+When a change affects help commands or model-facing instructions, check:
+- docs/runtime/hst-help_new.md;
+- docs/executors/PS/help_new.md;
+- docs/executors/PY/help_new.md;
+- docs/agent/help-command-routing_new.md;
+- relevant tools/*/README.md.
+
+When a change affects external tools, check:
+- docs/agent/external-tool-policy_new.md;
+- relevant tools/*/README.md;
+- docs/runtime/modules-index_new.md.
+
+When a change reveals repeated model confusion or operational failure, check:
+- docs/agent/model-feedback-policy_new.md;
+- docs/feedback/field-notes_new.md.
+
+When a change affects text transport, RAW/Base64, stdout/stderr, Unicode, payload framing, or result injection, check:
+- docs/runtime/hst-help_new.md;
+- docs/feedback/antigravity-text-transport-task_new.md;
+- affected executor docs.
+<!-- /COMPLETE_DOC_UPDATE_DOC_CHECKLIST_20260521 -->

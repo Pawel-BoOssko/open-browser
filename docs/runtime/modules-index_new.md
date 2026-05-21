@@ -78,3 +78,22 @@ Common structure belongs in:
 Tool usage belongs in:
 - tools/*/README.md
 - tools/*/*_WORKING_GUIDE.md
+
+<!-- COMPLETE_DOC_UPDATE_MODULES_INDEX_20260521 -->
+## Help command registry notes
+
+Model-facing help command documentation:
+- HST_HELP: docs/runtime/hst-help_new.md;
+- PS_HELP: docs/executors/PS/help_new.md;
+- PY_HELP: docs/executors/PY/help_new.md;
+- help command routing: docs/agent/help-command-routing_new.md.
+
+Tool help command targets:
+- LINKEDIN_HELP: tools/linkedin/README.md;
+- GITHUB_HELP: tools/github/README.md;
+- N8N_HELP: tools/n8n/README.md;
+- WEB_HELP: tools/web/README.md;
+- CLAUDE_HELP: tools/claude/README.md.
+
+A tool being installed in Windows does not automatically mean it is an OpenBridge executor. It must be listed by implemented OpenBridge commands to be treated as an executor.
+<!-- /COMPLETE_DOC_UPDATE_MODULES_INDEX_20260521 -->

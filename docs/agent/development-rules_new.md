@@ -1,4 +1,4 @@
-﻿# Development Rules
+# Development Rules
 
 Purpose:
 Defines how developer agents must work in the OpenBrowser/OpenBridge repository so that technical work leaves the project understandable, documented, testable, and safe for the next agent.
@@ -148,3 +148,18 @@ Relevant source documents for this migration batch:
 - docs/development/journal.md
 - docs/development/README.md
 
+
+<!-- COMPLETE_DOC_UPDATE_DEVELOPMENT_RULES_20260521 -->
+## Help, feedback, and external tool rules
+
+When changing model-facing command behavior, help text, executor behavior, or tool discovery, update the relevant help documentation:
+- docs/runtime/hst-help_new.md;
+- docs/executors/PS/help_new.md;
+- docs/executors/PY/help_new.md;
+- docs/agent/help-command-routing_new.md;
+- relevant tools/*/README.md.
+
+When work reveals a repeated model failure, confusing help, misleading legacy document, missing command, or wrong capability assumption, record a concise factual note according to docs/agent/model-feedback-policy_new.md.
+
+When work uses external services, distinguish local retries from external-service actions according to docs/agent/external-tool-policy_new.md. Do not blindly repeat write/publish/submit actions against external systems.
+<!-- /COMPLETE_DOC_UPDATE_DEVELOPMENT_RULES_20260521 -->

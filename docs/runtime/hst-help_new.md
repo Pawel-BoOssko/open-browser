@@ -1,83 +1,141 @@
 # HST Help
 
-Purpose:
-Defines the help content for Host-level OpenBridge commands and points models to executor-specific help files.
+Purpose: Defines the model-facing help index for OpenBridge Host commands and command discovery.
 
 Depends on:
-- docs/templates/document-header-template_new.md
+- docs/agent/READ_BEFORE_WORK_new.md
 - docs/agent/current-state_new.md
-- docs/agent/architecture-decisions_new.md
 - docs/runtime/modules-index_new.md
-- docs/templates/executor-docs-template_new.md
-- docs/runtime/environment.md
-- config/start-prompt.txt
-- docs/design/help-system.md
+- docs/agent/help-command-routing_new.md
 
 Impacts:
-- docs/runtime/start-prompt_new.md
-- docs/runtime/hst-status_new.md
-- docs/executors/HST/help_new.md
-- docs/executors/*/help_new.md
-- model self-discovery inside OpenBrowser
+- HST_HELP output
+- Host command discovery
+- tool help routing
+- executor help discovery
+- RAW payload usage
 
-Update rule:
-Update this file when Host commands, available executors, self-discovery rules, RAW payload rules, automatic bridge features, or help ownership rules change.
+Update rule: Update this file when Host commands, envelope format, RAW payload behavior, help command list, tool command list, or system-level anti-patterns change.
 
 Latest:
-- Source migration from docs/runtime/environment.md, config/start-prompt.txt, and docs/design/help-system.md is reflected here.
-- HST_HELP describes Host commands and available executors only.
-- HST_HELP must not duplicate full executor manuals.
-- Executor-specific help belongs to executor help files and executor HELP commands.
-- HST_HELP should tell the model that RAW payloads exist for longer or quote-heavy scripts.
-- Active command markers must not be reproduced casually because the first valid block executes.
+- HST_HELP is the system help index, not runtime status.
+- HST_STATUS is runtime status, not help.
+- Tool help commands display the README.md file for that tool and must say which file they display.
+- RAW is part of the OpenBridge command framing contract.
 
-## Host commands
+## What OpenBridge is
 
-HST_HELP:
-Shows Host-level commands, available executors, automatic bridge features, and where to ask for executor-specific help.
+OpenBridge is a local execution bridge between a language model running in OpenBrowser and local executors or tools.
 
-HST_STATUS:
-Shows current system status, working directory, conversation identity, recent downloads, available tools, pending command, and last result.
+The model does not execute system commands directly. It writes an OpenBridge command frame. OpenBrowser detects the frame, validates it, routes it through the Host, executes the requested command through the selected executor or tool, captures the result, and sends the result back to the model.
 
-## Available executors
+The purpose is controlled local work: filesystem inspection, file creation, scripts, local tools, project automation, and selected external service tools.
 
-PS:
-PowerShell executor. Use PS_HELP for details.
+## Execution flow
 
-PY:
-Python executor. Use PY_HELP for details.
+```text
+model response
+-> OpenBridge execution frame
+-> parser and validator
+-> Host command routing
+-> executor or tool
+-> result capture
+-> result returned to model
+```
 
-## Help ownership rule
+The model must not invent command syntax. It must use the documented frame and documented command names.
 
-Host help answers:
-- what Host commands exist;
-- what executors are available;
-- which HELP command to call next;
-- what automatic bridge features exist at a high level.
+## Command frame
 
-Executor help answers:
-- what that executor does;
-- what payload format it expects;
-- what constraints and rules apply;
-- what examples are safe and current.
+Every executable command must be wrapped like this:
 
-## RAW payload rule
+```text
+@@OPENBRIDGE_EXEC_BEGIN@@
+{"version":"001","command":"HST_STATUS","payload":""}
+@@OPENBRIDGE_EXEC_END@@
+```
 
-For commands longer than a few lines, or commands containing quotes, backslashes, JSON, markdown, or OpenBridge-sensitive text, use the runtime RAW payload mechanism described in docs/runtime/environment.md.
+Fields:
+- `version`: command frame version, currently `001`;
+- `command`: command name;
+- `payload`: command payload, usually a string.
 
-RAW content is written as plain text by the model and encoded by the system before JSON validation reaches the executor.
+A command written outside the execution frame is just text.
 
-RAW markers must be inside the payload JSON string. If placed outside the JSON object, the envelope becomes invalid.
+## System commands
 
-## Automatic OpenBrowser features
+System commands are Host commands. They use the `HST_` prefix.
 
-Generated files from ChatGPT sandbox are auto-detected and downloaded.
-Use HST_STATUS to see recent downloads and current paths.
+Current system commands:
+- `HST_HELP`: shows the OpenBridge help index;
+- `HST_STATUS`: shows runtime status.
 
-## Self-discovery path for models
+`HST_STATUS` reports current runtime state. It is not a usage manual.
 
-Recommended order:
-1. HST_HELP
-2. HST_STATUS
-3. executor HELP command, for example PS_HELP or PY_HELP
-4. task-specific command
+## Executor help commands
+
+Executor help commands explain how to use a specific executor.
+
+Known executor help commands:
+- `PS_HELP`: PowerShell executor help;
+- `PY_HELP`: Python executor help.
+
+Executor-specific rules belong in executor help, not in HST_HELP.
+
+## Tool help commands
+
+Tool help commands display the README.md file of a tool folder.
+
+Each tool help result must start by saying which file it displays.
+
+Known tool help commands:
+- `LINKEDIN_HELP`: reads `tools/linkedin/README.md`, LinkedIn posting tool;
+- `GITHUB_HELP`: reads `tools/github/README.md`, GitHub publishing tool;
+- `N8N_HELP`: reads `tools/n8n/README.md`, n8n workflow tool;
+- `WEB_HELP`: reads `tools/web/README.md`, web utility tool;
+- `CLAUDE_HELP`: reads `tools/claude/README.md`, Claude launcher/tooling.
+
+Example tool help header:
+
+```text
+LINKEDIN_HELP
+This is the content of:
+tools/linkedin/README.md
+```
+
+## RAW payload mechanism
+
+RAW is part of the OpenBridge command framing contract.
+
+Use RAW when payload text is long, quote-heavy, markdown-heavy, JSON-heavy, contains backslashes, Polish characters, command frames, or other fragile syntax.
+
+RAW content is placed inside the `payload` field as a RAW block.
+
+Before JSON-sensitive processing reaches the executor, OpenBridge protects the RAW block content by encoding the raw text as Base64 internally. The protected content travels through the OpenBridge workflow and is decoded before delivery to the target executor.
+
+The executor receives the original plain text payload.
+
+RAW works only in the documented placement: inside the payload JSON string. RAW outside the JSON object is invalid.
+
+Conceptual shape:
+
+```text
+@@OPENBRIDGE_EXEC_BEGIN@@
+{"version":"001","command":"PS","payload":"@@OPENBRIDGE_RAW_BEGIN@@
+plain text goes here
+@@OPENBRIDGE_RAW_END@@"}
+@@OPENBRIDGE_EXEC_END@@
+```
+
+## System anti-patterns
+
+Do not:
+- invent command names;
+- use removed commands;
+- treat status output as help;
+- treat legacy documentation as the source of truth;
+- search random README files before using the documented help command;
+- assume a tool exists unless it is listed by help or status;
+- use executor-specific tricks in HST commands.
+
+Executor anti-patterns belong in `PS_HELP`, `PY_HELP`, or the specific tool README.

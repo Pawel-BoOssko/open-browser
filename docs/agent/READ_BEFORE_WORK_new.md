@@ -1,4 +1,4 @@
-﻿# Read Before Work
+# Read Before Work
 
 Purpose:
 Defines the mandatory entrypoint for every developer agent before code changes, documentation changes, commit recommendations, final reports, or architecture-impacting work.
@@ -62,3 +62,19 @@ Before recommending COMMIT, explicitly report:
 - Commit allowed by commit-rules: yes/no
 
 If any answer is missing, do not recommend COMMIT.
+
+<!-- COMPLETE_DOC_UPDATE_REQUIRED_DOCS_20260521 -->
+## Additional required documentation after 2026-05-21 help and transport update
+
+Before work that touches OpenBridge command behavior, help output, executors, tools, external services, folder policy, documentation governance, or model-facing instructions, also read:
+
+8. docs/agent/help-command-routing_new.md
+9. docs/agent/model-feedback-policy_new.md
+10. docs/agent/external-tool-policy_new.md
+
+For text transport and encoding architecture work, also read:
+
+11. docs/feedback/antigravity-text-transport-task_new.md
+
+These documents are part of the active developer-agent documentation set.
+<!-- /COMPLETE_DOC_UPDATE_REQUIRED_DOCS_20260521 -->

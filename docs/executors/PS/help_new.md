@@ -1,84 +1,68 @@
-# PS Executor Help
+# PS Help
 
-Purpose:
-Defines operational help for using the PowerShell executor through OpenBridge.
+Purpose: Defines model-facing help for the PowerShell executor.
 
 Depends on:
-- docs/templates/document-header-template_new.md
-- docs/executors/PS/index_new.md
+- docs/runtime/hst-help_new.md
 - docs/executors/PS/rules_new.md
-- docs/templates/executor-docs-template_new.md
 - docs/agent/coding-invariants_new.md
-- docs/runtime/environment.md
 
 Impacts:
-- docs/runtime/hst-help_new.md
-- docs/executors/PS/index_new.md
-- docs/executors/PS/rules_new.md
-- model self-discovery inside OpenBrowser
+- PS_HELP output
+- PowerShell command usage
+- model operator behavior
+- text/file operations through PS
 
-Update rule:
-Update this file when PS command usage, payload expectations, output conventions, RAW payload guidance, truncation behavior, examples, or PS-specific constraints change.
+Update rule: Update this file when PS executor behavior, command usage, encoding behavior, RAW guidance, or PowerShell anti-patterns change.
 
 Latest:
-- Source migration from docs/runtime/environment.md is reflected here.
-- PS executes PowerShell payloads.
-- Use PS for local filesystem checks, diagnostics, small scripts, build commands, and controlled file writes.
-- Keep commands simple and single-purpose.
-- Use RAW payload for scripts longer than a few lines or containing quotes, backslashes, JSON, markdown, or OpenBridge-sensitive text.
-- When writing text files, use explicit UTF-8.
-- PS stdout may be truncated by the runtime; for large outputs, write to a file and return path plus preview.
+- PS is preferred for simple Windows, filesystem, and process operations.
+- Simple commands are more reliable than large defensive blocks.
+- Python should not be invoked with Bash syntax inside PS.
+- For long or fragile payloads, use RAW as described in HST_HELP.
 
-## Command
+## What PS is for
 
-PS:
-Executes a PowerShell payload in the OpenBrowser working environment.
+Use PS for simple Windows and filesystem work: `Get-Location`, `Get-ChildItem`, `Get-Item`, `Get-Content`, `Set-Content`, `New-Item`, `Copy-Item`, `Move-Item`, `Remove-Item`, process checks.
 
-PS_HELP:
-Shows help for the PowerShell executor.
+PS is not automatically better than PY for text parsing, Unicode verification, JSON/CSV/log processing, or larger structured data work.
 
-## Payload
+## Simple command rule
 
-The payload is PowerShell code or a PowerShell command line.
+Prefer simple commands over long defensive scripts when the task is simple.
 
-Use PS for:
-- listing files;
-- reading small files;
-- writing controlled files;
-- running build or diagnostic commands;
-- collecting repository state;
-- checking logs and downloads;
-- creating small helper scripts.
+Long commands increase the chance of model typo, quoting error, JSON escaping error, transport failure, and harder diagnosis.
 
-## RAW payload guidance
+Use this sequence by default:
 
-Use RAW payload when the command:
-- is longer than a few lines;
-- contains many quotes;
-- contains backslashes;
-- contains JSON;
-- contains markdown;
-- contains OpenBridge-sensitive text.
+```text
+inspect -> simple action -> verify
+```
 
-The runtime RAW mechanism lets the model write plain text while the system handles encoding before executor delivery.
+## Do not use Bash syntax in PS
 
-## Output expectations
+Do not use Bash heredoc or Bash-only syntax inside PS payloads.
 
-PS should return:
-- command output;
-- error output if present;
-- enough information to verify whether the operation succeeded.
+Wrong pattern:
 
-For large outputs, write the full output to a file and return:
-- output file path;
-- short preview;
-- whether the output was truncated.
+```powershell
+python - <<'PY'
+```
 
-## Encoding rule
+PowerShell is not Bash.
 
-When PS writes text files, it must use explicit UTF-8.
-Do not rely on Windows default encoding.
+If Python is the right tool, use the PY executor or a PowerShell-compatible Python invocation.
 
-## Practical rule
+## Text and encoding
 
-Use small, focused PS commands. A single command should have one clear responsibility unless the owner/architect explicitly asks for a larger scripted operation.
+PowerShell can write UTF-8 files when explicit encoding is used.
+
+Returned PS stdout may still be unsafe for non-ASCII verification in the current OpenBridge path. Mojibake in returned output does not automatically prove that the file is corrupted.
+
+For Unicode-sensitive verification, consider PY or another controlled method.
+
+## RAW
+
+For long, quote-heavy, markdown-heavy, JSON-heavy, backslash-heavy, Polish-text-heavy, or OpenBridge-sensitive payloads, use RAW as described in `HST_HELP`.
+
+Do not solve fragile quoting by building a larger PowerShell string escape puzzle.

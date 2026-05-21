@@ -1,4 +1,4 @@
-﻿# Current State
+# Current State
 
 Purpose:
 Defines the current repository-level truth that developer agents must use before making changes or recommendations.
@@ -291,3 +291,20 @@ Developer agents must not assume old files are current if a *_new.md replacement
 Historical or replaced content must not be treated as current truth unless migrated into active documentation.
 
 
+
+<!-- COMPLETE_DOC_UPDATE_CURRENT_STATE_20260521 -->
+## Current help and transport documentation state
+
+Active model-facing help files:
+- docs/runtime/hst-help_new.md: OpenBridge/HST help index, command frame, HST commands, tool help commands, RAW/Base64 framing;
+- docs/executors/PS/help_new.md: PowerShell executor help;
+- docs/executors/PY/help_new.md: Python executor help;
+- docs/agent/help-command-routing_new.md: maps help commands to documentation files.
+
+Active operational policy files:
+- docs/agent/model-feedback-policy_new.md: where and when models record operational observations;
+- docs/agent/external-tool-policy_new.md: how models treat external tools differently from local filesystem work;
+- docs/feedback/antigravity-text-transport-task_new.md: architecture task for text transport and encoding.
+
+Node.js may be available through the local Windows environment, but NODE is not an OpenBridge executor unless listed by implemented commands. Models must not infer a NODE executor from Node being installed.
+<!-- /COMPLETE_DOC_UPDATE_CURRENT_STATE_20260521 -->

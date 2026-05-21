@@ -1,4 +1,4 @@
-﻿# Coding Invariants
+# Coding Invariants
 
 Purpose:
 Defines mandatory technical rules that developer agents must preserve when changing OpenBrowser/OpenBridge code, scripts, runtime behavior, documentation generation, or command execution.
@@ -217,3 +217,23 @@ Source evidence:
 - docs/executors/PS/help_new.md
 - docs/executors/PS/rules_new.md
 
+
+<!-- COMPLETE_DOC_UPDATE_CODING_INVARIANTS_20260521 -->
+### INV-HELP-001: Help commands must map to explicit files
+
+Rule: Every model-facing help command must have a documented source file. Tool help commands display tools/<tool>/README.md and must state the file path in output.
+
+Reason: Models must not search random README files or infer tool usage from stale documentation.
+
+### INV-TRANSPORT-001: Text transport must be explicit
+
+Rule: OpenBridge text transport between model, Host, executor, and result return must not rely on undocumented default encodings or accidental shell behavior.
+
+Reason: payload text and returned output can include Unicode, markdown, JSON, command frames, quotes, and backslashes. These must survive both directions.
+
+### INV-FEEDBACK-001: Recurring model-operational failures must be recorded
+
+Rule: Repeated command failures, misleading help, wrong capability assumptions, legacy-document confusion, and tool behavior mismatches must be recorded according to docs/agent/model-feedback-policy_new.md.
+
+Reason: If a model repeatedly makes the same wrong assumption, the system documentation is probably insufficient.
+<!-- /COMPLETE_DOC_UPDATE_CODING_INVARIANTS_20260521 -->

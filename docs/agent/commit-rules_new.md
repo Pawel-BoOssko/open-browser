@@ -1,4 +1,4 @@
-﻿# Commit Rules
+# Commit Rules
 
 Purpose:
 Defines the conditions a developer agent must verify before recommending or performing a Git commit.
@@ -114,3 +114,20 @@ Never:
 The local pre-commit hook may remind the agent to apply docs/agent/READ_BEFORE_WORK_new.md.
 The hook does not replace agent responsibility for checking documentation, invariants, field notes, and commit scope.
 
+
+<!-- COMPLETE_DOC_UPDATE_COMMIT_RULES_20260521 -->
+## Additional commit checks after help and transport update
+
+Before COMMIT, if the change affects help, commands, tools, executors, text transport, RAW/Base64, external services, or model-facing behavior, verify that the relevant files were checked and updated:
+
+- docs/runtime/hst-help_new.md;
+- docs/executors/PS/help_new.md;
+- docs/executors/PY/help_new.md;
+- docs/agent/help-command-routing_new.md;
+- docs/agent/model-feedback-policy_new.md;
+- docs/agent/external-tool-policy_new.md;
+- docs/feedback/antigravity-text-transport-task_new.md;
+- relevant tools/*/README.md.
+
+Do not commit new help commands unless their source documentation file and output header rule are documented.
+<!-- /COMPLETE_DOC_UPDATE_COMMIT_RULES_20260521 -->
