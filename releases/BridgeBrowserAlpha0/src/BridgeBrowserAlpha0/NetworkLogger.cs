@@ -86,8 +86,9 @@ public sealed class NetworkLogger
 
             if (string.IsNullOrEmpty(requestId)) return;
             var bodyJson = await _core.CallDevToolsProtocolMethodAsync("Network.getResponseBody", JsonSerializer.Serialize(new { requestId }));
-            _log.WriteRun("cdp", "cdp_response_body", "ok", ClassifyUrl(url ?? ""), new { requestId, url, body = bodyJson });
-            _extractor.AddRaw("cdp", "cdp_response_body", bodyJson);
+            // Log only metadata, not full body — avoids flooding logs (GB of JS files from SPA)
+            // and spamming the extractor with false extraction_final events.
+            _log.WriteRun("cdp", "cdp_response_body", "ok", ClassifyUrl(url ?? ""), new { requestId, url, bodyLength = bodyJson?.Length ?? 0 });
         }
         catch (Exception ex)
         {
