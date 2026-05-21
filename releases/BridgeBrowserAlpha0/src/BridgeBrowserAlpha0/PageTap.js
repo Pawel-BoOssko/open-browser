@@ -18,8 +18,7 @@
   const looksLikeConversationRequest = (url, method) => {
     try {
       const text = String(url || "");
-      const m = String(method || "GET").toUpperCase();
-      return /^https:\/\/chatgpt\.com\/backend-api\/conversation\/[^/?#]+/.test(text);
+      return /^https:\/\/chatgpt\.com\/backend-api\/conversation/.test(text);
     } catch (_) {
       return false;
     }
