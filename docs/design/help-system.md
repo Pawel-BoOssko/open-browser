@@ -32,7 +32,7 @@ Each executor's help must cover everything the model needs to know:
 - Limits (output size, execution time)
 - Error handling — what errors look like, how to recover
 - Timeout behavior
-- Base64 support (`payload64`)
+- RAW payload support (base64 internally protected)
 - Encoding rules
 - Truncation markers
 - Anything else specific to that executor

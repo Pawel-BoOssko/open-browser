@@ -41,7 +41,7 @@ Every trace of a removed feature must be erased from the entire project. No ghos
 - No "deprecated" comments, no "removed in vX" notes, no commented-out code, no `_old` suffixes, no `// was:` lines.
 - The git history is the only record of what was removed. Nothing in the working tree may reference it.
 
-**Why:** stale references pollute agent context and cause agents to hallucinate nonexistent features (e.g. `payload64` appearing in a new prompt because an old handoff or parser comment mentioned it).
+**Why:** stale references pollute agent context and cause agents to hallucinate nonexistent features (e.g. a removed command or parameter appearing in a new prompt because an old handoff or parser comment mentioned it).
 
 ## Prohibitions
 

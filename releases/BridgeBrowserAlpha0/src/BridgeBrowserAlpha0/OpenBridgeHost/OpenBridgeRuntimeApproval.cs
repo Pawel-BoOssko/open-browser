@@ -282,9 +282,74 @@ private HostCommandResult ExecuteStatusCommand()
         }
     }
 
+    private HostCommandResult GetFileBackedHelp(string commandName, string relativePath, Func<string> fallbackGenerator)
+    {
+        string fullPath = Path.Combine(AppPaths.Root, relativePath.Replace('/', Path.DirectorySeparatorChar));
+        try
+        {
+            if (File.Exists(fullPath))
+            {
+                var content = File.ReadAllText(fullPath, System.Text.Encoding.UTF8);
+                var sb = new System.Text.StringBuilder();
+                sb.AppendLine(commandName);
+                sb.AppendLine("This is the content of:");
+                sb.AppendLine(relativePath);
+                sb.AppendLine();
+                sb.Append(content);
+
+                return new HostCommandResult
+                {
+                    Status = HostExecutionStatus.Ok,
+                    OperationId = Guid.NewGuid().ToString("N")[..12],
+                    DurationMs = 0,
+                    StdoutPreview = sb.ToString(),
+                    ExitCode = 0,
+                    Message = $"{commandName} completed from file."
+                };
+            }
+            else
+            {
+                _log?.WriteRun("runtime_approval", "help_fallback", "warning",
+                    $"Help file not found: {fullPath}. Using hardcoded fallback.",
+                    new { command = commandName, path = relativePath });
+            }
+        }
+        catch (Exception ex)
+        {
+            _log?.WriteRun("runtime_approval", "help_fallback", "warning",
+                $"Failed to read help file: {fullPath}. Exception: {ex.Message}. Using hardcoded fallback.",
+                new { command = commandName, path = relativePath, error = ex.Message });
+        }
+
+        try
+        {
+            var fallbackContent = fallbackGenerator();
+            return new HostCommandResult
+            {
+                Status = HostExecutionStatus.Ok,
+                OperationId = Guid.NewGuid().ToString("N")[..12],
+                DurationMs = 0,
+                StdoutPreview = fallbackContent,
+                ExitCode = 0,
+                Message = $"{commandName} completed."
+            };
+        }
+        catch (Exception ex)
+        {
+            return new HostCommandResult
+            {
+                Status = HostExecutionStatus.Error,
+                OperationId = Guid.NewGuid().ToString("N")[..12],
+                DurationMs = 0,
+                ErrorCode = HostErrorCodes.ExecutorError,
+                Message = $"{commandName} failed: {ex.Message}"
+            };
+        }
+    }
+
     private HostCommandResult ExecuteHelpCommand()
     {
-        try
+        return GetFileBackedHelp("HST_HELP", "docs/runtime/hst-help_new.md", () =>
         {
             var sb = new System.Text.StringBuilder();
             sb.AppendLine("OpenBridge Host Commands");
@@ -321,33 +386,13 @@ private HostCommandResult ExecuteStatusCommand()
             sb.AppendLine("  - Files created in the ChatGPT sandbox are auto-detected and downloaded.");
             sb.AppendLine("  - Downloads go to the Downloads directory (see HST_STATUS for recent files).");
             sb.AppendLine("  - Each command has a timeout. If exceeded, the system sends a timeout message to chat.");
-
-            return new HostCommandResult
-            {
-                Status = HostExecutionStatus.Ok,
-                OperationId = Guid.NewGuid().ToString("N")[..12],
-                DurationMs = 0,
-                StdoutPreview = sb.ToString(),
-                ExitCode = 0,
-                Message = "HST_HELP completed."
-            };
-        }
-        catch (Exception ex)
-        {
-            return new HostCommandResult
-            {
-                Status = HostExecutionStatus.Error,
-                OperationId = Guid.NewGuid().ToString("N")[..12],
-                DurationMs = 0,
-                ErrorCode = HostErrorCodes.ExecutorError,
-                Message = $"Help failed: {ex.Message}"
-            };
-        }
+            return sb.ToString();
+        });
     }
 
     private HostCommandResult ExecutePsHelp()
     {
-        try
+        return GetFileBackedHelp("PS_HELP", "docs/executors/PS/help_new.md", () =>
         {
             var sb = new System.Text.StringBuilder();
             sb.AppendLine("PS — PowerShell Executor");
@@ -384,33 +429,13 @@ private HostCommandResult ExecuteStatusCommand()
             sb.AppendLine("  @@OPENBRIDGE_EXEC_BEGIN@@");
             sb.AppendLine("  {\"version\":\"001\",\"command\":\"PS\",\"payload\":\"Get-ChildItem downloads\\\\\"}");
             sb.AppendLine("  @@OPENBRIDGE_EXEC_END@@");
-
-            return new HostCommandResult
-            {
-                Status = HostExecutionStatus.Ok,
-                OperationId = Guid.NewGuid().ToString("N")[..12],
-                DurationMs = 0,
-                StdoutPreview = sb.ToString(),
-                ExitCode = 0,
-                Message = "PS_HELP completed."
-            };
-        }
-        catch (Exception ex)
-        {
-            return new HostCommandResult
-            {
-                Status = HostExecutionStatus.Error,
-                OperationId = Guid.NewGuid().ToString("N")[..12],
-                DurationMs = 0,
-                ErrorCode = HostErrorCodes.ExecutorError,
-                Message = $"PS_HELP failed: {ex.Message}"
-            };
-        }
+            return sb.ToString();
+        });
     }
 
     private HostCommandResult ExecutePyHelp()
     {
-        try
+        return GetFileBackedHelp("PY_HELP", "docs/executors/PY/help_new.md", () =>
         {
             var sb = new System.Text.StringBuilder();
             sb.AppendLine("PY — Python 3 Executor");
@@ -441,28 +466,8 @@ private HostCommandResult ExecuteStatusCommand()
             sb.AppendLine("  @@OPENBRIDGE_EXEC_BEGIN@@");
             sb.AppendLine("  {\"version\":\"001\",\"command\":\"PY\",\"payload\":\"import os; print(os.getcwd())\"}");
             sb.AppendLine("  @@OPENBRIDGE_EXEC_END@@");
-
-            return new HostCommandResult
-            {
-                Status = HostExecutionStatus.Ok,
-                OperationId = Guid.NewGuid().ToString("N")[..12],
-                DurationMs = 0,
-                StdoutPreview = sb.ToString(),
-                ExitCode = 0,
-                Message = "PY_HELP completed."
-            };
-        }
-        catch (Exception ex)
-        {
-            return new HostCommandResult
-            {
-                Status = HostExecutionStatus.Error,
-                OperationId = Guid.NewGuid().ToString("N")[..12],
-                DurationMs = 0,
-                ErrorCode = HostErrorCodes.ExecutorError,
-                Message = $"PY_HELP failed: {ex.Message}"
-            };
-        }
+            return sb.ToString();
+        });
     }
 
     private static HostCommandResult NoPendingResult()

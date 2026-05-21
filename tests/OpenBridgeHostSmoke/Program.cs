@@ -286,7 +286,7 @@ class Program
         var ok24 = OpenBridgeHostCommandMapper.TryMap(env24, allowedRoot, 720_000, 50_000, out var req24, out var err24);
         Assert(!ok24, "Unsupported command is rejected");
         Assert(req24 == null, "No request for unsupported command");
-        Assert(err24 != null && err24.Contains("PS"), "Error mentions only PS accepted");
+        Assert(err24 != null && err24.Contains("not supported"), "Error mentions command not supported");
 
         var env25 = new OpenBridgeEnvelope { Command = "PS" };
         var ok25 = OpenBridgeHostCommandMapper.TryMap(env25, allowedRoot, 720_000, 50_000, out var req25, out var err25);
@@ -357,7 +357,7 @@ class Program
         approval.Reject();
         var ok32 = approval.TrySetPending(env32, out var err32);
         Assert(!ok32, "Unsupported command rejected");
-        Assert(err32 != null && err32.Contains("PS"), "Error mentions only PS accepted");
+        Assert(err32 != null && err32.Contains("not supported"), "Error mentions command not supported");
 
         var env33 = new OpenBridgeEnvelopeParseResult
         {

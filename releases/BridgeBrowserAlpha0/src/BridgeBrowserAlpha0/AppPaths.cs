@@ -25,17 +25,33 @@ public static class AppPaths
         var dir = AppContext.BaseDirectory;
         while (!string.IsNullOrEmpty(dir))
         {
-            if (Directory.Exists(Path.Combine(dir, "modules")) && 
-                Directory.Exists(Path.Combine(dir, "config")) && 
-                File.Exists(Path.Combine(dir, "src", "BridgeBrowserAlpha0", "BridgeBrowserAlpha0.csproj")))
+            // 1. If we are in the development repository, find the repo root
+            if (File.Exists(Path.Combine(dir, "releases", "BridgeBrowserAlpha0", "src", "BridgeBrowserAlpha0", "BridgeBrowserAlpha0.csproj")))
             {
                 return dir;
             }
-            var parent = Path.GetDirectoryName(dir);
-            if (parent == null || parent == dir) break;
-            dir = parent;
+            // 2. If we are traversing inside the releases folder of the repo
+            if (dir.EndsWith("releases\\BridgeBrowserAlpha0", StringComparison.OrdinalIgnoreCase) || 
+                dir.EndsWith("releases/BridgeBrowserAlpha0", StringComparison.OrdinalIgnoreCase))
+            {
+                var parent = Path.GetDirectoryName(dir);
+                if (parent != null && File.Exists(Path.Combine(parent, "releases", "BridgeBrowserAlpha0", "src", "BridgeBrowserAlpha0", "BridgeBrowserAlpha0.csproj")))
+                {
+                    return parent;
+                }
+            }
+            // 3. Packaged standalone release fallback (where src does not exist)
+            if (Directory.Exists(Path.Combine(dir, "modules")) && 
+                Directory.Exists(Path.Combine(dir, "config")) && 
+                !Directory.Exists(Path.Combine(dir, "releases"))) // to avoid matching parent directories prematurely
+            {
+                return dir;
+            }
+            var parentDir = Path.GetDirectoryName(dir);
+            if (parentDir == null || parentDir == dir) break;
+            dir = parentDir;
         }
-        return Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
+        return AppContext.BaseDirectory;
     }
 
     public static void EnsureAll()
