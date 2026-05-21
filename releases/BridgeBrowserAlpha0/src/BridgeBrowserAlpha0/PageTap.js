@@ -15,15 +15,34 @@
     } catch (_) {}
   };
 
-  const looksLikeConversationGet = (url, method) => {
+  const looksLikeConversationRequest = (url, method) => {
     try {
       const text = String(url || "");
       const m = String(method || "GET").toUpperCase();
-      return m === "GET" &&
-        /^https:\/\/chatgpt\.com\/backend-api\/conversation\/[^/?#]+/.test(text);
+      return /^https:\/\/chatgpt\.com\/backend-api\/conversation\/[^/?#]+/.test(text);
     } catch (_) {
       return false;
     }
+  };
+
+  const parseSseFromText = (url, text) => {
+    const records = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n\n");
+    for (const record of records) {
+      const trimmed = record.trim();
+      if (!trimmed || trimmed === "[DONE]") continue;
+      // Extract data: lines
+      const lines = trimmed.split("\n");
+      let data = "";
+      for (const line of lines) {
+        if (line.startsWith("data:")) {
+          data += line.slice(5).replace(/^\s+/, "");
+        }
+      }
+      if (data) {
+        post("page_fetch_sse_record", { url, record: data });
+      }
+    }
+    post("page_fetch_sse_done", { url });
   };
 
   const cloneHeaders = (headers) => {
@@ -71,7 +90,7 @@
       post("page_fetch_start", {
         url,
         method,
-        isConversationGet: looksLikeConversationGet(url, method)
+        isConversationGet: looksLikeConversationRequest(url, method)
       });
     } catch (error) {
       post("page_fetch_start_error", { error: String(error) }, "error");
@@ -80,10 +99,21 @@
     const response = await originalFetch.apply(this, arguments);
 
     try {
-      if (!looksLikeConversationGet(url, method)) {
+      const isConversation = looksLikeConversationRequest(url, method);
+
+      if (isConversation) {
+        // Parse SSE from conversation responses in background
+        try {
+          const sseClone = response.clone();
+          sseClone.text().then(text => parseSseFromText(url, text)).catch(() => {});
+        } catch (_) {}
+      }
+
+      if (!isConversation || method.toUpperCase() !== "GET") {
         return response;
       }
 
+      // Trimmer path: only for GET conversation requests with module available
       post("trimmer_fetch_seen", {
         url,
         method,

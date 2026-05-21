@@ -40,7 +40,15 @@ public sealed class WebViewMessageHandler
                     _extractor.AddRaw("page_tap", eventType, wsData.GetString() ?? "");
             }
 
-            if (eventType is "page_fetch_done" or "page_xhr_done" or "page_eventsource_error")
+            // SSE stream capture from fetch responses
+            if (eventType == "page_fetch_sse_record" && root.TryGetProperty("data", out var sseData) &&
+                sseData.ValueKind == JsonValueKind.Object &&
+                sseData.TryGetProperty("record", out var sseRecord) && sseRecord.ValueKind == JsonValueKind.String)
+            {
+                _extractor.AddRaw("page_tap", "page_fetch_sse_record", sseRecord.GetString() ?? "");
+            }
+
+            if (eventType is "page_fetch_done" or "page_xhr_done" or "page_eventsource_error" or "page_fetch_sse_done")
                 _extractor.Finish();
             else if (eventType == "page_websocket_message" && root.TryGetProperty("data", out var wsDataEl))
             {
