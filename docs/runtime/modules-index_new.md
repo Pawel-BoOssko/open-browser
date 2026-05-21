@@ -11,7 +11,6 @@ Depends on:
 - docs/agent/current-state_new.md
 - docs/design/session-rhythm.md
 - docs/design/help-system.md
-- docs/tools-sources-outline_new.txt
 
 Impacts:
 - docs/runtime/hst-help_new.md
@@ -26,7 +25,7 @@ Update rule:
 Update this file when a documented module, executor, command namespace, tool integration, status, or docs path is added, removed, renamed, or reclassified.
 
 Latest:
-- Tool source migration is reflected here.
+- Active tool integrations are reflected here.
 - This file is only a registry.
 - It stores module/tool name, type, status, and docs path.
 - It must not store common documentation rules or full tool manuals.

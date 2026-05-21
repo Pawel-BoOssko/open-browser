@@ -8,7 +8,6 @@ Depends on:
 - docs/templates/field-note-template_new.md
 - docs/agent/READ_BEFORE_WORK_new.md
 - docs/agent/documentation-update-checklist_new.md
-- docs/test-sources-outline_new.txt
 
 Impacts:
 - docs/agent/READ_BEFORE_WORK_new.md
@@ -65,7 +64,6 @@ Keep these proposals as source/backlog material. Promote individual items only a
 Links or files:
 - ideas.md
 - tool-proposals.md
-- docs/ideas-sources-outline_new.txt
 
 ## 2026-05-21 09:00 | developer-agent | problem | new
 
@@ -85,7 +83,6 @@ Links or files:
 - test-results-v3.md
 - test-results-v4.md
 - tools-test-results.md
-- docs/test-sources-outline_new.txt
 
 ## 2026-05-21 09:00 | developer-agent | problem | triaged
 

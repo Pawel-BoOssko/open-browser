@@ -9,7 +9,6 @@ Depends on:
 - docs/modules/PageTap/help_new.md
 - docs/modules/Downloads/rules_new.md
 - docs/agent/current-state_new.md
-- docs/test-sources-outline_new.txt
 
 Impacts:
 - docs/modules/PageTap/index_new.md

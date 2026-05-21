@@ -2,12 +2,12 @@
 
 A local desktop runtime that gives an LLM controlled access to your system through a real browser session.
 
-**LLM decides → executor executes → LLM receives the result.** No human in the loop. No cloud middleware. Everything runs locally.
+**LLM decides â†’ executor executes â†’ LLM receives the result.** No human in the loop. No cloud middleware. Everything runs locally.
 
 ## How it works
 
 1. An LLM (ChatGPT, Claude, etc.) runs in a real browser session inside a WebView2 window
-2. The LLM includes an **execution envelope** in its response — a JSON with a PowerShell command
+2. The LLM includes an **execution envelope** in its response â€” a JSON with a PowerShell command
 3. Open Browser detects the envelope, executes the command via PowerShell, and injects the result back into the chat
 4. The LLM sees the result and can act on it in its next turn
 5. The cycle continues autonomously
@@ -44,9 +44,9 @@ The LLM sends commands via execution envelopes in its response:
 @@OPENBRIDGE_EXEC_END@@
 ```
 
-Available commands: `PS` (PowerShell), `HST_HELP`, `HST_TOOLS`, `HST_STATUS`.
+Available commands: `PS` (PowerShell), `PY` (Python), `HST_HELP`, `HST_STATUS`.
 
-The full runtime contract for the model is in [docs/runtime/environment.md](docs/runtime/environment.md).
+The current model-facing runtime contract is in docs/runtime/start-prompt_new.md, docs/runtime/hst-help_new.md, and docs/executors/*/help_new.md.
 
 ## Tools
 
@@ -63,15 +63,15 @@ Built-in toolkits for external services:
 
 ```
 LLM (browser tab)
-  → ResponseExtractor (detects envelopes)
-  → OpenBridgeHost (routing + concurrency)
-  → GeneralCommandExecutor (PowerShell process)
-  → result injected back to chat
+  â†’ ResponseExtractor (detects envelopes)
+  â†’ OpenBridgeHost (routing + concurrency)
+  â†’ GeneralCommandExecutor (PowerShell process)
+  â†’ result injected back to chat
 ```
 
 Key properties:
-- Shared Host instance with concurrency lock — one command at a time
-- 360s cycle timeout — model always gets a response
+- Shared Host instance with concurrency lock â€” one command at a time
+- 360s cycle timeout â€” model always gets a response
 - Output truncated at 50,000 characters
 - Human-like response delay with randomized text wrapping
 

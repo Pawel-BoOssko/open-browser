@@ -9,7 +9,6 @@ Depends on:
 - docs/modules/Downloads/help_new.md
 - docs/runtime/hst-status_new.md
 - docs/agent/current-state_new.md
-- docs/test-sources-outline_new.txt
 - test-results-v4.md
 
 Impacts:
