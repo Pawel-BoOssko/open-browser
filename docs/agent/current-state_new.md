@@ -266,6 +266,19 @@ From test source migration:
 - web_fetch.py was initially missing dependencies in older results, but later test results show it working.
 - PS stdout may still corrupt Polish characters. Treat PS stdout UTF-8 as an open issue unless a later verification proves it fixed.
 - Older sandbox download test failed in test-results-v4.md, but later live OpenBrowser tests verified ChatGPT sandbox downloads. Treat the old failure as historical unless reproduced.
+## Current handoff for AntiGravity
+
+Current handoff file: handoff.md.
+
+The handoff is not a replacement for docs/agent/READ_BEFORE_WORK_new.md. It is a task handover for AntiGravity after the documentation cleanup.
+
+Near-term AntiGravity work should be inventory and planning only:
+- inspect dirty working tree, especially PortalScanner.js and runtime downloads;
+- propose how to separate OpenBrowser from the portal-document-download direction, possibly under the user-facing idea name Otwarty Portal Sądowy;
+- propose a procedure for creating a clearly distinguishable user-runnable build for Paweł on explicit owner request;
+- do not implement the split or build procedure until accepted.
+
+
 ## Current repository caution
 ## Current folder policy
 
@@ -276,3 +289,5 @@ There are existing older docs and new *_new.md docs during the documentation-gov
 Developer agents must not assume old files are current if a *_new.md replacement exists and is part of the current documentation-governance work.
 
 Historical or replaced content must not be treated as current truth unless migrated into active documentation.
+
+

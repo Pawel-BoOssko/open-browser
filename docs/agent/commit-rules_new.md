@@ -113,3 +113,4 @@ Never:
 
 The local pre-commit hook may remind the agent to apply docs/agent/READ_BEFORE_WORK_new.md.
 The hook does not replace agent responsibility for checking documentation, invariants, field notes, and commit scope.
+

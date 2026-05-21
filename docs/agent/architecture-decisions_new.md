@@ -1,4 +1,4 @@
-# Architecture Decisions
+﻿# Architecture Decisions
 
 Purpose:
 Records accepted architecture and project-governance decisions that developer agents must treat as current project rules.
