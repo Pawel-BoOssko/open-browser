@@ -1,4 +1,4 @@
-﻿# OpenBrowser Handoff for AntiGravity - 2026-05-21
+# OpenBrowser Handoff for AntiGravity - 2026-05-21
 
 ## Read this first
 
@@ -28,10 +28,10 @@ During the prior CloudCode work, a temporary instruction was used to stop uncont
 
 Do not preserve or reintroduce these as permanent project rules:
 
-- no new features without approval;
-- overriding rule #12;
-- stable copy must not be touched;
-- D:\projects\open-browser-stable as a current architecture requirement.
+- the prior temporary feature-freeze instruction;
+- the prior numbered stop-gap rule used to stop uncontrolled expansion;
+- the prior instruction about a separate working copy;
+- any path-specific separate-instance rule as a current architecture requirement.
 
 The real standing rule is narrower: keep work scoped to the requested task, do not introduce unrelated features, and record real architecture decisions in docs/agent/architecture-decisions_new.md.
 
