@@ -411,7 +411,9 @@ public sealed class ResponseExtractor
         if (!role.Equals("assistant", StringComparison.OrdinalIgnoreCase)) return;
 
         var channel = GetString(message, "channel") ?? "";
-        if (!channel.Equals("final", StringComparison.OrdinalIgnoreCase)) return;
+        // gpt-5-5-thinking sends final messages without a channel field (null/empty).
+        // Only skip messages that explicitly declare a non-final channel (e.g. "thinking").
+        if (!string.IsNullOrEmpty(channel) && !channel.Equals("final", StringComparison.OrdinalIgnoreCase)) return;
 
         if (!message.TryGetProperty("content", out var content) || content.ValueKind != JsonValueKind.Object) return;
         var contentType = GetString(content, "content_type") ?? "";
