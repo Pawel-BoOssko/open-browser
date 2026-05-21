@@ -1,3 +1,11 @@
+<!-- LEGACY_DOCUMENT_NOTICE -->
+> Legacy document notice: this is an older documentation file. Its current operational content has been migrated or superseded by: docs/runtime/modules-index_new.md; tool README/working-guide files may remain active operational references.
+>
+> Before using this file as source of truth, read: docs/agent/READ_BEFORE_WORK_new.md.
+>
+> Treat this file as historical or secondary unless the new documentation explicitly points back to it as an active operational reference.
+<!-- /LEGACY_DOCUMENT_NOTICE -->
+
 # Working with Claude Code from Open Browser
 
 Claude Code is a separate AI coding assistant running via the DeepSeek API. Use it to delegate complex file analysis, code generation, or multi-step reasoning tasks that are cumbersome to do via individual PS commands.

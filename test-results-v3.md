@@ -1,4 +1,12 @@
-﻿# Test Results v3
+<!-- LEGACY_DOCUMENT_NOTICE -->
+> Legacy document notice: this is an older documentation file. Its current operational content has been migrated or superseded by: docs/agent/current-state_new.md and docs/feedback/field-notes_new.md.
+>
+> Before using this file as source of truth, read: docs/agent/READ_BEFORE_WORK_new.md.
+>
+> Treat this file as historical or secondary unless the new documentation explicitly points back to it as an active operational reference.
+<!-- /LEGACY_DOCUMENT_NOTICE -->
+
+# Test Results v3
 
 Date: 2026-05-19 15:43:00
 

@@ -1,3 +1,11 @@
+<!-- LEGACY_DOCUMENT_NOTICE -->
+> Legacy document notice: this is an older documentation file. Its current operational content has been migrated or superseded by: docs/runtime/modules-index_new.md; tool README/working-guide files may remain active operational references.
+>
+> Before using this file as source of truth, read: docs/agent/READ_BEFORE_WORK_new.md.
+>
+> Treat this file as historical or secondary unless the new documentation explicitly points back to it as an active operational reference.
+<!-- /LEGACY_DOCUMENT_NOTICE -->
+
 # tools/n8n/
 
 **Purpose:** Python scripts for managing n8n workflows via the n8n Public API, plus Supabase/Postgres queries. Designed to be called from Open Browser via PowerShell (`python tools/n8n/<script>.py`).

@@ -1,3 +1,11 @@
+<!-- LEGACY_DOCUMENT_NOTICE -->
+> Legacy document notice: this is an older documentation file. Its current operational content has been migrated or superseded by: docs/runtime/modules-index_new.md; tool README/working-guide files may remain active operational references.
+>
+> Before using this file as source of truth, read: docs/agent/READ_BEFORE_WORK_new.md.
+>
+> Treat this file as historical or secondary unless the new documentation explicitly points back to it as an active operational reference.
+<!-- /LEGACY_DOCUMENT_NOTICE -->
+
 # Working with n8n from Open Browser
 
 This guide covers how to manage n8n workflows via the Public API using the scripts in `tools/n8n/`. All commands below are PowerShell — send them through the `PS` envelope.

@@ -1,3 +1,11 @@
+<!-- LEGACY_DOCUMENT_NOTICE -->
+> Legacy document notice: this is an older documentation file. Its current operational content has been migrated or superseded by: docs/runtime/start-prompt_new.md, docs/runtime/hst-help_new.md, docs/executors/*/help_new.md.
+>
+> Before using this file as source of truth, read: docs/agent/READ_BEFORE_WORK_new.md.
+>
+> Treat this file as historical or secondary unless the new documentation explicitly points back to it as an active operational reference.
+<!-- /LEGACY_DOCUMENT_NOTICE -->
+
 # Open Bridge Runtime Environment
 
 You are an LLM running inside **Open Browser** — a local execution environment that gives you controlled access to the user's system through a browser session.
