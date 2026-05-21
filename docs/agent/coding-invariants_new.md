@@ -1,4 +1,4 @@
-# Coding Invariants
+﻿# Coding Invariants
 
 Purpose:
 Defines mandatory technical rules that developer agents must preserve when changing OpenBrowser/OpenBridge code, scripts, runtime behavior, documentation generation, or command execution.
@@ -37,6 +37,12 @@ Latest:
 - Invariants are not suggestions. A developer agent must check them before final reports and before recommending COMMIT.
 
 ## Current invariants
+### INV-FOLDER-001: Folder policy coverage
+
+Rule: Every folder must be covered by docs/agent/folder-policy_new.md, a local FOLDER.md, or an inherited parent FOLDER.md. New root folders require explicit policy update or architect approval.
+
+Reason: Uncontrolled folder creation pollutes the repository and makes agent work harder to verify.
+
 
 ### INV-ENC-001: Explicit UTF-8 for generated text files
 

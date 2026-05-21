@@ -1,4 +1,4 @@
-# Read Before Work
+﻿# Read Before Work
 
 Purpose:
 Defines the mandatory entrypoint for every developer agent before code changes, documentation changes, commit recommendations, final reports, or architecture-impacting work.
@@ -39,6 +39,7 @@ Before starting any code change, documentation change, architecture-impacting ta
 4. docs/agent/documentation-update-checklist_new.md
 5. docs/agent/commit-rules_new.md
 6. docs/feedback/field-notes_new.md
+7. docs/agent/folder-policy_new.md
 
 ## Required response after reading
 

@@ -1,4 +1,4 @@
-# Development Rules
+﻿# Development Rules
 
 Purpose:
 Defines how developer agents must work in the OpenBrowser/OpenBridge repository so that technical work leaves the project understandable, documented, testable, and safe for the next agent.
@@ -63,6 +63,10 @@ Do not replace a simple mkdir, dir, copy, Get-Content, Set-Content, or Get-Item 
 
 If payload escaping becomes fragile, use RAW payload rather than adding complex quoting or escaping logic.
 ## Build and validation rules
+## Folder policy rule
+
+Before creating a new folder, check docs/agent/folder-policy_new.md and the nearest applicable FOLDER.md. New root folders require explicit policy update or architect approval.
+
 
 After every change to .cs files:
 - run dotnet build.

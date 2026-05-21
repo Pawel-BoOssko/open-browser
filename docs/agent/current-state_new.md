@@ -1,4 +1,4 @@
-# Current State
+﻿# Current State
 
 Purpose:
 Defines the current repository-level truth that developer agents must use before making changes or recommendations.
@@ -267,6 +267,10 @@ From test source migration:
 - PS stdout may still corrupt Polish characters. Treat PS stdout UTF-8 as an open issue unless a later verification proves it fixed.
 - Older sandbox download test failed in test-results-v4.md, but later live OpenBrowser tests verified ChatGPT sandbox downloads. Treat the old failure as historical unless reproduced.
 ## Current repository caution
+## Current folder policy
+
+Folder governance is defined in docs/agent/folder-policy_new.md and local FOLDER.md files. New root folders require policy update or architect approval.
+
 
 There are existing older docs and new *_new.md docs during the documentation-governance migration.
 Developer agents must not assume old files are current if a *_new.md replacement exists and is part of the current documentation-governance work.

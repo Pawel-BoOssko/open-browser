@@ -1,4 +1,4 @@
-# Commit Rules
+﻿# Commit Rules
 
 Purpose:
 Defines the conditions a developer agent must verify before recommending or performing a Git commit.
@@ -50,6 +50,7 @@ Before recommending COMMIT, verify:
 10. Removed features have no remaining active-file ghosts.
 11. config/local files are not included.
 12. The commit is one logical package.
+13. New folders comply with docs/agent/folder-policy_new.md and applicable FOLDER.md files.
 
 ## Commit scope rules
 

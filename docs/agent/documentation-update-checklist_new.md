@@ -1,4 +1,4 @@
-# Documentation Update Checklist
+﻿# Documentation Update Checklist
 
 Purpose:
 Defines the mandatory documentation impact check for developer agents after any change to code, behavior, commands, modules, executors, paths, logs, tests, or project rules.
@@ -28,6 +28,7 @@ Impacts:
 - docs/modules/*/help_new.md
 - docs/modules/*/rules_new.md
 - docs/feedback/field-notes_new.md
+- docs/agent/folder-policy_new.md and local FOLDER.md files when folders are added, removed, renamed, or reclassified
 
 Update rule:
 Update this file when documentation impact rules or required documentation checks change.
