@@ -5,9 +5,17 @@
 
   function observe() {
     const d = w.document;
-    const parts = Array.from(d.querySelectorAll('[data-message-author-role]'));
-    let last = parts[parts.length - 1] || null;
-    const role = last ? last.getAttribute("data-message-author-role") : "";
+    // ChatGPT's DIL UI (verified 2026-10-18 on the owner's test chat)
+    // uses data-chatgpt-selection-message-id for assistant replies and
+    // data-user-message-bubble for user prompts instead of the old role.
+    const legacy = Array.from(d.querySelectorAll('[data-message-author-role]'));
+    const modern = legacy.length ? [] : Array.from(d.querySelectorAll(
+      '[data-user-message-bubble],[data-chatgpt-selection-message-id]'));
+    const parts = legacy.length ? legacy : modern;
+    const last = parts[parts.length - 1] || null;
+    const role = last ? (legacy.length ? last.getAttribute('data-message-author-role') :
+      last.hasAttribute('data-chatgpt-selection-message-id') ? 'assistant' :
+      last.hasAttribute('data-user-message-bubble') ? 'user' : 'unknown') : 'unknown';
     const text = last && role === "assistant" ?
       String(last.innerText || "").slice(-8000) : "";
     const stop = !!d.querySelector(

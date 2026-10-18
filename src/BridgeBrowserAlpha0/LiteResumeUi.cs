@@ -145,7 +145,15 @@ internal sealed partial class ChatGptLiteForm
                 decision = advice.Decision, confidence = advice.Confidence
             });
             if (advice.Decision != "continue") return;
-            if (!IsApprovedTestChat(core.Source)) return;
+            if (!IsApprovedTestChat(core.Source) ||
+                !await RevalidateResumeBeforeSendAsync(core, chat, decision.ResponseHash))
+            {
+                LiteEventLog.Write("resume_preflight_rejected", new {
+                    reason = "chat_or_last_answer_changed_or_not_idle_high"
+                });
+                _resumeStatus.Text = "Wznowienie wstrzymane: stan rozmowy się zmienił";
+                return;
+            }
 
             // Commit uncertain BEFORE attempting to touch the DOM. No retries,
             // including after a renderer crash or whole-PC restart.
