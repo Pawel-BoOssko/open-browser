@@ -14,6 +14,7 @@ function create(mode="instant",option=true,host="chatgpt.com"){
  return {api:win.__OPENBROWSER_HIGH_GUARD__,get chosen(){return chosen}};
 }
 {const p=create("high");assert.equal(p.api.audit().compliant,true);}
+{const p=create("Wysoki");assert.equal(p.api.audit().compliant,true);}
 {const p=create("extra high");assert.equal(p.api.audit().compliant,true);}
 {const p=create("instant");assert.equal(p.api.audit().mode,"instant");assert.equal(p.api.switchHigh().state,"high_selection_requested");assert.equal(p.chosen,1);assert.equal(p.api.audit().mode,"high");}
 {const p=create("medium");p.api.switchHigh();assert.equal(p.api.audit().compliant,true);}

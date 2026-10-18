@@ -93,8 +93,12 @@ internal static class Program
             Environment.ExitCode = LiteBrandIcon.Export() ? 0 : 2;
             return;
         }
+        bool safeOpen = args.Any(arg => string.Equals(arg, "--lite-open-safely", StringComparison.OrdinalIgnoreCase));
+        if (safeOpen && System.Diagnostics.Process.GetProcessesByName("BridgeBrowserAlpha0")
+            .Any(process => process.Id != Environment.ProcessId && !process.HasExited))
+            return; // Existing browser or pending upgrade: never start a second WebView2 profile.
         ApplicationConfiguration.Initialize();
-        var lite = args.Any(arg => string.Equals(arg, "--chatgpt-lite", StringComparison.OrdinalIgnoreCase));
+        var lite = safeOpen || args.Any(arg => string.Equals(arg, "--chatgpt-lite", StringComparison.OrdinalIgnoreCase));
         Application.Run(lite ? new ChatGptLiteForm() : new MainForm());
     }
 }

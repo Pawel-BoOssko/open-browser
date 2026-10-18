@@ -3,7 +3,11 @@
   if (w.__OPENBROWSER_HIGH_GUARD__ || !w.document ||
       w.location.hostname !== "chatgpt.com") return;
   const modes = new Set(["instant", "medium", "high", "extra high"]);
-  const clean = value => String(value || "").trim().replace(/\s+/g, " ").toLowerCase();
+  const clean = value => {
+    const label = String(value || "").trim().replace(/\s+/g, " ").toLowerCase();
+    return ({"wysoki":"high", "wysoka":"high", "średni":"medium",
+      "sredni":"medium", "natychmiastowy":"instant"})[label] || label;
+  };
   const visible = node => !node.hidden && node.getAttribute("aria-hidden") !== "true" &&
     (!node.getClientRects || node.getClientRects().length > 0);
 
