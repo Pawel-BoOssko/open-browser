@@ -10,10 +10,13 @@ function setup() {
   let scheduled;
   let clicks = 0;
   let busy = false;
+  let userBubbles = [];
   const editor = { innerText: "", focus() {} };
   let activeEditor = editor;
   const doc = {
-    querySelectorAll() { return []; },
+    querySelectorAll(selector) {
+      return selector.includes('data-user-message-bubble') ? userBubbles : [];
+    },
     querySelector(selector) {
       if (selector.startsWith("#prompt-textarea")) return activeEditor;
       if (selector === '[data-testid="send-button"]')
@@ -34,6 +37,7 @@ function setup() {
   return {
     win, editor, sender, run() { assert.equal(typeof scheduled, "function"); scheduled(); },
     count() { return clicks; }, setBusy(value) { busy = value; },
+    showAcknowledgment(text) { userBubbles = [{ innerText: text }]; },
     replaceComposer() { activeEditor = { innerText: "", focus() {} }; }
   };
 }
@@ -71,4 +75,18 @@ function setup() {
   p.run();
   assert.equal(p.count(), 0, "must not click another composer after React replacement");
 }
-console.log("LiteResumeSenderRace: 5 PASS");
+{
+  const p = setup();
+  p.showAcknowledgment("[OB-" + id + "]\n" + prompt);
+  assert.equal(p.sender.hasAck(id), true,
+    "DIL user bubble must acknowledge already submitted receipt");
+  assert.equal(p.sender.send(prompt, id), "already_visible",
+    "do not submit a new message when DIL DOM already contains receipt");
+  assert.equal(p.count(), 0);
+}
+{
+  const p = setup();
+  p.showAcknowledgment("Different message without the receipt");
+  assert.equal(p.sender.hasAck(id), false);
+}
+console.log("LiteResumeSenderRace: 7 PASS");

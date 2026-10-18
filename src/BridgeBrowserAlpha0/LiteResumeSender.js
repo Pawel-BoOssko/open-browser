@@ -10,8 +10,11 @@
     return w.document.querySelector('#prompt-textarea,[data-testid="composer-text-input"],textarea');
   }
   function hasAck(receiptId) {
-    return Array.from(w.document.querySelectorAll('[data-message-author-role="user"]'))
-      .slice(-5).some(n => String(n.innerText || "").includes(receiptId));
+    // ChatGPT DIL renderer uses data-user-message-bubble (verified 2026-10-18).
+    // The legacy selector is kept for older or alternate UI variants.
+    return Array.from(w.document.querySelectorAll(
+      '[data-message-author-role="user"],[data-user-message-bubble]'))
+      .slice(-8).some(n => String(n.innerText || n.textContent || "").includes(receiptId));
   }
   function send(text, receiptId) {
     if (!/^\/c\//.test(w.location.pathname) ||
