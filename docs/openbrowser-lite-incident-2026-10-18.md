@@ -50,3 +50,19 @@ Cel: zachowac ustalenia przed restartem, zbadac przyczyny i wprowadzic diagnosty
 - PBOX1: git pull --ff-only wykonany, czysty katalog przed synchronizacją, commit 0fe0087 -> 2b769de, plik LiteEventLog.cs jest w klonie. Bez ręcznego git push.
 - PBOX1: przygotowanie osobnego katalogu aplikacji `OpenBrowserChatGPTLite_20261018_telemetry`, bez zastępowania aktualnego exe i bez ruszania profilu. Publikacja w toku.
 - Istniejaca aplikacja na SATANAMD PID 13384 nie zatrzymana; kompilacja Release do starego output była zablokowana plikiem uruchomionej aplikacji. Kompilacja Debug z nowym kodem powiodła się.
+
+## Wynik wdrozenia na PBOX1
+- PBOX1 `dotnet publish -c Release --no-restore -m:1` PASS, 0 błędów, znane ostrzezenie MSB3277; instalacja wersjonowana `%LOCALAPPDATA%\Programs\OpenBrowserChatGPTLite_20261018_telemetry`. Stara instalacja pozostala w oryginalnym katalogu.
+- Kontrolowane zatrzymanie TYLKO zadania `OpenBrowser ChatGPT Lite`, PID 48284 zamkniety, bez usuwania profilu i bez zamykania innych przegladarek/ChatGPT.
+- Aktualizacja zadania i skrotow Desktop/Start do nowej instalacji, restart. Task Running, proces PID 49928 `Responding=True`.
+- PBOX1 zapisuje `diagnostics/lite-events-2026-10-18.jsonl`: `webview_initialized browserVersion=155.0.4283.60`, `navigation_start host=chatgpt.com`, `navigation_completed IsSuccess=true`, `ui_heartbeat` co ~30 s. Nie testowano logowania ani poprawnosci generowania odpowiedzi.
+- PBOX1 po restarcie: 7 procesow WebView2; wolne RAM ~788 MiB w jednym pomiarze, ~631 MiB w kolejnym; pagefile używany ~5455 MiB (monitor).
+- Zapisano skrypt niezależnego monitoringu zasobów `scripts/monitor-lite-resources.ps1` i ukryty launcher `scripts/monitor-lite-resources-hidden.vbs` do katalogu diagnostyki na PBOX1. Pierwszy odczyt `resources-2026-10-18.jsonl` PASS: hostCount=1, webviewCount=7, 631 MiB free, 5455 MiB zajete pagefile.
+- Zablokowana/wolna operacja LC MultiHost PBOX1: rejestracja zadania `OpenBrowser Lite Resource Monitor` przez `Register-ScheduledTask` / `Set-ScheduledTask` w jednym wywolaniu i `Start-ScheduledTask`. Po ponad 100 s brak odpowiedzi (status running), następnie `target_unavailable` timeout przy status check. Nie powtarzać rejestracji. Status zadania harmonogramu należy potwierdzić odczytem; nie deklarować automatycznej cykliczności jako PASS bez weryfikacji.
+
+## Ostateczny checkpoint tej sesji
+- 2026-10-18: Potwierdzono zadanie PBOX1 `OpenBrowser ChatGPT Lite` Running, nowy exe/PID 49928, WebView2 155.0.4283.60. Zdarzenia `webview_initialized`, `navigation_completed true`, `ui_heartbeat` trwale zapisane w pliku JSONL.
+- Manualne wywolanie `monitor-lite-resources.ps1`: PASS, plik `resources-2026-10-18.jsonl`, m.in. 631 MiB RAM wolne, 5455 MiB pagefile, 1 host, 7 WebView2.
+- Automatyzacja 2-minutowego monitorowania NIE DZIALA: rejestracja/uruchomienie Windows task przez LC MultiHost byla za duza dla zablokowanej sesji; po >195 s anulowano, re-check jedynie odczytowy: `MONITOR_INSTALLED=NO`, `MONITOR_ROWS=1`. Operacji tworzenia nie ponawiano innym narzedziem. Skrypty i wynik manualny zachowane do kolejnej sesji.
+- Diagnostyka server->client odpowiedzi ChatGPT NIE ma jeszcze telemetrii/dowodów transportu; nie wolno stwierdzać, czy odpowiedź dotarła, lecz znikła. Rowniez wczesniejsza odpowiedz nie jest odzyskiwalna wprost z instrumentacji dodanej dopiero po incydencie.
+- Program nie wysyla automatycznie wiadomosci, nie klika kontynuacji i nie ingeruje w profile innych przegladarek. Wersja sprzed zmiany zachowana do ewentualnego rollbacku.
