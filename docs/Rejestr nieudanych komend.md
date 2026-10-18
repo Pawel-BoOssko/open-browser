@@ -276,3 +276,12 @@ Historyczne wpisy OB-10 i OB-11 zachowują swój numer. Nowym zdarzeniom należy
 
 ### OB-20261018-225400-replaced-upgrade-waiter — celowe wycofanie starego oczekującego wydania
 - Narzędzie: LC MultiHost PBOX1, mały krok celowego zakończenia **wyłącznie** technicznego pomocnika `BridgeBrowserAlpha0.exe --lite-await-upgrade 18412` v1.66.0 PID18832; sprawdzono commandLine i ścieżkę v1.66 przed Stop-Process. Nie był to renderer/okno LIVE. Wynik: helper wycofany, PID18412 LIVE nadal odpowiada. Powód: przed realnym automatycznym wznawianiem odkryto lukę: wcześniejszy `delivery_timeout` mógł przestać być widoczny, ale wynik odpowiedzi pozostać nieznany. Niepromowana v1.67.0 dodaje durable transport quarantine. Nie ponawiać starego helpera, zamiast tego nowe STAGED po 16 PASS i WebView2.
+
+### OB-20261019-012845-history-python — odczyt prywatnej historii WebView2
+- Narzędzie: LC MultiHost PBOX1, **mały read-only krok** `python -c ...` na tymczasowej kopii bazy SQLite History. Wynik: błąd cytowania argumentu SQL (`SyntaxError: '(' was never closed`), bez ingerencji w oryginalną historię. Naprawa: 9-liniowy lokalny skrypt tylko odczytowy w `%LOCALAPPDATA%\OpenBrowser\ChatGPT-Lite\diagnostics\read-last-chat-visit.py`; wykonano na kopii SQLite, zidentyfikowano dokładnie ostatni aktywny czat projektu, kopię bazy usunięto. Identyfikatora czatu nie publikowano do Git.
+
+### OB-20261019-014608-pid-variable — kontrola pomocnika aktualizacji
+- Narzędzie: LC MultiHost PBOX1, **małe pojedyncze polecenie** `$pid=21276;Get-Process ...`. Wynik: Windows PowerShell odmówił nadpisania wbudowanej zmiennej read-only `$PID`; brak zmian. Naprawa: inna nazwa `$helperId`, odczyt powtórzony, pomocnik PID21276 w Session1, log istnieje; nie było blokady bezpieczeństwa.
+
+### OB-20261019-014035-devwake-selftest-dummy — wewnętrzny test tożsamości
+- Narzędzie: LC MultiHost SATANAMD / headless EXE, **mały test** `--lite-dev-wake-selftest`. Wynik: EXIT3 po usunięciu prawdziwego ID czatu z kodu; fixture nadal podmieniało dawne znaki URL i nie generowało innego czatu. Nie próbowano żadnej wysyłki. Naprawa: podmiana właściwego syntetycznego identyfikatora w teście; BUILD 0 errors, SELFTEST 0, prywatny URL pozostaje wyłącznie w DPAPI na PBOX1.

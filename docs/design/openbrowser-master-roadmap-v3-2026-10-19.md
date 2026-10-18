@@ -12,6 +12,15 @@ Nadzór należy do **Open Browser Lite**. Co ~25 minut program obserwuje JEDEN p
 
 Każdy krok ma stany `TODO | SOURCE | TEST | STAGED | LIVE_VERIFIED | BLOCKED`. Zatrzymanie wykonania w środku kroku => nowy checkpoint, nie powtarzać niepewnego wysłania. Nie wyłączaj systemowych zabezpieczeń, nie obchodź blokad przez inne narzędzia.
 
+## Wykonanie P0 — checkpoint 2026-10-19 01:50 CEST
+- 001–003: źródło i stan PBOX1 zinwentaryzowane. Dokładny URL tego czatu potwierdzony w prywatnej kopii historii WebView2 (NIE zapisany w repo).
+- 004–014: kod v1.68.0 w Open Browser `LiteDevWakeState.cs` + `LiteDevWakeUi.cs`, wewnętrzny timer 60s/wybudzenie 25m, DPAPI, wybór wyłącznie jednego czatu, High, no draft/error/busy, preflight odpowiedzi i no duplicate. Testy stanu 10/10 PASS; runtime E2E pending.
+- 015–016: PBOX1 STAGED 1.68.0 w `%LOCALAPPDATA%\\Programs\\OpenBrowserChatGPTLite_v1.68.0_20261019_0142`, manifest i hash PASS, 17/17 selftestów, izolowany prawdziwy WebView2 UI QA PASS. Nie jest to jeszcze potwierdzenie rzeczywistej wysyłki budzącej do serwera ChatGPT.
+- 017: jednorazowy, techniczny helper PBOX1 `%LOCALAPPDATA%\\OpenBrowser\\ChatGPT-Lite\\diagnostics\\one-time-upgrade-168-when-idle.ps1` PID21276, Session1; czeka >=15 minut i >=10 minut braku aktywności, próbuje WYŁĄCZNIE graceful close starego PID13032 (v1.67.0), bez force i z uwzględnieniem blokady zapisu notatek. Dopiero po naturalnym wyjściu uruchomi nowy 1.68.0; log `dev-wake-rollover.log`. Nie jest to ChatGPT przypominajka ani usługa cykliczna. Przy niepowodzeniu helper wyjdzie i opisze blokadę.
+- Konfiguracja na PBOX1 uzbrojona przez headless `--lite-dev-wake-arm`: DPAPI file istnieje, log `dev_wake_armed` confirmed, firstDue około 02:08 CEST. Aktywne okno o 01:46 było jeszcze v1.67.0; nie twierdzić, że autopraca już wysyła wiadomości. Sprawdź LIVE EXE, log `dev_wake_loaded`, `dev_wake_send_attempt`, `dev_wake_ack` po 25m przed oznaczeniem LIVE_VERIFIED.
+- 018–020: do wykonania po uruchomieniu LIVE 1.68.0 i rzeczywistej pierwszej odpowiedzi. Pracuj nad pozostałymi punktami niezależnie w aktualnym czacie.
+- Równolegle SOURCE 1.69.0: tylko odczytowy fallback do metadanych DIL w `LiteDomOptimizer.js`, test `lite-dom-dil-count.test.cjs` 3 PASS. Optymalizacja DIL pozostaje OFF do realnego QA, aby nie rozbić React.
+
 ## Faza 0 — P0: autowznowienie tego czatu
 
 - [ ] OB3-001. Zabezpieczyć aktualne repo (dirty/staged) i identyfikatory aktywnej produkcji, bez resetu.

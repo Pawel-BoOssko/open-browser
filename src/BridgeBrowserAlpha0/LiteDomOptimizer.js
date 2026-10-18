@@ -4,13 +4,15 @@
   if (!global.document || global.location.hostname !== "chatgpt.com") return;
 
   const doc = global.document;
-  const selector = '[data-testid^="conversation-turn-"]';
+  const legacySelector = '[data-testid^="conversation-turn-"]';
+  const dilSelector = '[data-user-message-bubble],[data-chatgpt-selection-message-id]';
   const flag = "data-ob-lite-offscreen";
   const styleId = "openbrowser-lite-content-visibility";
   const state = {
     enabled: true, supported: !!(global.CSS && global.CSS.supports &&
       global.CSS.supports("content-visibility", "auto")),
     keepRecent: 40, minTurns: 60, turnCount: 0, optimized: 0,
+    domVariant: 'unknown',
     skippedBusy: false, lastDurationMs: 0, lastCheckedAt: null, errorCount: 0
   };
   let timer = null;
@@ -32,11 +34,16 @@
   function check() {
     const start = global.performance.now();
     try {
-      const turns = Array.from(doc.querySelectorAll(selector));
+      const oldTurns = Array.from(doc.querySelectorAll(legacySelector));
+      // DIL changed its turn wrappers in 2026. Count it accurately, but do not
+      // change modern React message layout before standalone visual QA.
+      const modern = oldTurns.length === 0;
+      const turns = modern ? Array.from(doc.querySelectorAll(dilSelector)) : oldTurns;
+      state.domVariant = modern ? 'dil_observe_only' : 'legacy';
       state.turnCount = turns.length;
       state.skippedBusy = busy();
       const mayOptimize = state.enabled && state.supported &&
-        !state.skippedBusy && turns.length >= state.minTurns;
+        !modern && !state.skippedBusy && turns.length >= state.minTurns;
       if (mayOptimize) ensureStyle();
       const recentStart = Math.max(0, turns.length - state.keepRecent);
       let optimized = 0;
@@ -70,7 +77,8 @@
     return {
       enabled: state.enabled, supported: state.supported,
       keepRecent: state.keepRecent, turnCount: state.turnCount,
-      optimized: state.optimized, skippedBusy: state.skippedBusy,
+      optimized: state.optimized, domVariant: state.domVariant,
+      skippedBusy: state.skippedBusy,
       lastDurationMs: state.lastDurationMs, lastCheckedAt: state.lastCheckedAt,
       errorCount: state.errorCount
     };
