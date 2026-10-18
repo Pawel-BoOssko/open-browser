@@ -108,15 +108,41 @@ public sealed class ResponseExtractor
                                    || eventType.Contains("eventsource", StringComparison.OrdinalIgnoreCase));
 
             var isCdpConversationBody = source.Equals("cdp", StringComparison.OrdinalIgnoreCase)
-                                        && eventType == "cdp_response_body"
-                                        && raw.Contains("conversation", StringComparison.OrdinalIgnoreCase);
+                                         && eventType == "cdp_response_body"
+                                         && raw.Contains("conversation", StringComparison.OrdinalIgnoreCase);
+
+            var isCdpWebSocketFrame = source.Equals("cdp", StringComparison.OrdinalIgnoreCase)
+                                      && eventType == "cdp_websocket_frame_received";
+
+            var wasSawPageStreamBefore = _sawPageStream;
 
             if (isPageStream)
             {
                 _sawPageStream = true;
                 _pageStreamEvents++;
             }
-            if (!isPageStream && !isCdpConversationBody && _sawPageStream) return;
+
+            _log.WriteRun("extractor_trace", "add_raw_routing", "ok", 
+                $"Routing check: source={source}, eventType={eventType}, length={raw.Length}, isPageStream={isPageStream}, isCdpConversationBody={isCdpConversationBody}, isCdpWebSocketFrame={isCdpWebSocketFrame}, sawPageStreamBefore={wasSawPageStreamBefore}, sawPageStreamAfter={_sawPageStream}",
+                new { 
+                    source, 
+                    eventType, 
+                    length = raw.Length, 
+                    isPageStream, 
+                    isCdpConversationBody, 
+                    isCdpWebSocketFrame,
+                    sawPageStreamBefore = wasSawPageStreamBefore, 
+                    sawPageStreamAfter = _sawPageStream,
+                    sample = raw.Length > 200 ? raw.Substring(0, 200) + "... [TRUNCATED]" : raw
+                });
+
+            if (!isPageStream && !isCdpConversationBody && !isCdpWebSocketFrame && _sawPageStream)
+            {
+                _log.WriteRun("extractor_trace", "add_raw_ignored", "ignored", 
+                    $"Extractor IGNORED raw chunk because _sawPageStream=True. Source: {source}, Event: {eventType}",
+                    new { source, eventType, length = raw.Length });
+                return;
+            }
 
             var before = GetCurrentAnswerText();
             ProcessRaw(raw, flushTail: false);
@@ -156,24 +182,57 @@ public sealed class ResponseExtractor
 
             var hasNewFrames = false;
             var newFrames = new List<AssistantMessageFrame>();
+            var duplicateFrames = new List<string>();
             foreach (var f in _frames)
             {
-                if (f.Text.Length > 0 && _observedMessageIds.Add(f.MessageId))
+                if (f.Text.Length > 0)
                 {
-                    hasNewFrames = true;
-                    newFrames.Add(f);
+                    if (_observedMessageIds.Add(f.MessageId))
+                    {
+                        hasNewFrames = true;
+                        newFrames.Add(f);
+                    }
+                    else
+                    {
+                        duplicateFrames.Add(f.MessageId);
+                    }
                 }
             }
+
+            // TELEMETRY: Log frame observation results
+            _log.WriteRun("extractor_trace", "finish_frame_observation", "ok",
+                $"Finish frame scan: totalFrames={_frames.Count}, newFrames={newFrames.Count}, duplicateFrames={duplicateFrames.Count}, totalObserved={_observedMessageIds.Count}",
+                new { totalFrames = _frames.Count, newFrameIds = newFrames.Select(f => f.MessageId).ToArray(), duplicateFrameIds = duplicateFrames.ToArray(), totalObserved = _observedMessageIds.Count });
 
             if (hasNewFrames)
             {
                 AppConstants.LastAssistantMessageId = newFrames[^1].MessageId;
                 var newAnswer = GetCurrentAnswerTextForFrames(newFrames);
+
+                // TELEMETRY: Log full text going to Observer
+                _log.WriteRun("extractor_trace", "finish_observer_input", "ok",
+                    $"Sending to Observer: newFrameCount={newFrames.Count}, answerLength={newAnswer.Length}",
+                    new { newFrameCount = newFrames.Count, answerLength = newAnswer.Length,
+                           answerSample = newAnswer.Length > 1000 ? newAnswer.Substring(0, 1000) + "... [TRUNCATED]" : newAnswer,
+                           containsExecBegin = newAnswer.Contains("@@OPENBRIDGE_EXEC_BEGIN@@"),
+                           containsExecEnd = newAnswer.Contains("@@OPENBRIDGE_EXEC_END@@") });
+
                 var parseResult = _observer.Observe(newAnswer);
+
+                // TELEMETRY: Log observer result
+                _log.WriteRun("extractor_trace", "finish_observer_result", "ok",
+                    $"Observer result: hasEnvelope={parseResult?.HasEnvelope}, error={parseResult?.Error}",
+                    new { hasEnvelope = parseResult?.HasEnvelope, error = parseResult?.Error.ToString() });
+
                 if (parseResult?.HasEnvelope == true)
                 {
                     OnEnvelopeDetected?.Invoke(parseResult);
                 }
+            }
+            else
+            {
+                _log.WriteRun("extractor_trace", "finish_no_new_frames", "ok",
+                    $"No new frames to observe. Total frames={_frames.Count}, already observed={_observedMessageIds.Count}");
             }
 
             var status = answer.Length > 0 ? "ok" : "extraction_failed";
@@ -215,16 +274,27 @@ public sealed class ResponseExtractor
 
     private void ProcessRaw(string raw, bool flushTail)
     {
+        _log.WriteRun("extractor_trace", "process_raw_start", "ok", 
+            $"ProcessRaw started: rawLength={raw.Length}, flushTail={flushTail}",
+            new { rawLength = raw.Length, flushTail });
+
         for (int depth = 0; depth < 5; depth++)
         {
             var cdpBody = TryExtractCdpBody(raw);
             if (cdpBody == null) break;
+            _log.WriteRun("extractor_trace", "process_raw_cdp_unwrap", "ok", 
+                $"Unwrapped CDP body at depth {depth}: newLength={cdpBody.Length}",
+                new { depth, newLength = cdpBody.Length });
             raw = cdpBody;
         }
 
         var looksLikeSse = raw.Contains("data:", StringComparison.OrdinalIgnoreCase)
                            || raw.Contains("event:", StringComparison.OrdinalIgnoreCase)
                            || _sseBuffer.Length > 0;
+
+        _log.WriteRun("extractor_trace", "process_raw_classification", "ok", 
+            $"Classification: looksLikeSse={looksLikeSse}, rawContainsData={raw.Contains("data:")}, sseBufferLength={_sseBuffer.Length}",
+            new { looksLikeSse, sseBufferLength = _sseBuffer.Length });
 
         if (looksLikeSse)
         {
@@ -235,12 +305,24 @@ public sealed class ResponseExtractor
 
         var trimmed = raw.Trim();
         if (trimmed.StartsWith("{") || trimmed.StartsWith("["))
+        {
+            _log.WriteRun("extractor_trace", "process_raw_direct_json", "ok", "Raw payload looks like direct JSON, processing...", new { length = trimmed.Length });
             ProcessJsonPayload(trimmed, null);
+        }
+        else
+        {
+            _log.WriteRun("extractor_trace", "process_raw_ignored_non_json", "ignored", 
+                $"Raw chunk not SSE and does not start with JSON object or array notation. Sample: {(trimmed.Length > 100 ? trimmed.Substring(0, 100) : trimmed)}");
+        }
     }
 
     private void ProcessSseBuffer(bool flushTail)
     {
         if (_sseBuffer.Length == 0) return;
+
+        _log.WriteRun("extractor_trace", "process_sse_buffer_start", "ok", 
+            $"ProcessSseBuffer: bufferLength={_sseBuffer.Length}, flushTail={flushTail}",
+            new { bufferLength = _sseBuffer.Length, flushTail });
 
         var text = _sseBuffer.ToString().Replace("\r\n", "\n").Replace('\r', '\n');
         var consumed = 0;
@@ -251,12 +333,24 @@ public sealed class ResponseExtractor
             if (idx < 0) break;
             var record = text.Substring(consumed, idx - consumed);
             consumed = idx + 2;
+
+            _log.WriteRun("extractor_trace", "process_sse_buffer_split", "ok", 
+                $"Split SSE record found: length={record.Length}, consumedTotal={consumed}",
+                new { recordLength = record.Length, consumed });
+
             ProcessSseRecord(record);
         }
 
         var tail = text.Substring(consumed);
+        _log.WriteRun("extractor_trace", "process_sse_buffer_end", "ok", 
+            $"Buffer processing complete: consumed={consumed}, remainingTail={tail.Length}",
+            new { consumed, tailLength = tail.Length });
+
         if (flushTail && !string.IsNullOrWhiteSpace(tail))
         {
+            _log.WriteRun("extractor_trace", "process_sse_buffer_flush_tail", "ok", 
+                $"Flushing trailing SSE buffer record: length={tail.Length}",
+                new { tailLength = tail.Length });
             ProcessSseRecord(tail);
             tail = "";
         }
@@ -265,7 +359,11 @@ public sealed class ResponseExtractor
         if (tail.Length > 0)
         {
             if (tail.Length > 1_000_000)
+            {
+                _log.WriteRun("extractor_trace", "process_sse_buffer_overflow", "warning", 
+                    $"SSE buffer overflow! Trimming buffer from {tail.Length} to 1,000,000 characters.");
                 tail = tail[^1_000_000..];
+            }
             _sseBuffer.Append(tail);
         }
     }
@@ -275,6 +373,10 @@ public sealed class ResponseExtractor
         if (string.IsNullOrWhiteSpace(record)) return;
         _sseRecords++;
 
+        _log.WriteRun("extractor_trace", "process_sse_record_start", "ok", 
+            $"Processing SSE record: length={record.Length}",
+            new { length = record.Length, sample = record.Length > 300 ? record.Substring(0, 300) + "... [TRUNCATED]" : record });
+
         string? eventName = null;
         var data = new StringBuilder();
         using var reader = new StringReader(record);
@@ -282,7 +384,10 @@ public sealed class ResponseExtractor
         while ((line = reader.ReadLine()) != null)
         {
             if (line.StartsWith("event:", StringComparison.OrdinalIgnoreCase))
+            {
                 eventName = line[6..].Trim();
+                _log.WriteRun("extractor_trace", "sse_record_event_type", "ok", $"SSE Event field parsed: '{eventName}'");
+            }
             else if (line.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
             {
                 if (data.Length > 0) data.Append('\n');
@@ -291,7 +396,16 @@ public sealed class ResponseExtractor
         }
 
         var payload = data.ToString().Trim();
-        if (payload.Length == 0 || payload == "[DONE]") return;
+        _log.WriteRun("extractor_trace", "sse_record_parsed_data", "ok", 
+            $"SSE Event parsed payload: eventName={eventName ?? "none"}, dataLength={payload.Length}",
+            new { eventName, dataLength = payload.Length });
+
+        if (payload.Length == 0) return;
+        if (payload == "[DONE]")
+        {
+            _log.WriteRun("extractor_trace", "sse_record_done_marker", "ok", "SSE record contained standard [DONE] stream end marker.");
+            return;
+        }
         _ssePayloads++;
         ProcessJsonPayload(payload, eventName);
     }
@@ -314,9 +428,65 @@ public sealed class ResponseExtractor
     {
         JsonDocument? doc = null;
         try { doc = JsonDocument.Parse(payload); } catch { _jsonParseErrors++; }
-        if (doc == null) return;
+        if (doc == null)
+        {
+            _log.WriteRun("extractor_trace", "json_payload_parse_failed", "error", 
+                $"JSON payload failed to parse. Length={payload.Length}",
+                new { length = payload.Length, sample = payload.Length > 500 ? payload.Substring(0, 500) + "... [TRUNCATED]" : payload });
+            return;
+        }
+
+        _log.WriteRun("extractor_trace", "json_payload_parse_success", "ok", 
+            $"JSON payload parsed successfully. Length={payload.Length}, sseEvent={sseEvent ?? "none"}",
+            new { length = payload.Length, sseEvent });
+
         using (doc)
         {
+            // TELEMETRY: Extract conversation_id from conversation-update payloads
+            try
+            {
+                var root = doc.RootElement;
+                string? convType = null;
+                string? convId = null;
+                string? updateType = null;
+
+                // Direct conversation-update format: {"type":"conversation-update","payload":{"conversation_id":"..."}}
+                if (root.TryGetProperty("type", out var typeProp) && typeProp.ValueKind == JsonValueKind.String)
+                    convType = typeProp.GetString();
+                if (root.TryGetProperty("payload", out var payloadProp) && payloadProp.ValueKind == JsonValueKind.Object)
+                {
+                    if (payloadProp.TryGetProperty("conversation_id", out var cidProp) && cidProp.ValueKind == JsonValueKind.String)
+                        convId = cidProp.GetString();
+                    if (payloadProp.TryGetProperty("type", out var utProp) && utProp.ValueKind == JsonValueKind.String)
+                        updateType = utProp.GetString();
+                    if (payloadProp.TryGetProperty("update_type", out var ut2Prop) && ut2Prop.ValueKind == JsonValueKind.String)
+                        updateType = ut2Prop.GetString();
+                }
+                // Wrapper array format: [{"type":"message","payload":{"type":"conversation-turn-complete","payload":{"conversation_id":"..."}}}]
+                if (root.ValueKind == JsonValueKind.Array && root.GetArrayLength() > 0)
+                {
+                    var first = root[0];
+                    if (first.TryGetProperty("payload", out var innerPayload) && innerPayload.ValueKind == JsonValueKind.Object)
+                    {
+                        if (innerPayload.TryGetProperty("type", out var innerType) && innerType.ValueKind == JsonValueKind.String)
+                            updateType = innerType.GetString();
+                        if (innerPayload.TryGetProperty("payload", out var innerPayload2) && innerPayload2.ValueKind == JsonValueKind.Object)
+                        {
+                            if (innerPayload2.TryGetProperty("conversation_id", out var cidInner) && cidInner.ValueKind == JsonValueKind.String)
+                                convId = cidInner.GetString();
+                        }
+                    }
+                }
+
+                if (convId != null || convType != null)
+                {
+                    _log.WriteRun("extractor_trace", "json_payload_conversation_context", "ok",
+                        $"Conversation context: convId={convId ?? "null"}, type={convType ?? "null"}, updateType={updateType ?? "null"}",
+                        new { conversationId = convId, type = convType, updateType });
+                }
+            }
+            catch { }
+
             ProcessElement(doc.RootElement, sseEvent, null, null);
         }
     }
@@ -341,7 +511,13 @@ public sealed class ResponseExtractor
                 if (v.ValueKind == JsonValueKind.String)
                 {
                     var value = v.GetString() ?? "";
-                    if (ShouldApplyTextValue(sseEvent, localOp, localPath))
+                    var shouldApply = ShouldApplyTextValue(sseEvent, localOp, localPath);
+
+                    _log.WriteRun("extractor_trace", "process_element_value_match", "ok", 
+                        $"Evaluating property value: path={localPath ?? "null"}, op={localOp ?? "null"}, shouldApply={shouldApply}, sseEvent={sseEvent ?? "null"}, valueLength={value.Length}",
+                        new { path = localPath, op = localOp, shouldApply, sseEvent, valueLength = value.Length });
+
+                    if (shouldApply)
                     {
                         ApplyTextValue(localOp, localPath, value);
                         return;
@@ -379,6 +555,11 @@ public sealed class ResponseExtractor
         var messageId = GetString(element, "message_id");
         var marker = GetString(element, "marker");
         var markerEvent = GetString(element, "event");
+        
+        _log.WriteRun("extractor_trace", "message_marker_seen", "ok", 
+            $"Message marker: messageId={messageId ?? "null"}, marker={marker ?? "null"}, event={markerEvent ?? "null"}",
+            new { messageId, marker, markerEvent });
+
         if (string.IsNullOrWhiteSpace(messageId)) return true;
 
         if (string.Equals(marker, "last_token", StringComparison.OrdinalIgnoreCase)
@@ -389,10 +570,12 @@ public sealed class ResponseExtractor
             {
                 markedFrame.MarkerCount++;
                 markedFrame.SawLastToken = true;
+                _log.WriteRun("extractor_trace", "message_marker_last_token", "ok", $"Set SawLastToken=True on frame: messageId={messageId}");
             }
             else
             {
                 _lastTokenForUnknownMessage++;
+                _log.WriteRun("extractor_trace", "message_marker_unknown_frame", "warning", $"Received last_token message marker for unknown frame: messageId={messageId}");
             }
             CloseFrame(messageId, "last_token");
         }
@@ -408,27 +591,74 @@ public sealed class ResponseExtractor
         var role = "";
         if (message.TryGetProperty("author", out var author) && author.ValueKind == JsonValueKind.Object)
             role = GetString(author, "role") ?? "";
-        if (!role.Equals("assistant", StringComparison.OrdinalIgnoreCase)) return;
 
         var channel = GetString(message, "channel") ?? "";
+        var status = GetString(message, "status") ?? "";
+
+        // TELEMETRY: conversation_id comes from wrapping conversation-update context\n        // It is logged in ProcessElement's traversal when encountered
+        
+        _log.WriteRun("extractor_trace", "process_message_metadata", "ok", 
+            $"ProcessMessage frame evaluation: id={id}, role={role}, channel={channel}, status={status}",
+            new { id, role, channel, status });
+
+        if (!role.Equals("assistant", StringComparison.OrdinalIgnoreCase))
+        {
+            // TELEMETRY: Log rejected non-assistant messages
+            _log.WriteRun("extractor_trace", "process_message_rejected_role", "ok",
+                $"Message rejected: role={role} (not assistant). id={id}, channel={channel}",
+                new { id, role, channel, status });
+            return;
+        }
+
         // gpt-5-5-thinking sends final messages without a channel field (null/empty).
         // Only skip messages that explicitly declare a non-final channel (e.g. "thinking").
-        if (!string.IsNullOrEmpty(channel) && !channel.Equals("final", StringComparison.OrdinalIgnoreCase)) return;
+        if (!string.IsNullOrEmpty(channel) && !channel.Equals("final", StringComparison.OrdinalIgnoreCase))
+        {
+            // TELEMETRY: Log rejected non-final channel messages
+            _log.WriteRun("extractor_trace", "process_message_rejected_channel", "ok",
+                $"Message rejected: channel={channel} (not final/empty). id={id}, role={role}",
+                new { id, role, channel, status });
+            return;
+        }
 
-        if (!message.TryGetProperty("content", out var content) || content.ValueKind != JsonValueKind.Object) return;
+        if (!message.TryGetProperty("content", out var content) || content.ValueKind != JsonValueKind.Object)
+        {
+            _log.WriteRun("extractor_trace", "process_message_no_content", "ok",
+                $"Message has no content object: id={id}", new { id, role, channel });
+            return;
+        }
         var contentType = GetString(content, "content_type") ?? "";
-        if (!contentType.Equals("text", StringComparison.OrdinalIgnoreCase)) return;
+        if (!contentType.Equals("text", StringComparison.OrdinalIgnoreCase))
+        {
+            _log.WriteRun("extractor_trace", "process_message_rejected_content_type", "ok",
+                $"Message rejected: content_type={contentType} (not text). id={id}",
+                new { id, role, channel, contentType });
+            return;
+        }
 
         var frame = GetOrCreateFrame(id);
         frame.MessageObjectCount++;
         _currentAssistantMessageId = id;
 
-        if (!content.TryGetProperty("parts", out var parts) || parts.ValueKind != JsonValueKind.Array) return;
+        if (!content.TryGetProperty("parts", out var parts) || parts.ValueKind != JsonValueKind.Array)
+        {
+            _log.WriteRun("extractor_trace", "process_message_no_parts", "ok",
+                $"Message content has no parts array: id={id}", new { id, contentType });
+            return;
+        }
         var text = string.Concat(parts.EnumerateArray().Where(x => x.ValueKind == JsonValueKind.String).Select(x => x.GetString() ?? ""));
+        
+        _log.WriteRun("extractor_trace", "process_message_content", "ok", 
+            $"ProcessMessage content extracted: frameTextLenBefore={frame.Text.Length}, newTextLen={text.Length}",
+            new { id, frameTextLenBefore = frame.Text.Length, newTextLen = text.Length,
+                   containsExecBegin = text.Contains("@@OPENBRIDGE_EXEC_BEGIN@@"),
+                   textSample = text.Length > 500 ? text.Substring(0, 500) + "... [TRUNCATED]" : text });
+
         if (text.Length == 0) return;
 
         if (text.Length >= frame.Text.Length)
         {
+            _log.WriteRun("extractor_trace", "process_message_content_overwrite", "ok", $"Overwriting frame text buffer with full content: id={id}, length={text.Length}");
             frame.Text.Clear();
             frame.Text.Append(text);
         }
@@ -447,21 +677,29 @@ public sealed class ResponseExtractor
         if (value.Length == 0)
         {
             _emptyDeltaValues++;
+            _log.WriteRun("extractor_trace", "apply_text_value_empty", "ok", "Ignored empty delta value.");
             return;
         }
         if (string.IsNullOrWhiteSpace(_currentAssistantMessageId))
         {
             _textValuesWithoutMessageId++;
+            _log.WriteRun("extractor_trace", "apply_text_value_no_frame", "warning", $"Ignored delta value because _currentAssistantMessageId is null or empty. Value: '{value}'");
             return;
         }
 
         var frame = GetOrCreateFrame(_currentAssistantMessageId);
         frame.LastTextAtUtc = _currentEventTsUtc;
+        var beforeLen = frame.Text.Length;
+
         if (op != null && op.Equals("replace", StringComparison.OrdinalIgnoreCase) && IsTextPartPath(path))
         {
             frame.Text.Clear();
             frame.Text.Append(value);
             frame.DeltaCount++;
+            
+            _log.WriteRun("extractor_trace", "apply_text_value_replace", "ok", 
+                $"Applied REPLACE delta to frame={frame.MessageId}: op={op}, path={path}, valueLength={value.Length}, deltaCount={frame.DeltaCount}, textLenBefore={beforeLen}, textLenAfter={frame.Text.Length}",
+                new { messageId = frame.MessageId, op, path, valueLength = value.Length, deltaCount = frame.DeltaCount, textLenBefore = beforeLen, textLenAfter = frame.Text.Length, sample = value.Length > 200 ? value.Substring(0, 200) + "... [TRUNCATED]" : value });
             return;
         }
 
@@ -471,13 +709,25 @@ public sealed class ResponseExtractor
             frame.Text.Clear();
             frame.Text.Append(value);
             frame.DeltaCount++;
+
+            _log.WriteRun("extractor_trace", "apply_text_value_superset", "ok", 
+                $"Applied SUPERSET replacement delta to frame={frame.MessageId}: valueLength={value.Length}, deltaCount={frame.DeltaCount}, textLenBefore={beforeLen}, textLenAfter={frame.Text.Length}",
+                new { messageId = frame.MessageId, valueLength = value.Length, deltaCount = frame.DeltaCount, textLenBefore = beforeLen, textLenAfter = frame.Text.Length, addedLength = value.Length - beforeLen });
             return;
         }
 
-        if (current.EndsWith(value, StringComparison.Ordinal)) return;
+        if (current.EndsWith(value, StringComparison.Ordinal))
+        {
+            _log.WriteRun("extractor_trace", "apply_text_value_duplicate_suffix", "ok", $"Ignored delta value because it is already a suffix of the current buffer: value='{value}'");
+            return;
+        }
 
         frame.Text.Append(value);
         frame.DeltaCount++;
+
+        _log.WriteRun("extractor_trace", "apply_text_value_append", "ok", 
+            $"Applied APPEND delta to frame={frame.MessageId}: valueLength={value.Length}, deltaCount={frame.DeltaCount}, textLenBefore={beforeLen}, textLenAfter={frame.Text.Length}",
+            new { messageId = frame.MessageId, valueLength = value.Length, deltaCount = frame.DeltaCount, textLenBefore = beforeLen, textLenAfter = frame.Text.Length, sample = value });
     }
 
     private AssistantMessageFrame GetOrCreateFrame(string messageId)

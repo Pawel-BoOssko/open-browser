@@ -18,6 +18,7 @@ Impacts:
 Update rule: Update this file when root folder allowlist, local FOLDER.md format, inheritance rules, or folder-validation behavior changes.
 
 Latest:
+- 2026-10-18: src/ is an existing local source relocation root; scripts/check-agent-docs.ps1 now recognizes it and requires src/FOLDER.md. This change records the current worktree layout, without approving or completing the code migration.
 - Folder policy is part of developer-agent governance.
 - Every folder must be covered by its own FOLDER.md or inherited parent policy.
 - New root folders require policy update or architect approval.

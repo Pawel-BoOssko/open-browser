@@ -35,6 +35,8 @@ Update rule:
 Update this file when implemented behavior, active architecture, available commands, active modules, active executors, runtime paths, build/test commands, RAW payload behavior, or verified system capabilities change.
 
 Latest:
+- 2026-10-18: Local SATANAMD working tree has an unfinished, staged relocation of 38 source files from releases/BridgeBrowserAlpha0/src/BridgeBrowserAlpha0 to src/BridgeBrowserAlpha0. The old .csproj path no longer exists in this worktree. The moved .csproj has unresolved relative paths to assets. No build verification or runtime fixes are part of this housekeeping pass.
+- 2026-10-18: Maintenance checkpoint and privacy exclusions are recorded in docs/maintenance-open-browser-2026-10-18.md. Runtime downloads remain on disk but are ignored by Git.
 - Source migration from docs/development/*, docs/runtime/environment.md, config/start-prompt.txt, and design docs is reflected here.
 - OpenBrowser project working directory is D:\projects\open-browser.
 - Developer agents must begin technical work with git status --short.
@@ -98,8 +100,10 @@ Operational rule:
 After every change to .cs files:
 - run dotnet build.
 
-Full build command:
+Historical build command (no longer valid after the pending local source relocation):
 - dotnet build D:\projects\open-browser\releases\BridgeBrowserAlpha0\src\BridgeBrowserAlpha0\BridgeBrowserAlpha0.csproj
+
+Current local project file is src/BridgeBrowserAlpha0/BridgeBrowserAlpha0.csproj, but its asset references need correction before this path can be used as a validated build command.
 
 After changes to OpenBridgeProtocol:
 - dotnet run --project tests/OpenBridgeProtocolSmoke/OpenBridgeProtocolSmoke.csproj
@@ -210,9 +214,9 @@ Security and environment sources state:
 - There is no authentication or network security layer for public exposure.
 - Secrets, API keys, tokens, and credentials belong in config/local/.
 - config/local/ is git-ignored and must not be committed.
-- Core application path is releases/BridgeBrowserAlpha0/src/BridgeBrowserAlpha0/.
-- OpenBridgeHost code lives under releases/BridgeBrowserAlpha0/src/BridgeBrowserAlpha0/OpenBridgeHost/.
-- OpenBridgeProtocol code lives under releases/BridgeBrowserAlpha0/src/BridgeBrowserAlpha0/OpenBridgeProtocol/.
+- The previous application path was releases/BridgeBrowserAlpha0/src/BridgeBrowserAlpha0/; local sources are currently staged for relocation to src/BridgeBrowserAlpha0/.
+- Local OpenBridgeHost code is currently under src/BridgeBrowserAlpha0/OpenBridgeHost/.
+- Local OpenBridgeProtocol code is currently under src/BridgeBrowserAlpha0/OpenBridgeProtocol/.
 - General command executor lives under OpenBridgeHost/GeneralCommand/.
 - diagnostics/pipeline-output/ is used for pipeline diagnostic dumps.
 

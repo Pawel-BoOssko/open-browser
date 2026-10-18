@@ -59,7 +59,7 @@ if ($Strict) {
 Write-Output ''
 Write-Output 'Folder policy check'
 Write-Output '==================='
-$AllowedRootFolders = @('.claude', '.git', '.githooks', 'analysis', 'config', 'diagnostics', 'docs', 'extracted', 'github_export', 'github_export_zips', 'logs', 'modules', 'profile', 'releases', 'scripts', 'tests', 'tools')
+$AllowedRootFolders = @('.claude', '.git', '.githooks', 'analysis', 'config', 'diagnostics', 'docs', 'extracted', 'github_export', 'github_export_zips', 'logs', 'modules', 'profile', 'releases', 'scripts', 'src', 'tests', 'tools')
 $rootFolders = Get-ChildItem -Path . -Directory -Force | Select-Object -ExpandProperty Name
 $unknownRootFolders = @($rootFolders | Where-Object { $AllowedRootFolders -notcontains $_ })
 if ($unknownRootFolders.Count -gt 0) {
@@ -67,7 +67,7 @@ if ($unknownRootFolders.Count -gt 0) {
     $unknownRootFolders | ForEach-Object { Write-Output ('- ' + $_) }
     exit 1
 }
-$RequiredFolderPolicies = @('FOLDER.md', 'docs/FOLDER.md', 'docs/agent/FOLDER.md', 'docs/runtime/FOLDER.md', 'docs/modules/FOLDER.md', 'docs/executors/FOLDER.md', 'tools/FOLDER.md', 'scripts/FOLDER.md', 'tests/FOLDER.md', 'diagnostics/FOLDER.md', 'config/FOLDER.md', 'releases/FOLDER.md', 'releases/BridgeBrowserAlpha0/FOLDER.md', 'releases/BridgeBrowserAlpha0/downloads/FOLDER.md')
+$RequiredFolderPolicies = @('FOLDER.md', 'docs/FOLDER.md', 'docs/agent/FOLDER.md', 'docs/runtime/FOLDER.md', 'docs/modules/FOLDER.md', 'docs/executors/FOLDER.md', 'tools/FOLDER.md', 'scripts/FOLDER.md', 'src/FOLDER.md', 'tests/FOLDER.md', 'diagnostics/FOLDER.md', 'config/FOLDER.md', 'releases/FOLDER.md', 'releases/BridgeBrowserAlpha0/FOLDER.md', 'releases/BridgeBrowserAlpha0/downloads/FOLDER.md')
 $missingFolderPolicies = @($RequiredFolderPolicies | Where-Object { -not (Test-Path $_) })
 if ($missingFolderPolicies.Count -gt 0) {
     Write-Output 'Missing required folder policy files:'

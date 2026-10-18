@@ -28,6 +28,16 @@ public sealed partial class MainForm : Form
 
         _extractor.OnEnvelopeDetected = parseResult =>
         {
+            // TELEMETRY: Log entry to OnEnvelopeDetected
+            _log.WriteRun("runtime_approval", "envelope_detected_entry", "ok",
+                $"OnEnvelopeDetected fired: hasEnvelope={parseResult.HasEnvelope}, error={parseResult.Error}, hasEnvelopeObj={parseResult.Envelope != null}",
+                new { hasEnvelope = parseResult.HasEnvelope, error = parseResult.Error.ToString(),
+                       command = parseResult.Envelope?.Command, version = parseResult.Envelope?.Version,
+                       payloadLength = parseResult.Envelope?.Payload?.Length ?? 0,
+                       payloadSample = (parseResult.Envelope?.Payload?.Length ?? 0) > 500
+                           ? parseResult.Envelope!.Payload!.Substring(0, 500) + "... [TRUNCATED]"
+                           : parseResult.Envelope?.Payload });
+
             if (parseResult.Envelope == null)
             {
                 var msg = BridgeBrowserAlpha0.OpenBridgeProtocol.OpenBridgeEnvelopeParser.ErrorToUserMessage(parseResult);
@@ -37,6 +47,10 @@ public sealed partial class MainForm : Form
             }
 
             var ok = _runtimeApproval.TrySetPending(parseResult, out var error);
+            _log.WriteRun("runtime_approval", "try_set_pending_result", ok ? "ok" : "warning",
+                $"TrySetPending result: ok={ok}, command={parseResult.Envelope.Command}, error={error ?? "none"}",
+                new { ok, command = parseResult.Envelope.Command, payload = parseResult.Envelope.Payload, error });
+
             if (ok)
             {
                 SetStatus("Executing command...");

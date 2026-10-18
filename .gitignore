@@ -38,3 +38,19 @@ tools/web/exports/*.html
 test-results-v4.md
 .claude/
 analysis/
+
+# Local runtime data, never include in Autosync snapshots.
+/releases/BridgeBrowserAlpha0/downloads/*
+!/releases/BridgeBrowserAlpha0/downloads/FOLDER.md
+/releases/BridgeBrowserAlpha0/config/start-prompt.txt
+/tools/*/exports/*
+!/tools/*/exports/.gitkeep
+**/__pycache__/
+*.py[cod]
+
+# Local diagnostics and ad hoc test artifacts.
+/ps_utf8_disk.txt
+/test_download.html
+/test_py_write.txt
+/utf8_test.txt
+/utf8_test2.txt
