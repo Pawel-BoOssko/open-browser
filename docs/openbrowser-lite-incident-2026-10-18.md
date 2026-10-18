@@ -73,3 +73,15 @@ Cel: zachowac ustalenia przed restartem, zbadac przyczyny i wprowadzic diagnosty
 - Dziennik `resources-2026-10-18.jsonl` zawiera 3 wiersze, aktualizacja 13:43:30 lokalnie, ostatnia próbka 596 MiB wolnej RAM, 1 host i 9 procesów WebView2.
 - ZADANIE MONITORUJĄCE AKTYWNE i poprawnie wykonuje próbki; wcześniejszy status NIEAKTYWNE jest historyczny, nie bieżący.
 - Ponieważ zadanie utworzono z `/IT`, wymaga zalogowanej sesji Windows. Trwałość konfiguracji Task Scheduler jest systemowa, ale jeszcze nie zweryfikowano wykonania pomiaru po restarcie komputera.
+
+## Nowy incydent: konieczny restart calego PBOX1 — 2026-10-18 13:53
+- Użytkownik zgłosił całkowitą nieresponsywność komputera PBOX1, wymuszającą restart. Po restarcie sesja Open Browser Lite działa i wyświetla ChatGPT (zrzut dostarczony w rozmowie).
+- LC MultiHost PBOX1 potwierdził boot time: 2026-10-18 13:53:23+02:00. Snapshot po restarcie 14:00: 9121 MiB RAM wolne, vs 274 MiB o 13:45; nie wolno uznawać presji pamięci za potwierdzoną przyczynę awarii.
+- Ostatnie próbki przed rebootem: 13:41 free=831 MiB/pagefile=6069 MiB, 13:43 free=596/pagefile=6148, 13:45 free=274/pagefile=6061, 13:48 free=1004/pagefile=6299.
+- W tych próbkach największe procesy: msedge ~1611-2445 MiB, aplikacja ChatGPT ~842-940 MiB, Claude ~549-660 MiB, procesy WebView2 i Memory Compression. Zasoby obciążone globalnie, brak dowodu wycieku Lite.
+- Przeliczenie przyrostów CPU renderer WebView2 PID 31112: 13:41-13:43 ~16,4% jednego rdzenia, 13:43-13:45 ~28,0%, 13:45-13:48 ~20,9%; GPU WebView2 ~2,5-6,9% jednego rdzenia. Nie wykazano pojedynczego renderera konsumującego cały rdzeń CPU.
+- Lite `ui_heartbeat` działał z lukami około 30 s aż do 13:52:54, tuż przed restartem, bez nowego `webview_process_failed` i bez `window_closing`. Heartbeat WinForms NIE sprawdza przetwarzania JavaScript w ChatGPT ani reakcji systemu na wejście myszy/klawiatury.
+- Po restarcie Lite automatycznie/ponownie uruchomił PID 15860, `webview_initialized browserVersion=155.0.4283.60`, `navigation_completed IsSuccess=true`, heartbeat co 30 s. Screenshot użytkownika przedstawia renderowaną treść i napis „Gotowe”.
+- Monitoring Windows Task Scheduler przetrwał restart. O 13:59:59 `LastTaskResult=0x800710E0` (odmowa wykonania przez operatora/administratora, chwilowy), ale o 14:01:01 zadanie wykonało się z `LastTaskResult=0` i dopisało próbkę. Nie oznaczać monitoringu jako stale niesprawnego.
+- Task `OpenBrowser Lite Resource Monitor` nadal ma `DisallowStartIfOnBatteries=True` i `StopIfGoingOnBatteries=True`; laptop nie gromadzi próbek na baterii. Do poprawy po świadomej decyzji, bez powtarzania wcześniejszej zablokowanej rejestracji.
+- Priorytet: pasywny detektor zawieszenia WebView2/JS niezależny od WinForms, rozróżnienie statusu backend i renderera, alert krytycznego memory/commit pressure, poprawny sampling CPU per sekunda, minimalny kosztem zasobów. Nie wznawiać modelu automatycznie po samym braku widocznego tekstu.
