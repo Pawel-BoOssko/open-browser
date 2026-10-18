@@ -8,6 +8,9 @@
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <AssemblyName>BridgeBrowserAlpha0</AssemblyName>
     <RootNamespace>BridgeBrowserAlpha0</RootNamespace>
+    <Version>1.60.0</Version>
+    <LiteBuildUtcStamp>$([System.DateTimeOffset]::UtcNow.ToString('yyyyMMddTHHmmssZ'))</LiteBuildUtcStamp>
+    <InformationalVersion>$(Version)+build.$(LiteBuildUtcStamp)</InformationalVersion>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2957.106" />

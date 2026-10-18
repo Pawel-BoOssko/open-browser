@@ -1,0 +1,60 @@
+# Open Browser Lite — kompletny plan wdrożenia v2.0 — 2026-10-18 16:26 CEST
+
+Zakres: do ukończenia WSZYSTKICH omówionych funkcji. Priorytety uporządkowane, ale żaden etap końcowy nie znika z backlogu. Każdy punkt przechodzi SOURCE -> TEST -> STAGED -> LIVE VERIFIED; niedowodnione nie jest DONE.
+
+## Reguły wykonania
+- SATANAMD `D:\projects\open-browser` to źródło; PBOX1 klon i wersjonowane wydania; Autosync na autosync/SATANAMD bez ręcznych push.
+- Nie wstrzymuj pracy przy pierwszym blockerze. Realizuj inne niezależne zadania, loguj dokładnie odmowy w `docs/Rejestr nieudanych komend.md` z unikalnym ID, nie obchodź odmów alternatywnym narzędziem.
+- Każdy krok prowadź od małej implementacji do testów negatywnych, side-by-side release i realnej obserwacji; nie przerywaj aktywnej odpowiedzi aktualnego WebView2.
+- Model projektu domyślnie w trybie **High**, jeśli ustawienie jest dostępne. Rejestruj odchylenie od High (np. Instant/Medium), proponuj poprawkę użytkownikowi, nie zakładaj możliwości samodzielnego przestawiania ustawień ChatGPT bez udokumentowanej drogi. Nie przypisuj automatycznie blokad OpenAI ustawieniu Instant: przyczynę wymagają dowodów; zabezpieczeń nie obchodzić.
+- Godziny w interfejsie lokalne Europe/Warsaw z jednoznaczną strefą, timestamp kompilacji pochodzi z builda, nie z czasu uruchomienia ani nadpisania pliku.
+
+## P0: natychmiast — wersja i nadzorca rozmów
+1. [TODO] Wersja czytelna w titlebar oraz toolbar: semver lub build label + data i godzina *zbudowania* (Europe/Warsaw); wspólny manifest w wydaniu, SHA źródła i sprawdzalna ścieżka exe; test formatu i niezmienności po kopiowaniu, odświeżeniu, ponownym uruchomieniu.
+2. [TODO] Panel diagnostyczny: wersja aplikacji, WebView2, kanał wydania, PBOX1/SATANAMD, ostatnie uruchomienie, repo SHA, pomiary CPU/RAM.
+3. [TODO] Wykrywanie faz odpowiedzi: initial, submitted, generating, tool pending, streaming, final stable, crashed/unresponsive, needs_user, done/all_tasks_completed, blocked, unknown. Multi-signal + stabilizacja >2 próbek; timeout != completed.
+4. [TODO] Pobieranie **ostatniej widocznej odpowiedzi** i kontekstu blokad, checkpointów oraz niezrealizowanego backlogu. Przed przesłaniem do zewnętrznego API redakcja sekretów, ograniczenie długości, jawny zakres i zaufane dane.
+5. [TODO] Luna planner via supported API: administrator ustawia rzeczywisty identyfikator modelu i klucz przechowywany poza repo (Windows DPAPI/OS), wydatki i rate limits; plan odpowiedzi ze schemą JSON decyzji CONTINUE / WAIT / ASK_USER / STOP / UNKNOWN, argumenty i krótki kontekst. Użytkownik musi potwierdzić rzeczywiste API model ID, jeżeli dostępne informacje są niejednoznaczne. Nie mylić nazwy „Luna” z oficjalnym API ID; fallback deterministyczny tylko może WAIT, nie może sztucznie rozkręcać pracy.
+6. [TODO] Luna powinna pisać do czatu jak współpracownik: „Kontynuuj pozostałe zadania, jeżeli są jednoznaczne, pomiń zablokowane i je zgłoś; jeśli wszystko wykonane, nie twórz nowych zadań; jeśli odpowiedź niekompletna, wskaż co brakuje”. Bez ogólnego „kontynuuj” w pętli, bez zgadywania zezwoleń ani namawiania do obchodzenia zabezpieczeń.
+7. [TODO] Trwały nadzorca jednego czatu: lease/fencing/once-only request key, zapis planu, re-check bezpośrednio przed wysłaniem; dwufazowy status Pending -> SendingUncertain -> Delivered (lub NeedsReview), crash recovery bez ponowienia niewiadomych wysłań.
+8. [TODO] Wysłanie przez legalną/obsługiwaną warstwę UI WebView2 przy potwierdzonym idle/kompozytorze, ack widocznej *konkretnej* wiadomości; brak prób podwójnych po błędzie; absolutnie nie automatyzować captcha, logowania, płatności i odmów zabezpieczeń.
+9. [TODO] Przy aktywnym domyślnym nadzorze: w panelu można pauzować/wyłączyć, wskazać czaty/projekty, limity wywołań na godzinę/dobę, allowlist tematu i dozwolonego działania; awaria -> alarm + STOP, a nie auto-resubmit.
+10. [TODO] E2E na czacie „testowy” z książką przygodową: najpierw ręczne przypisanie URL, bezpieczna próbka 1 rozdział, potem różne stany: naturalne zakończenie, blocker, prośba o użytkownika, niejasne zakończenie, timeout, brak API, długa odpowiedź, awaria/restart, poprawne zatrzymanie po zakończeniu całej książki.
+11. [TODO] Release minimalne P0 jak najwcześniej: personalny side-by-side build, bezpieczny handoff procesu, rollback, weryfikacja LIVE PBOX1 na realnej rozmowie i logach.
+
+## P1: diagnostyka i zachowanie rozmów
+12. [PARTIAL] Zewnętrzny monitor CPU/RAM co 2 minuty przetrwał reboot, metryki i logowanie; rozszerzyć o normalized CPU/process trees, private bytes, commit, progi niedoboru RAM.
+13. [PARTIAL] Lite event log WebView2/lifecycle, DOM obserwatory, błędy renderowania, DPAPI archive; połączyć telemetrię etapów żądania -> UI -> snapshot, korelacje bez payloadów.
+14. [TODO] „Nie udało się wczytać odpowiedzi”: porównanie etapów transportu, WebSocket, React, renderera, archiwum oraz kodu błędu z confidence i dowodem tego, co realnie dotarło. Nie udawać wiedzy o backendzie.
+15. [TODO] Gwarantowany prywatny checkpoint widocznej odpowiedzi w trakcie streamu, samoweryfikacja i wybiórcze odtwarzanie fragmentów; osobne backupy, policy retencji.
+16. [PARTIAL] DOM: CSS content-visibility, hard prune starszych 24/90, porównać core-v06; testy React E2E, feature flag, rollback przy utracie responsywności.
+17. [TODO] Zasoby po awarii: eksport raportu dla operatora, timeline, błędy/stany/zwieszenia; zero zapisu sekretów do Git.
+
+## P2: dashboard i projekty
+18. [PARTIAL] Rejestr dowolnej liczby projektów, wieloczaty i przypięcie URL, ręczna rola lead; wersjonowanie schemy, CRUD, filtry, archiwizacja, import obecnych z ChatGPT.
+19. [TODO] Karty dashboardu: per projekt lead/worker, stan pracy, godziny, tokeny lub koszt jeśli udokumentowany, CPU/RAM/DOM, ostatni checkpoint, blokery, logi, skróty do aktywnej karty.
+20. [PARTIAL] Trwała ewidencja zadania i lease/fencing, historii handoff; jedna spójna idempotentna transakcja przejęcia roli i dobry rollback.
+21. [PARTIAL] Natywny per-chat panel notatek z Win+H; naprawić microphone permissions web ChatGPT, wznowienie dyktowania, copy, obsługę focus i zapisu.
+22. [PARTIAL] Zaszyfrowana kolejka notatek per czat oraz ack; dołączyć UI i bezpieczne **jednokrotne** przekazanie „Informacje od Pawła:” do właściwego czatu; nie przerywać trwającego tool call.
+23. [TODO] Karty pracy utrzymywane przez adaptacyjny bounded warm pool WebView2 (1 foreground + max 2 warm, według RAM); odstawianie tylko idles, UI notifies.
+24. [TODO] Własny wygląd: logo/ikony, pasek zadań i tray, Ctrl+Tab, widok techniczny, onboarding bez danych kont.
+
+## P3: koordynacja oraz odporność
+25. [TODO] Własny lokalny MCP server z register_chat/heartbeat/task_checkpoint/lead_handoff/report_blocker/notes_ack, z uprawnieniami i kontrolą kto jest kim; nie ufać bezkrytycznie samoopisowi.
+26. [TODO] Obsługa autoryzacji, ról lead/worker/support, handoff do nowego czatu i archiwizacja starych danych bez przypadkowego przecieku.
+27. [TODO] Rozpoznawanie zatrzymania czynności a nie zatrzymania UI, bezpieczne kontynuowanie po restarcie i w godzinowej automatyzacji niezależnej od webowego ChataGPT.
+28. [TODO] Panel dodawania MCP, test dostępności/instalacji, brak wklejania sekretów do czatu; infrastruktura pluginów zgodna z aktualną platformą.
+29. [TODO] API Luna/niższy model jako konfigurowalne strategie, monitor rachunków/timeout/429, fallback na WAIT lub model zatwierdzony, logger kosztów bez ujawniania promptu.
+
+## P4: produkcyjne zakończenie
+30. [TODO] Wielogodzinny soak test CPU/RAM /10k tur/hard prune na długich rozmowach, autostart, bateria, standby, reboot, crash/back-pressure; brak memory leak assumptions.
+31. [TODO] Spójny system konfigurowania projektów i rozdzielenie ChatGPT native Projects od lokalnych aliasów bez założeń o publicznym API.
+32. [TODO] Testy integracyjne 2 hosty, różne czaty/projekty, równoległe handoffy, blokady, offline API i rollback; QA wizualne Windows11.
+33. [TODO] Polityka prywatności, backup/retencja, eksport i import ustawień bez cookies; szyfrowanie i prywatny katalog użytkownika Windows.
+34. [TODO] Wersjonowany instalator i updater, kontrolowany restart i bezpieczne uwolnienie procesu, sygnatura, równoległy STAGED, promocja do LIVE i rollback.
+35. [TODO] Dokumentacja operatora i dewelopera, rejestr odrzuconych komend, dowody końcowego testu, wszystkie pozycje DONE i live verified, kompletny stabilny Open Browser.
+
+## Stan na początek 16:25
+- PBOX1 **LIVE zmienił się od poprzednich checkpointów**: PID 18676, start 16:16:29, aktualna binarka %LOCALAPPDATA%\Programs\OpenBrowserChatGPTLite_20261018_notes_dom_voice\BridgeBrowserAlpha0.exe, Responding=True. Nie uśmiercać.
+- PBOX1 Windows scheduled task nadal wskazuje starszy telemetry, co wymaga osobnego rozwiązania wcześniej zablokowanego problemu i nie jest jeszcze DONE.
+- Zdania o przyczynach odmów narzędzi wynikających z Instant traktować jako hipotezę operatora, nie fakt potwierdzony przez telemetrię.

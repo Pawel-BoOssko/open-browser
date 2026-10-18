@@ -8,6 +8,11 @@ internal static class Program
     [STAThread]
     private static void Main(string[] args)
     {
+        if (args.Any(arg => string.Equals(arg, "--lite-version-selftest", StringComparison.OrdinalIgnoreCase)))
+        {
+            Environment.ExitCode = LiteBuildInfo.SelfTest();
+            return;
+        }
         if (args.Any(arg => string.Equals(arg, "--lite-projects-selftest", StringComparison.OrdinalIgnoreCase)))
         {
             Environment.ExitCode = LiteSelfTest.Run();

@@ -25,6 +25,13 @@ internal sealed partial class ChatGptLiteForm : Form
     private readonly Button _reload = new() { Text = "Odśwież", Width = 95 };
     private readonly Button _home = new() { Text = "ChatGPT", Width = 95 };
     private readonly Button _openArchive = new() { Text = "Archiwum", Width = 90 };
+    private readonly Label _buildVersion = new()
+    {
+        AutoSize = true,
+        Padding = new Padding(8, 8, 8, 0),
+        Font = new Font(SystemFonts.DefaultFont, FontStyle.Bold),
+        Text = LiteBuildInfo.Display()
+    };
     private readonly Label _status = new()
     {
         AutoSize = true,
@@ -34,7 +41,7 @@ internal sealed partial class ChatGptLiteForm : Form
 
     public ChatGptLiteForm()
     {
-        Text = "Open Browser | ChatGPT Lite";
+        Text = "Open Browser Lite | " + LiteBuildInfo.Display();
         Width = 1280;
         Height = 850;
         MinimumSize = new Size(980, 600);
@@ -59,7 +66,7 @@ internal sealed partial class ChatGptLiteForm : Form
             WrapContents = false,
             AutoScroll = true
         };
-        toolbar.Controls.AddRange(new Control[] { _back, _forward, _reload, _home, _domToggle, _hardPruneToggle, _archiveToggle, _openArchive, _status, _domInfo });
+        toolbar.Controls.AddRange(new Control[] { _buildVersion, _back, _forward, _reload, _home, _domToggle, _hardPruneToggle, _archiveToggle, _openArchive, _status, _domInfo });
         var content = new SplitContainer
         {
             Dock = DockStyle.Fill,
