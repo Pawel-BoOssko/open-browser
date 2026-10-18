@@ -44,3 +44,9 @@ Cel: zachowac ustalenia przed restartem, zbadac przyczyny i wprowadzic diagnosty
 - Kompilacja Debug SATANAMD: 0 błędów, znane ostrzezenie MSB3277. Release build przez LC MultiHost SATANAMD `dotnet build ... --configuration Release --no-restore` zablokowany: MSB3021/MSB3027, exe zajety przez istniejący proces PID 13384. Zakres: zamiana jednego pliku hosta, inne skompilowane zrodla pozostały nietknięte. Nie probowano ponawiac tej samej operacji.
 - Aktualna wersja PBOX1 pozostaje starsza: kod po kompilacji Debug na SATANAMD NIE JEST JESZCZE WDROŻONY na PBOX1 i nie wolno twierdzić inaczej.
 - Zapytanie LC MultiHost o eventy PBOX1 zablokowalo sie na ponad 200 s; sesja zakończona jako crashed; brak danych WER; nie ponawiano zapytania w innym narzędziu.
+
+## Checkpoint synchronizacji i wdrozenia
+- SATANAMD Autosync manualnie wyzwolony przez istniejacy Windows Scheduled Task `Autosync repozytoriów`. Wersja gałęzi autosync/SATANAMD: 2b769de1f5aeb90524f94beced8fd5cd6ccf9407.
+- PBOX1: git pull --ff-only wykonany, czysty katalog przed synchronizacją, commit 0fe0087 -> 2b769de, plik LiteEventLog.cs jest w klonie. Bez ręcznego git push.
+- PBOX1: przygotowanie osobnego katalogu aplikacji `OpenBrowserChatGPTLite_20261018_telemetry`, bez zastępowania aktualnego exe i bez ruszania profilu. Publikacja w toku.
+- Istniejaca aplikacja na SATANAMD PID 13384 nie zatrzymana; kompilacja Release do starego output była zablokowana plikiem uruchomionej aplikacji. Kompilacja Debug z nowym kodem powiodła się.
