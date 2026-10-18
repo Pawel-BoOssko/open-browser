@@ -1,0 +1,11 @@
+# Open Browser v1.61 — Luna i High, checkpoint 2026-10-18 17:11
+
+- User confirms Luna credentials already set in another local project and requests automatic release activation and High enforcement.
+- On PBOX1 Windows Credential Manager TARGET found: FileScannerAI/OpenAIAPIKey (target name only, no secret read by assistant). OpenFill config AppConfig model default is gpt-6-luna, high effort possible; alias/model fallback now matches this existing configuration.
+- New SOURCE: LiteApiCredential.cs reads GENERIC credential with Windows CredRead in local application memory, without exporting, printing, storing in repo, or logging secret. LiteLunaAdvisor.cs falls back to this credential and gpt-6-luna; explicit OPENBROWSER_LUNA_MODEL / OPENAI_API_KEY override remains. No API call made before explicit one-shot connectivity test.
+- New SOURCE: LiteHighGuard.js and LiteHighUi.cs add top toolbar effort indicator, detect current Instant/Medium/High, initiate picker selection of High and VERIFY after change, otherwise gate supervisor. No statement that High switched without evidence. LiteResumeProbe.js now derives effort primarily from this guard.
+- New SOURCE: LiteLunaConnectivitySelfTest.cs permits one-shot API probe on synthetic adventure-book metadata; no real conversation text and no automatic resubmission.
+- Project semver bumped 1.61.0. SATANAMD build Debug 0 errors, 1 known MSB3277; version/resume/luna/ledger selftests 0; high guard JavaScript 7 PASS.
+- PBOX1 prior LIVE v1.60.0 PID21532 started 16:59:36, responding. Renderer WebView2 failed RenderProcessUnresponsive 17:02:35, preceded by archive_probe_timeout/dom_probe_timeout, followed by more probe delays. Other window processes still live. Do not claim bug root cause from these logs alone.
+- TODO: side-by-side staged publish 1.61 on PBOX1 + credential/API connectivity test with redacted logs; ensure High selection UI E2E before auto-send; user testowy adventure book chat active; production install when safe without interrupting ongoing answer.
+- Full backlog: docs/design/openbrowser-full-delivery-plan-v2-2026-10-18-1626.md. Tool failures: docs/Rejestr nieudanych komend.md.
