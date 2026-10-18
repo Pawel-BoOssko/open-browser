@@ -83,12 +83,33 @@ $incidents = @(
         }
     }
 )
+$critical = @($events | Where-Object {
+    $_.eventName -eq 'webview_process_failed' -or
+    ($_.eventName -eq 'response_error_transition' -and $_.details.state -ne 'cleared')
+} | Select-Object -Last 40 | ForEach-Object {
+    [ordered]@{
+        timeUtc = [string]$_.utc
+        signal = [string]$_.eventName
+        stage = if ($_.eventName -eq 'webview_process_failed') { 'renderer_process_failure' } else { 'visible_page_error' }
+        rendererKind = if ($_.eventName -eq 'webview_process_failed') { [string]$_.details.kind } else { $null }
+        rendererReason = if ($_.eventName -eq 'webview_process_failed') { [string]$_.details.reason } else { $null }
+        uiError = if ($_.eventName -eq 'response_error_transition') { [string]$_.details.state } else { $null }
+        serverAnswerDelivery = 'unknown_not_proven'
+    }
+})
+$counts = @($events | Where-Object { $_.eventName -match $incidentPattern } |
+    Group-Object eventName | Sort-Object Name | ForEach-Object {
+        [ordered]@{ name = $_.Name; count = $_.Count }
+    })
 [ordered]@{
-    schema = 1
+    schema = 2
     scope = 'local_metadata_only'
     eventsRead = $events.Count
     resourceSamplesRead = $resources.Count
     incidentCount = $incidents.Count
+    eventCounts = $counts
+    criticalTimeline = $critical
+    criticalEventCount = $critical.Count
     incidents = $incidents
     interpretation = 'HTTP 200, heartbeat, or saved local text do not prove server completion or full answer delivery'
 } | ConvertTo-Json -Depth 7 -Compress
