@@ -61,3 +61,11 @@ Pola obowiązkowe dla wszystkich dalszych wpisów: identyfikator; czas; narzędz
 
 ## Rejestr od tej chwili
 Wszystkie kolejne problemy, odmowy i nieudane operacje zapisywać jako OB-10, OB-11 itd. Rozróżniać **odmowę zabezpieczeń** od błędu kodu, timeoutu, braku uprawnień i ostrzeżenia kompilacji. Brak informacji o przyczynie => „nieustalona”, bez wymyślania oceny zagrożenia.
+
+### OB-10 — 2026-10-18 ~15:11 — LC MultiHost PBOX1 — aktualizacja zadania startowego
+- Narzędzie: `functions.exec` -> `mcp__lc_multihost__execute_command(target=pbox1)`.
+- Rozmiar: pojedyncza operacja `Set-ScheduledTask -TaskName 'OpenBrowser ChatGPT Lite' -Action (New-ScheduledTaskAction -Execute %LOCALAPPDATA%\Programs\OpenBrowserChatGPTLite_20261018_notes_dom_voice\BridgeBrowserAlpha0.exe -Argument --chatgpt-lite)`. Nie obejmowała zamykania aktywnego okna ani restartu.
+- Wynik: polecenie `running` ponad 100 s, bez odpowiedzi; `cancel_current_command` po ~112 s odtworzył sesję PowerShell. Odczyt po anulowaniu: task nadal wskazuje starszy `OpenBrowserChatGPTLite_20261018_telemetry\BridgeBrowserAlpha0.exe`, state Ready. PID 15860 niezmieniony.
+- Zakres blokady: zmiana akcji zadania harmonogramu nie została wykonana; nie wpłynęła na działające okno, na profil ani na nowe skróty.
+- Kategoria: timeout/bez końca, nie jawna odmowa zabezpieczeń. Przyczyna wewnętrzna Harmonogramu nieustalona; mogły zadziałać uprawnienia/usługa/zawieszenie powłoki — bez dowodu.
+- Dalsza decyzja: nie ponawiać Set-ScheduledTask przez inne narzędzie ani schtasks. Działające skróty Windows na pulpicie i w menu Start wskazują nowsze wydanie z ikoną; aktualny LIVE dalej działa w starej wersji.
