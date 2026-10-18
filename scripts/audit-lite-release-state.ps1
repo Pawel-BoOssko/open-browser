@@ -55,8 +55,15 @@ $monitor = $null
 $freeMiB = $null
 $ramLevel = 'unknown'
 if (-not $SkipSystemProbes) {
+    $upgradeHelperPids = @()
+    try {
+        $upgradeHelperPids = @(Get-CimInstance Win32_Process -Filter "Name='BridgeBrowserAlpha0.exe'" |
+            Where-Object { $_.CommandLine -match '--lite-await-upgrade\s+\d+' } |
+            ForEach-Object { [int]$_.ProcessId })
+    } catch { }
     try {
         $live = @(Get-Process -Name 'BridgeBrowserAlpha0' -ErrorAction SilentlyContinue |
+            Where-Object { $_.Id -notin $upgradeHelperPids } |
             ForEach-Object {
                 $exe = $_.Path
                 if (-not $exe -or $exe -notlike '*OpenBrowserChatGPTLite_*') { return }
