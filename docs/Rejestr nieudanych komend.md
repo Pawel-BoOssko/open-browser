@@ -162,3 +162,22 @@ Wszystkie kolejne problemy, odmowy i nieudane operacje zapisywać jako OB-10, OB
 - Operacja: pętla `foreach($f in @(...))` wywołująca `git cat-file -e ('refs/remotes/origin/autosync/SATANAMD:'+ $f)` z próbą odczytu `$LASTEXITCODE` w tej samej grupie wyrażeń.
 - Rezultat: parser PowerShell zgłosił `Missing closing ')' in expression`, exit_code=1; nie wykonano odczytu wskazanych obiektów Git. Kategoria: błąd składni przygotowanego polecenia, NIE odmowa zabezpieczeń. Brak zmian repo, tasków i procesów.
 - Zakres: tylko read-only weryfikacja czterech nowych plików w zdalnej gałęzi Autosync; przyczyna jawna (niepoprawne nawiasy).
+
+### OB-20261018-1630-version — wersjonowanie assembly: naprawiony parser
+- Narzędzie: LC MultiHost SATANAMD (małe dotnet build i --lite-version-selftest).
+- Wynik: build 0 błędów; pierwsze uruchomienie selftest EXIT=2. WinInfo ujawnił suffix .<gitsha> dopisywany przez .NET SDK za v1.60.0+build.TIMESTAMP.
+- Przyczyna techniczna: regex parsował tylko opcjonalny +suffix, nie .suffix; poprawiono LiteBuildInfo.cs i potwierdzono EXIT=0. Bez blokady bezpieczeństwa, bez wpływu na LIVE.
+
+### OB-20261018-1634-luna-test — błędny fixture testu Luny
+- Narzędzie: LC MultiHost SATANAMD (mały build i --lite-luna-selftest).
+- Wynik: pierwsze uruchomienie EXIT=2, bo test oczekiwał odrzucenia tekstu dłuższego niż minimalny próg 16 znaków. Poprawiono fixture na krótszy napis, kolejny run EXIT=0.
+- Zakres: test offline, nie wykonywano żądań API ani wysyłki do ChatGPT. Kategoria: błąd testu, nie odmowa zabezpieczeń.
+
+### OB-20261018-1643-checkpoint-script — błąd lokalnego kodu wywołania
+- Narzędzie: functions.exec, JS budujący zapis nowego checkpointu RDC. Wynik: SyntaxError Unexpected identifier SendingUncertain przed wykonaniem wywołania narzędzia (niezamknięty backtick w literalnym szablonie).
+- Zakres: pierwotny checkpoint nie został wywołany ani zapisany. Skorygowano wyłącznie format reprezentacji tekstu; aktualny docs/openbrowser-checkpoint-2026-10-18-1643-v160.md zapisany osobną, zakończoną operacją.
+
+### OB-20261018-1645-model-unconfigured — brak konfiguracji API Luny na PBOX1
+- Narzędzie: LC MultiHost PBOX1, małe read-only sprawdzenie bool wartości zmiennych OPENBROWSER_LUNA_MODEL i OPENAI_API_KEY (bez odczytu sekretów).
+- Wynik: obie wartości FALSE. Brak możliwości uruchomienia API planner bez model ID i autoryzowanego klucza; nie wykonywano HTTP ani nie utworzono zastępczego fikcyjnego ID.
+- Zakres: tylko generowanie automatycznej kontynuacji; numer wersji, timer obserwacji, JS probe, DPAPI ledger i inne testy headless działają. Wymagana później poprawna konfiguracja konta API.
