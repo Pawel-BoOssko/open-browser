@@ -66,3 +66,10 @@ Cel: zachowac ustalenia przed restartem, zbadac przyczyny i wprowadzic diagnosty
 - Automatyzacja 2-minutowego monitorowania NIE DZIALA: rejestracja/uruchomienie Windows task przez LC MultiHost byla za duza dla zablokowanej sesji; po >195 s anulowano, re-check jedynie odczytowy: `MONITOR_INSTALLED=NO`, `MONITOR_ROWS=1`. Operacji tworzenia nie ponawiano innym narzedziem. Skrypty i wynik manualny zachowane do kolejnej sesji.
 - Diagnostyka server->client odpowiedzi ChatGPT NIE ma jeszcze telemetrii/dowodów transportu; nie wolno stwierdzać, czy odpowiedź dotarła, lecz znikła. Rowniez wczesniejsza odpowiedz nie jest odzyskiwalna wprost z instrumentacji dodanej dopiero po incydencie.
 - Program nie wysyla automatycznie wiadomosci, nie klika kontynuacji i nie ingeruje w profile innych przegladarek. Wersja sprzed zmiany zachowana do ewentualnego rollbacku.
+
+## Aktualizacja po instalacji monitora przez operatora — 2026-10-18, 13:44
+- Użytkownik uruchomił ręcznie poprawiony skrypt rejestrujący zadanie przez `schtasks.exe /Create /SC MINUTE /MO 2 /IT` po niepowodzeniu wariantu `New-ScheduledTaskTrigger -Daily` (brak właściwości `Repetition.Interval`).
+- Weryfikacja wykonana przez LC MultiHost PBOX1, bez zmian: zadanie `OpenBrowser Lite Resource Monitor` istnieje, `State=Ready`, `LastRunTime=2026-10-18T13:43:43+02:00`, `LastTaskResult=0`, `NextRunTime=2026-10-18T13:45:45+02:00`.
+- Dziennik `resources-2026-10-18.jsonl` zawiera 3 wiersze, aktualizacja 13:43:30 lokalnie, ostatnia próbka 596 MiB wolnej RAM, 1 host i 9 procesów WebView2.
+- ZADANIE MONITORUJĄCE AKTYWNE i poprawnie wykonuje próbki; wcześniejszy status NIEAKTYWNE jest historyczny, nie bieżący.
+- Ponieważ zadanie utworzono z `/IT`, wymaga zalogowanej sesji Windows. Trwałość konfiguracji Task Scheduler jest systemowa, ale jeszcze nie zweryfikowano wykonania pomiaru po restarcie komputera.
