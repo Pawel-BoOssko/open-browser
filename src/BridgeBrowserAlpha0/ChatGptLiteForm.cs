@@ -11,6 +11,8 @@ internal sealed class ChatGptLiteForm : Form
 {
     private const string HomeUrl = "https://chatgpt.com/";
     private readonly WebView2 _browser = new() { Dock = DockStyle.Fill };
+    private readonly System.Windows.Forms.Timer _heartbeat = new() { Interval = 30000 };
+    private DateTimeOffset _lastHeartbeat = DateTimeOffset.UtcNow;
     private readonly Button _back = new() { Text = "Wstecz", Width = 90 };
     private readonly Button _forward = new() { Text = "Dalej", Width = 85 };
     private readonly Button _reload = new() { Text = "Odśwież", Width = 95 };
