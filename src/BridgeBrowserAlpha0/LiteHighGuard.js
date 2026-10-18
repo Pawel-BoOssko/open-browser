@@ -22,6 +22,10 @@
     }
     return "unknown";
   }
+  function hasUserDraft() {
+    const editor = w.document.querySelector('textarea,[contenteditable="true"]');
+    return !!editor && !!String(editor.value || editor.innerText || '').trim();
+  }
   function switchHigh() {
     const current = currentMode();
     if (current === "high" || current === "extra high")
@@ -32,18 +36,24 @@
       .reverse().find(el => visible(el) &&
         clean(el.getAttribute("aria-label") || el.innerText || el.textContent) === current);
     if (!trigger) return { state: "no_picker", mode: current };
-    // Stop only a demonstrably active lower-effort generation. Never infer it.
-    const stop = w.document.querySelector?.('[data-testid="stop-button"]');
-    let stopped = false;
-    if (stop && !stop.disabled) { stop.click(); stopped = true; }
+    // Never interrupt a generation or tool just to change its effort.
+    // In particular this code must not click Stop in an unrelated chat.
+    if (w.document.querySelector('[data-testid="stop-button"],[aria-busy="true"]'))
+      return { state: "generation_busy", mode: current };
+    if (hasUserDraft()) return { state: "user_draft_present", mode: current };
+    const selectedPath = w.location.pathname;
     trigger.click();
     // React may render the picker options on a later event-loop turn.
-    w.setTimeout(chooseHigh, 250);
-    return { state: "high_selection_requested", previous: current, stopRequested: stopped };
+    w.setTimeout(() => chooseHigh(selectedPath), 250);
+    return { state: "high_selection_requested", previous: current, stopRequested: false };
   }
-  function chooseHigh() {
+  function chooseHigh(selectedPath) {
+    if (w.location.hostname !== "chatgpt.com" || w.location.pathname !== selectedPath ||
+        hasUserDraft() ||
+        w.document.querySelector('[data-testid="stop-button"],[aria-busy="true"]'))
+      return { state: "page_changed_or_busy" };
     const opts = Array.from(w.document.querySelectorAll(
-      '[role="menuitem"],[role="option"],[role="radio"],[data-radix-collection-item],button'));
+      '[role="menuitem"],[role="option"],[role="radio"],[data-radix-collection-item]'));
     const high = opts.reverse().find(el => visible(el) &&
       clean(el.getAttribute("aria-label") || el.innerText || el.textContent) === "high");
     if (high && !high.disabled) {

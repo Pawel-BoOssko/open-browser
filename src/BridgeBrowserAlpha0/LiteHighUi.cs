@@ -19,6 +19,7 @@ internal sealed partial class ChatGptLiteForm
     private bool _highProbePending;
     private string _lastEffort = "";
     private string _effortChangeFrom = "";
+    private string _effortChangeChat = "";
     private DateTimeOffset _lastHighSwitch = DateTimeOffset.MinValue;
 
     private void InitializeHighUi()
@@ -71,11 +72,16 @@ internal sealed partial class ChatGptLiteForm
                 _highIndicator.Text = "Tryb: HIGH";
                 if (_effortChangeFrom.Length > 0)
                 {
-                    LiteEventLog.Write("high_guard_switch_confirmed", new {
-                        previous = _effortChangeFrom, actual = mode
-                    });
-                    QueueHighReview(_effortChangeFrom, core.Source);
+                    if (_effortChangeChat == LiteChatNotes.NormalizeKey(core.Source))
+                    {
+                        LiteEventLog.Write("high_guard_switch_confirmed", new {
+                            previous = _effortChangeFrom, actual = mode
+                        });
+                        QueueHighReview(_effortChangeFrom, core.Source);
+                    }
+                    else LiteEventLog.Write("high_guard_switch_context_changed");
                     _effortChangeFrom = "";
+                    _effortChangeChat = "";
                 }
                 await TryHighReviewAsync(core);
                 return;
@@ -84,12 +90,24 @@ internal sealed partial class ChatGptLiteForm
             _highIndicator.ForeColor = Color.DarkRed;
             _highIndicator.Text = "Tryb: " + mode.ToUpperInvariant() + " — sprawdzam";
             if (mode is not ("instant" or "medium")) return;
+            // A global page-level effort detector must NEVER alter unrelated
+            // private chats. Only explicitly registered active project chats
+            // may have their model selector changed.
+            string chatKey = LiteChatNotes.NormalizeKey(core.Source);
+            bool managed = _projects?.Projects.Any(p => p.Active && p.Chats.Any(c =>
+                LiteChatNotes.NormalizeKey(c.Url) == chatKey)) == true;
+            if (!managed)
+            {
+                _highIndicator.Text = "Tryb: " + mode.ToUpperInvariant() + " (poza projektem)";
+                return;
+            }
             if (DateTimeOffset.UtcNow - _lastHighSwitch < TimeSpan.FromSeconds(20))
                 return;
 
             // Known low effort: request the real selector in the WebView2 UI.
             // We do NOT claim the mode changed until the next audit confirms it.
             _effortChangeFrom = mode;
+            _effortChangeChat = chatKey;
             _lastHighSwitch = DateTimeOffset.UtcNow;
             var switchTask = core.ExecuteScriptAsync(
                 "window.__OPENBROWSER_HIGH_GUARD__ ? JSON.stringify(window.__OPENBROWSER_HIGH_GUARD__.switchHigh()) : null");
