@@ -33,6 +33,11 @@ internal static class Program
             Environment.ExitCode = LiteNotesSelfTest.Run();
             return;
         }
+        if (args.Any(arg => string.Equals(arg, "--lite-outbox-selftest", StringComparison.OrdinalIgnoreCase)))
+        {
+            Environment.ExitCode = LiteNotesOutboxSelfTest.Run();
+            return;
+        }
         if (args.Any(arg => string.Equals(arg, "--lite-icon-export", StringComparison.OrdinalIgnoreCase)))
         {
             Environment.ExitCode = LiteBrandIcon.Export() ? 0 : 2;

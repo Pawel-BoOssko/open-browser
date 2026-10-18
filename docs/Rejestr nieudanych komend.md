@@ -69,3 +69,10 @@ Wszystkie kolejne problemy, odmowy i nieudane operacje zapisywać jako OB-10, OB
 - Zakres blokady: zmiana akcji zadania harmonogramu nie została wykonana; nie wpłynęła na działające okno, na profil ani na nowe skróty.
 - Kategoria: timeout/bez końca, nie jawna odmowa zabezpieczeń. Przyczyna wewnętrzna Harmonogramu nieustalona; mogły zadziałać uprawnienia/usługa/zawieszenie powłoki — bez dowodu.
 - Dalsza decyzja: nie ponawiać Set-ScheduledTask przez inne narzędzie ani schtasks. Działające skróty Windows na pulpicie i w menu Start wskazują nowsze wydanie z ikoną; aktualny LIVE dalej działa w starej wersji.
+
+### OB-11 — 2026-10-18, kolejna iteracja: rejestracja dwóch sesji LC MultiHost
+- Narzędzie: `functions.exec`, jedno wywołanie JS `Promise.all` obejmujące dwa `mcp__lc_multihost__register_chat` (target SATANAMD i PBOX1).
+- Rozmiar: dwa małe niezależne wywołania rejestracji nazw tej samej rozmowy, bez wykonywania komend systemowych i bez zapisu plików.
+- Rezultat: `To wywołanie narzędzia zostało zablokowane przez zabezpieczenia OpenAI. Sprawdź dokładniej, co wysyłasz.`; nie otrzymano potwierdzenia rejestracji żadnego hosta.
+- Zakres: wyłącznie złożona rejestracja obu sesji; nie obejmuje repozytorium ani kodu. Przyczyna decyzji zabezpieczeń nie została ujawniona.
+- Dalsze postępowanie: bez ponawiania tej samej podwójnej operacji; zadania czytania i edycji plików przez RDC pozostają niezależne od tej rejestracji.

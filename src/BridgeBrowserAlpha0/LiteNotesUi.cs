@@ -8,6 +8,7 @@ internal sealed partial class ChatGptLiteForm
     private static extern void keybd_event(byte virtualKey, byte scan, uint flags, UIntPtr extra);
 
     private readonly LiteChatNotes _noteStore = new();
+    private readonly LiteNotesOutbox _notesOutbox = new();
     private readonly TextBox _noteEditor = new()
     {
         Multiline = true, Dock = DockStyle.Fill, ScrollBars = ScrollBars.Vertical,
@@ -58,10 +59,29 @@ internal sealed partial class ChatGptLiteForm
             _noteState.Text = "Skopiowano. Możesz wkleić do czatu; nie wysłano automatycznie.";
             LiteEventLog.Write("notes_copied_to_clipboard");
         };
+        var queue = new Button { Text = "Do kolejki", Width = 106, Height = 32 };
+        queue.Click += (_, _) =>
+        {
+            if (string.IsNullOrWhiteSpace(_noteEditor.Text)) return;
+            FlushNotes();
+            try
+            {
+                var item = _notesOutbox.Enqueue(_noteKey, _noteEditor.Text);
+                _noteState.Text = "W kolejce lokalnej #" + item.Sequence +
+                    ". Nie wysłano do ChatGPT.";
+                LiteEventLog.Write("notes_outbox_queued", new { sequence = item.Sequence });
+            }
+            catch (Exception ex)
+            {
+                _noteState.Text = "Błąd kolejki. Notatka pozostała w edytorze.";
+                LiteEventLog.Write("notes_outbox_failed", new { errorType = ex.GetType().Name });
+            }
+        };
         var save = new Button { Text = "Zapisz", Width = 78, Height = 32 };
         save.Click += (_, _) => FlushNotes();
         actions.Controls.Add(dictate);
         actions.Controls.Add(copy);
+        actions.Controls.Add(queue);
         actions.Controls.Add(save);
 
         _noteEditor.TextChanged += (_, _) =>
