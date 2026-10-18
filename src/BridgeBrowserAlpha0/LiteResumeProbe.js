@@ -25,9 +25,13 @@
     const editor = d.querySelector('textarea,[contenteditable="true"]');
     const draft = editor && String(editor.value || editor.innerText || "").trim().length > 0;
     const errorText = d.querySelector('[role="alert"],[data-testid*="error"]');
-    const error = errorText &&
+    const alertError = !!errorText &&
       /nie udało się wczytać|failed to load|przerwano|interrupted|przekroczono limit|timed out/i.test(
         String(errorText.textContent || "").slice(-400));
+    // The centralized detector also checks short DIL assistant error placeholders.
+    // User quotations are deliberately excluded by that detector.
+    const responseError = w.__OPENBROWSER_RESPONSE_SIGNALS__?.read()?.visibleError;
+    const error = alertError || !!responseError;
     const modelModes = Array.from(d.querySelectorAll('button')).slice(-45)
       .map(button => String(button.innerText || button.textContent || '').trim().toLowerCase())
       .filter(value => /^(high|instant|medium|extra high)$/.test(value));

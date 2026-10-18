@@ -87,9 +87,23 @@ internal static class LiteWebViewIntegrationSelfTest
                     Ensure(state == "submission_requested", "one submission requested");
                     phase = "wait_and_check_ack";
                     await Task.Delay(850);
-                    Ensure(await EvaluateAsync(core,
-                        "window.__OPENBROWSER_RESUME_SENDER__?.hasAck('" + receipt + "')") == "true",
-                        "new DIL user bubble acknowledges receipt");
+                    bool ack = await EvaluateAsync(core,
+                        "window.__OPENBROWSER_RESUME_SENDER__?.hasAck('" + receipt + "')") == "true";
+                    if (!ack) {
+                        var bubbles = await EvaluateAsync(core,
+                            "document.querySelectorAll('[data-user-message-bubble]').length");
+                        var draftLength = await EvaluateAsync(core,
+                            "document.querySelector('#prompt-textarea').innerText.length");
+                        var includesMarker = await EvaluateAsync(core,
+                            "document.querySelector('#prompt-textarea').innerText.includes('" + receipt + "')");
+                        var bubbleInfo = await EvaluateAsync(core,
+                            "(() => {let b=[...document.querySelectorAll('[data-user-message-bubble]')].at(-1); " +
+                            "return JSON.stringify({len:b.textContent.length, marker:b.textContent.includes('" + receipt + "')," +
+                            " visibleLen:b.innerText.length});})()");
+                        throw new InvalidOperationException("ack_not_found; bubbles=" + bubbles +
+                            "; draftLength=" + draftLength + "; markerInEditor=" + includesMarker +
+                            "; lastBubble=" + bubbleInfo);
+                    }
                     Ensure(await EvaluateAsync(core,
                         "document.querySelectorAll('[data-user-message-bubble]').length") == "3",
                         "exactly one new user bubble");
@@ -134,6 +148,8 @@ internal static class LiteWebViewIntegrationSelfTest
         using var parsed = JsonDocument.Parse(result);
         return parsed.RootElement.ValueKind switch {
             JsonValueKind.String => parsed.RootElement.GetString() ?? "",
+            JsonValueKind.True => "true",
+            JsonValueKind.False => "false",
             JsonValueKind.Null => "",
             _ => parsed.RootElement.ToString()
         };

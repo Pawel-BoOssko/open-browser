@@ -18,7 +18,8 @@
     const t0 = global.performance.now();
     const doc = global.document;
     const turns = doc.querySelectorAll('[data-testid^="conversation-turn-"]');
-    const assistants = doc.querySelectorAll('[data-message-author-role="assistant"]');
+    const assistants = doc.querySelectorAll(
+      '[data-message-author-role="assistant"],[data-chatgpt-selection-message-id]');
     let error = null;
     const alerts = doc.querySelectorAll('[role="alert"],[data-testid*="error"],[data-testid*="toast"]');
     for (const node of Array.from(alerts).slice(-35)) {
