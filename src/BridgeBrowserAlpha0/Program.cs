@@ -88,6 +88,11 @@ internal static class Program
             Environment.ExitCode = LiteDeliveryEvidenceSelfTest.Run();
             return;
         }
+        if (args.Any(arg => string.Equals(arg, "--lite-renderer-backpressure-selftest", StringComparison.OrdinalIgnoreCase)))
+        {
+            Environment.ExitCode = LiteRendererBackpressureSelfTest.Run();
+            return;
+        }
         if (args.Any(arg => string.Equals(arg, "--lite-icon-export", StringComparison.OrdinalIgnoreCase)))
         {
             Environment.ExitCode = LiteBrandIcon.Export() ? 0 : 2;

@@ -24,12 +24,8 @@ internal static class LiteDeliveryEvidence
         if (o.RendererResponsive == false || o.JavaScriptResponsive == false)
             return new("renderer_or_js_unresponsive", "medium_local", saved, false,
                 "Check WebView2 process lifecycle and memory pressure");
-        if (saved && o.AnswerVisible == true)
-            return new("visible_and_archived", "high_local", true, false,
-                "Compare later chat render with encrypted snapshot digest");
-        if (saved && o.AnswerVisible == false)
-            return new("archived_but_not_visible", "high_local", true, false,
-                "Inspect encrypted local archive and renderer state");
+        // Actual present error signals override earlier locally saved text.
+        // 'Recoverable' remains true where an archive exists.
         if (o.BackendHttpStatus is >= 400 and <= 599)
             return new("backend_http_error_observed", "high_http", saved, false,
                 "Correlate endpoint metadata and request timing");
@@ -37,6 +33,12 @@ internal static class LiteDeliveryEvidence
             "reasoning_interrupted")
             return new("ui_failure_reported", "high_ui", saved, false,
                 "Correlate UI error with transport and renderer signals");
+        if (saved && o.AnswerVisible == true)
+            return new("visible_and_archived", "high_local", true, false,
+                "Compare later chat render with encrypted snapshot digest");
+        if (saved && o.AnswerVisible == false)
+            return new("archived_but_not_visible", "high_local", true, false,
+                "Inspect encrypted local archive and renderer state");
         if (o.AnswerVisible == true && o.SnapshotPersisted == false)
             return new("visible_not_archived", "medium_local", false, false,
                 "Check capture timer and DPAPI save failures");

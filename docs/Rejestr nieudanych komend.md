@@ -200,3 +200,15 @@ Wszystkie kolejne problemy, odmowy i nieudane operacje zapisywać jako OB-10, OB
 ### OB-20261018-183251-manifest-relative — walidator wymaga manifestu obok EXE
 - Narzędzie: LC MultiHost SATANAMD, mały test skryptu verify-lite-release-manifest.ps1 z manifestem w Recovery, a EXE w bin/Debug.
 - Wynik: `Manifest executable is missing`, zgodnie z wymogiem formatu manifestu (ścieżka EXE to basename). Poprawiono lokalizację testową do katalogu EXE, verified PASS. Nie była to blokada narzędzia.
+
+### OB-20261018-185900-pbox-publish — blokada wydania 1.63
+- Narzędzie: `mcp__lc_multihost__execute_command`, target=PBOX1; **złożony krok**: `dotnet publish C:\Users\pboru\Documents\Projects\open-browser-lite-source\src\BridgeBrowserAlpha0\BridgeBrowserAlpha0.csproj -c Release -f net8.0-windows --self-contained false --no-restore --output %LOCALAPPDATA%\Programs\OpenBrowserChatGPTLite_v1.63.0_20261018 --verbosity quiet -m:1 /p:UseSharedCompilation=false`, następnie odczyt ProductVersion i SHA256 i PID LIVE.
+- Wynik narzędzia: DOSŁOWNIE `This tool call was blocked by OpenAI's safety checks. Please double check what you are sending.`
+- Zakres: **całe wywołanie** zostało odrzucone przed uzyskaniem jakiegokolwiek wyniku; brak dowodu wykonania publish, weryfikacji EXE czy zmiany LIVE. SOURCE SATANAMD Debug build oraz testy osobno PASS, to NIE jest zgoda na STAGED/LIVE.
+- Postępowanie: nie ponawiać publikacji przez inne narzędzie, zmianę argumentów ani podział zabronionego działania; pozostać przy niezależnych pracach analitycznych i testach oraz opisać NO-GO. To blokada zabezpieczeń, NIE błąd Instant, .NET ani antywirusa.
+
+### OB-20261018-185925-renderer-backpressure-ui — blokada powiązania gate z oknem
+- Narzędzie: `functions.exec` z trzema małymi `mcp__Remote_Desktop_Commander__edit_block` na SATANAMD, plik `src/BridgeBrowserAlpha0/ChatGptLiteForm.cs`; operacje: (1) dodać `LiteRendererBackpressure` i `RendererProbeAllowed` przy WebView2, (2) resetować limiter po udanej nawigacji, (3) przy `core.ProcessFailed` zablokować auto-resume, High review i zapisać `renderer_probe_cooldown`. Wywołanie narzędzia miało 3 kroki; każda edycja była mała, ale całe wywołanie było złożone.
+- Dosłowna odmowa: `This tool call was blocked by OpenAI's safety checks. Please double check what you are sending.`
+- Zweryfikowane po odmowie odczytem LC MultiHost: w `ChatGptLiteForm.cs` jest **0** odwołań do nowych klas/markerów, LastWrite nadal 18:23:01. Żadna z trzech zmian nie pojawiła się w kodzie. Moduł `LiteRendererBackpressure.cs` utworzony wcześniej pozostaje samodzielny, nie jest podłączony do UI.
+- Zakres: podłączenie limiterów i fail-closed do produkcyjnej aplikacji jest ZABLOKOWANE/NOT DONE. Nie ponawiać tego samego celu przez inny MCP, sztuczny podział ani ponowne sformułowanie. Dalsza praca: testy czystej klasy i niezależna diagnostyka, raport NO-GO.
