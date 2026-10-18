@@ -13,6 +13,21 @@ internal static class LiteResumeLedgerSelfTest
         {
             var ledger = new LiteResumeLedger(folder);
             Check(!ledger.WasReviewed(key, hash1), "empty");
+            Check(!ledger.IsTransportQuarantined(key), "initial transport clear");
+            Check(!ledger.QuarantineTransport(key, "unsupported"), "reject unknown failure");
+            Check(ledger.QuarantineTransport(key, "delivery_timeout"), "delivery failure quarantines");
+            Check(new LiteResumeLedger(folder).IsTransportQuarantined(key),
+                "transport quarantine survives restart");
+            Check(ledger.Register(key, hash1, "continue") is null,
+                "quarantined transport blocks new receipts");
+            Check(!ledger.QuarantineTransport(key, "delivery_timeout"),
+                "duplicate transport failure does not rewrite");
+            Check(!ledger.ClearTransportQuarantineAfterManualReview(key + "-other"),
+                "one chat cannot clear another chat's block");
+            Check(ledger.ClearTransportQuarantineAfterManualReview(key),
+                "explicit manual reconciliation clears block");
+            Check(!new LiteResumeLedger(folder).IsTransportQuarantined(key),
+                "manual reconciliation survives restart");
             var receipt = ledger.Register(key, hash1, "continue");
             Check(receipt is not null, "registered");
             Check(ledger.WasReviewed(key, hash1), "receipt persisted");
@@ -31,7 +46,7 @@ internal static class LiteResumeLedgerSelfTest
             Check(!System.Text.Encoding.UTF8.GetString(data).Contains(hash1),
                 "ledger file encrypted");
             LiteEventLog.Write("resume_ledger_selftest",
-                new { passed = true, checks = 11 });
+                new { passed = true, checks = 20 });
             return 0;
         }
         catch (Exception ex)

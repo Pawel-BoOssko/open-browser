@@ -113,8 +113,23 @@ internal static class LiteWebViewIntegrationSelfTest
                     Ensure(await EvaluateAsync(core,
                         "document.querySelectorAll('[data-user-message-bubble]').length") == "3",
                         "no duplicate bubble after repeated call");
+                    phase = "detect_and_clear_visible_failure";
+                    await core.ExecuteScriptAsync("(() => {const n=document.createElement('div'); " +
+                        "n.id='qa-error';n.setAttribute('data-chatgpt-selection-message-id','failure');" +
+                        "n.innerText='Nie udało się wczytać tej odpowiedzi';" +
+                        "document.querySelector('main').appendChild(n);})()");
+                    Ensure(await EvaluateAsync(core,
+                        "window.__OPENBROWSER_RESPONSE_SIGNALS__.read().visibleError") ==
+                        "response_load_failed", "DIL failure recognized as real UI error");
+                    Ensure(await EvaluateAsync(core,
+                        "window.__OPENBROWSER_RESUME_PROBE__.observe().error") == "true",
+                        "supervisor stops when the UI shows a DIL failure");
+                    await core.ExecuteScriptAsync("document.getElementById('qa-error').remove()");
+                    Ensure(await EvaluateAsync(core,
+                        "window.__OPENBROWSER_RESUME_PROBE__.observe().error") == "false",
+                        "test fixture error can disappear without automatic retry");
                     LiteEventLog.Write("webview_integration_selftest", new {
-                        passed = true, checks = 8, offline = true
+                        passed = true, checks = 11, offline = true
                     });
                     code = 0;
                 }

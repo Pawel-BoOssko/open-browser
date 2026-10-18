@@ -40,6 +40,31 @@ internal sealed partial class ChatGptLiteForm
                     "Open Browser — konfiguracja Luny");
                 return;
             }
+            if (!_resumeEnabled && _browser.CoreWebView2 is { } activeCore)
+            {
+                string chatKey = LiteChatNotes.NormalizeKey(activeCore.Source);
+                if (_resumeLedger.IsTransportQuarantined(chatKey))
+                {
+                    if (!string.IsNullOrEmpty(_lastResponseFailure))
+                    {
+                        _resumeStatus.Text = "Nadzór: aktywny błąd ChatGPT";
+                        return;
+                    }
+                    var approved = MessageBox.Show(this,
+                        "W tym czacie wystąpił błąd dostarczenia. Samo zniknięcie " +
+                        "komunikatu nie oznacza, że odpowiedź została dostarczona.\n\n" +
+                        "Czy sprawdziłeś historię rozmowy i świadomie zezwalasz " +
+                        "na wznowienie nadzoru?",
+                        "Open Browser — ręczne uzgodnienie dostarczenia",
+                        MessageBoxButtons.YesNo, MessageBoxIcon.Warning,
+                        MessageBoxDefaultButton.Button2);
+                    if (approved != DialogResult.Yes) return;
+                    if (_resumeLedger.ClearTransportQuarantineAfterManualReview(chatKey))
+                        LiteEventLog.Write("resume_transport_manual_clear", new {
+                            userConfirmed = true
+                        });
+                }
+            }
             _resumeEnabled = !_resumeEnabled;
             _resumeToggle.Text = _resumeEnabled ? "Nadzór: TEST" : "Nadzór: WYŁ.";
             _resumeStatus.Text = _resumeEnabled ? "Oczekiwanie na testowy czat" :
@@ -86,6 +111,14 @@ internal sealed partial class ChatGptLiteForm
         _resumePolling = true;
         try
         {
+            string observedChat = LiteChatNotes.NormalizeKey(core.Source);
+            if (_resumeLedger.IsTransportQuarantined(observedChat))
+            {
+                _resumeEnabled = false;
+                _resumeToggle.Text = "Nadzór: WYŁ.";
+                _resumeStatus.Text = "Nadzór: ręczna kontrola dostarczenia wymagana";
+                return;
+            }
             var read = core.ExecuteScriptAsync(
                 "window.__OPENBROWSER_RESUME_PROBE__ ? JSON.stringify(window.__OPENBROWSER_RESUME_PROBE__.observe()) : null");
             if (await Task.WhenAny(read, Task.Delay(6500)) != read)
@@ -147,6 +180,7 @@ internal sealed partial class ChatGptLiteForm
             });
             if (advice.Decision != "continue") return;
             if (!IsApprovedTestChat(core.Source) ||
+                _resumeLedger.IsTransportQuarantined(chat) ||
                 !string.IsNullOrEmpty(_lastResponseFailure) ||
                 !await RevalidateResumeBeforeSendAsync(core, chat, decision.ResponseHash))
             {

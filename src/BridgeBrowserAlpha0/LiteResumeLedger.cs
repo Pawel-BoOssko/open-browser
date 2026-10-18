@@ -23,6 +23,9 @@ internal sealed class LiteResumeLedger
     {
         public int Schema { get; set; } = 1;
         public List<Receipt> Receipts { get; set; } = new();
+        public bool TransportQuarantined { get; set; }
+        public string TransportErrorKind { get; set; } = "";
+        public DateTimeOffset? TransportBlockedAtUtc { get; set; }
     }
 
     private readonly string _folder;
@@ -73,6 +76,34 @@ internal sealed class LiteResumeLedger
         finally { if (File.Exists(staging)) File.Delete(staging); }
     }
 
+    internal bool IsTransportQuarantined(string key) => Read(key).TransportQuarantined;
+
+    internal bool QuarantineTransport(string key, string errorKind)
+    {
+        if (errorKind is not ("delivery_timeout" or "response_load_failed"))
+            return false;
+        Store store = Read(key);
+        if (store.TransportQuarantined) return false;
+        store.TransportQuarantined = true;
+        store.TransportErrorKind = errorKind;
+        store.TransportBlockedAtUtc = DateTimeOffset.UtcNow;
+        Write(key, store);
+        return true;
+    }
+
+    // This must ONLY be called after an explicit manual reconciliation of the
+    // browser's conversation history, never on timeout clearance or restart.
+    internal bool ClearTransportQuarantineAfterManualReview(string key)
+    {
+        Store store = Read(key);
+        if (!store.TransportQuarantined) return false;
+        store.TransportQuarantined = false;
+        store.TransportErrorKind = "";
+        store.TransportBlockedAtUtc = null;
+        Write(key, store);
+        return true;
+    }
+
     internal bool WasReviewed(string key, string responseHash)
     {
         return Read(key).Receipts.Any(r => r.ResponseHash == responseHash);
@@ -86,6 +117,7 @@ internal sealed class LiteResumeLedger
             decision is not ("continue" or "wait" or "ask_user" or "stop"))
             throw new ArgumentException("Invalid continuation receipt");
         Store store = Read(key);
+        if (store.TransportQuarantined) return null;
         if (store.Receipts.Any(r => r.ResponseHash == responseHash)) return null;
         var at = now ?? DateTimeOffset.UtcNow;
         if (store.Receipts.Count(r => r.CreatedUtc > at.AddHours(-1)) >= 2)
@@ -106,6 +138,7 @@ internal sealed class LiteResumeLedger
     internal bool MarkSendingUncertain(string key, string receiptId)
     {
         Store store = Read(key);
+        if (store.TransportQuarantined) return false;
         var receipt = store.Receipts.FirstOrDefault(r =>
             r.Id == receiptId && r.Status == Phase.Reviewed &&
             r.Decision == "continue");

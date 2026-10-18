@@ -74,6 +74,22 @@ internal sealed partial class ChatGptLiteForm
             string failure = root.GetProperty("visibleError").ValueKind == JsonValueKind.String
                 ? root.GetProperty("visibleError").GetString() ?? "" : "";
             bool generating = root.GetProperty("generatingSignal").GetBoolean();
+            // Quarantine per chat on EVERY observation, not just a failure
+            // transition. The same error can be visible in two different chats.
+            if ((failure is "delivery_timeout" or "response_load_failed") &&
+                Uri.TryCreate(core.Source, UriKind.Absolute, out var currentUri) &&
+                currentUri.Host == "chatgpt.com" &&
+                currentUri.AbsolutePath.StartsWith("/c/", StringComparison.OrdinalIgnoreCase))
+            {
+                string chatKey = LiteChatNotes.NormalizeKey(core.Source);
+                if (_resumeLedger.QuarantineTransport(chatKey, failure))
+                    LiteEventLog.Write("resume_transport_quarantined", new {
+                        errorKind = failure, requiresManualReview = true
+                    });
+                _resumeEnabled = false;
+                _resumeToggle.Text = "Nadzór: WYŁ.";
+                _resumeStatus.Text = "Nadzór: blokada po błędzie dostarczenia";
+            }
             if (failure != _lastResponseFailure)
             {
                 var assessment = LiteDeliveryEvidence.Classify(new(
