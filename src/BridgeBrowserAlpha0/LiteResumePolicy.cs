@@ -35,14 +35,17 @@ internal sealed class LiteResumePolicy
             return new("observing", "The assistant text changed", hash, false);
         }
         _samples++;
-        if (value.Error)
-            return new("error", "A visible page error must be investigated", hash, false);
-        if (value.Generating || value.ToolBusy)
-            return new("busy", "Model or tool is still running", hash, false);
-        if (value.HasDraft)
-            return new("draft", "Do not overwrite an unsent user message", hash, false);
-        if (!value.ComposerReady)
-            return new("unavailable", "Composer not ready", hash, false);
+        if (value.Error || value.Generating || value.ToolBusy ||
+            value.HasDraft || !value.ComposerReady)
+        {
+            // Do not count busy time toward a stable finished answer.
+            _sinceUtc = value.AtUtc;
+            _samples = 0;
+            string state = value.Error ? "error" :
+                (value.Generating || value.ToolBusy) ? "busy" :
+                value.HasDraft ? "draft" : "unavailable";
+            return new(state, "Page is not verified idle", hash, false);
+        }
         if (value.LastRole != "assistant" || string.IsNullOrWhiteSpace(value.VisibleText) ||
             value.VisibleText.Length < 12)
             return new("no_final_answer", "Last assistant answer is not available", hash, false);

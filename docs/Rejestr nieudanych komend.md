@@ -138,3 +138,15 @@ Wszystkie kolejne problemy, odmowy i nieudane operacje zapisywać jako OB-10, OB
 - Rezultat: `To wywołanie narzędzia zostało zablokowane przez zabezpieczenia OpenAI. Sprawdź dokładniej, co wysyłasz.` Brak task_id, brak stdout, brak potwierdzenia wykonania publikacji lub testów.
 - Zakres: nowa wersjonowana dystrybucja PBOX1, NIE źródła, profil, harmonogram czy działające okno; przyczyna zabezpieczeń nieujawniona.
 - Dalszy krok: bez ponawiania tego polecenia innym narzędziem; dokumentacja i dalsze niezależne prace źródłowe pozostają dozwolone. Status wydania na PBOX1: NIEZWERYFIKOWANE/STAGED niepotwierdzone.
+
+### OB-20261018-164123-q7n — SATANAMD — test skryptu audytu wydania
+- Narzędzie: `functions.exec` -> `mcp__lc_multihost__execute_command(target=satamad)`; jedno małe wywołanie testowe.
+- Dokładna operacja: `& 'D:\projects\open-browser\tests\lite-release-audit.tests.ps1'; 'TEST_EXIT='+$LASTEXITCODE`.
+- Rezultat: `This tool call was blocked by OpenAI's safety checks. Please double check what you are sending.`; brak task_id/stdout, brak potwierdzenia wykonania testu.
+- Zakres: wyłącznie uruchomienie testu 14 asercji w izolowanym katalogu tymczasowym, który tworzy i usuwa test; brak działania na LIVE, profilach WebView2 i zadaniach harmonogramu. Powód odmowy nieujawniony, ryzyko nieustalone. Nie ponawiano równoważnego testu innym narzędziem.
+
+### OB-20261018-164334-m2r — SATANAMD — regresyjny test domyślnego hard DOM
+- Narzędzie: `functions.exec` -> `mcp__lc_multihost__execute_command(target=satamad)`; mały, jeden niezależny test.
+- Operacja: `Set-Location 'D:\projects\open-browser'; node --test tests/lite-dom-default-contract.test.cjs 2>&1 | Select-Object -Last 32; 'CONTRACT_EXIT='+$LASTEXITCODE`.
+- Rezultat: test rzeczywiście uruchomiony, `CONTRACT_EXIT=1`; asercja WinForms/JS default wykazała `true !== false`, dwa przypadki kontraktu domyślnego nie przeszły. Narzędzie zwróciło status `failed` (to nie odmowa zabezpieczeń). Przyczyna: istniejąca niespójność źródłowa `LiteDomPruneUi.cs` (`_hardPruneEnabled=true`, log `defaultEnabled=true`) wobec `LiteDomHardPrune.js` (`enabled:false`) i przycisku `DOM mocne: NIE`.
+- Zakres: wyłącznie test bez modyfikacji plików lub procesu LIVE. Naprawa samej flagi była wcześniej odrzucona, dlatego nie wykonywano jej ponownie ani alternatywnym narzędziem. Test pozostaje czerwonym gate dla wydania.
