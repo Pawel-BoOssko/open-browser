@@ -131,3 +131,10 @@ Wszystkie kolejne problemy, odmowy i nieudane operacje zapisywać jako OB-10, OB
 - Treść: uporządkowanie wymagań: szyfrowane notatki/dyktowanie per czat, ochrona przed dublowaniem, ograniczone karty WebView2, agresywny DOM, diagnoza znikających odpowiedzi, ikona i odzyskiwanie okna; wskazanie istniejących checkpointów i otwartych testów.
 - Wynik: `To wywołanie narzędzia zostało zablokowane przez zabezpieczenia OpenAI.` Bez potwierdzenia modyfikacji Field Notes.
 - Zakres: wyłącznie aktualizacja dokumentu Field Notes. Wymagania i ich status są wcześniej utrwalone w `docs/design/openbrowser-master-plan-2026-10-18.md` i `docs/openbrowser-checkpoint-2026-10-18-1552.md`. Nie wykonano próby obejścia.
+
+### OB-16 — 2026-10-18 ~15:56 — PBOX1 zbiorczy publish i selftest wydania
+- Narzędzie: `functions.exec` → `mcp__lc_multihost__execute_command(target=pbox1)`.
+- Rozmiar: duża, ale jednocelowa operacja wydaniowa zawierająca `dotnet publish <C:\Users\pboru\Documents\Projects\open-browser-lite-source\src\BridgeBrowserAlpha0\BridgeBrowserAlpha0.csproj> -c Release -f net8.0-windows --self-contained false --no-restore --output %LOCALAPPDATA%\Programs\OpenBrowserChatGPTLite_20261018_1556_outbox_tabs --verbosity quiet -m:1 /p:UseSharedCompilation=false`, następnie kontrola istnienia exe, osiem `Start-Process exe --lite-*-selftest -Wait` i odczyt działającego PID. Bez zatrzymywania/aktualizacji LIVE lub profilów.
+- Rezultat: `To wywołanie narzędzia zostało zablokowane przez zabezpieczenia OpenAI. Sprawdź dokładniej, co wysyłasz.` Brak task_id, brak stdout, brak potwierdzenia wykonania publikacji lub testów.
+- Zakres: nowa wersjonowana dystrybucja PBOX1, NIE źródła, profil, harmonogram czy działające okno; przyczyna zabezpieczeń nieujawniona.
+- Dalszy krok: bez ponawiania tego polecenia innym narzędziem; dokumentacja i dalsze niezależne prace źródłowe pozostają dozwolone. Status wydania na PBOX1: NIEZWERYFIKOWANE/STAGED niepotwierdzone.
