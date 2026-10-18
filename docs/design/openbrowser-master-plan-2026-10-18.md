@@ -90,3 +90,19 @@ Dokument źródłowy: docs/design/openbrowser-control-center-analysis-2026-10-18
 - [DONE] SATANAMD: `dotnet build Debug --no-restore` PASS (0 błędów, znane MSB3277); `Start-Process BridgeBrowserAlpha0.exe --lite-projects-selftest -Wait -PassThru` zakończył się kodem 0; Node test DOM 5 PASS.
 - [PARTIAL] PBOX1 sklonował kod do rewizji 624fb2f i zbudował w katalogu `%LOCALAPPDATA%\Programs\OpenBrowserChatGPTLite_20261018_projects_dom`; PUBLISH_EXIT 0, JS test 5 PASS. Obecnego procesu przeglądarki NIE zamknięto, ponieważ aktywny użytkownik prowadzi w nim rozmowę. Program jest przygotowany side-by-side, nie raportować nowego dashboardu jako już widocznego.
 - [BLOCKED] Próba `functions.exec` zawierająca dwa wywołania `Remote_Desktop_Commander__edit_block` w dokumentach `docs/agent/current-state_new.md` i `docs/agent/architecture-decisions_new.md` została odrzucona przez zabezpieczenia; nie potwierdzono wykonania żadnego edytowania. Zapis w niniejszym planie jest alternatywnym checkpointem merytorycznym, nie powtórzeniem zablokowanej operacji. Czynności systemowych nie wykonywano tym wywołaniem.
+
+## Checkpoint pakiet C — zaszyfrowane przyrostowe kopie
+- [DONE] Źródło `LiteSecureArchive.cs`: Windows DPAPI CurrentUser, tylko szyfrogramy .dpapi w katalogu %LOCALAPPDATA%/OpenBrowser/ChatGPT-Lite/archive, zapis append-only odrębnych wersji z czasem i skrótem SHA-256, deduplikacja identycznych wiadomości, retencja 30 dni.
+- [DONE] Źródło `LiteConversationSnapshot.js`: wybiera najwyżej dwie ostatnie widoczne wiadomości assistant w otwartym czacie chatgpt.com, nie odczytuje konta / cookies / historii sieciowej. 5 testów Node PASS.
+- [DONE] Źródło `LiteConversationCaptureUi.cs` i integracja ChatGptLiteForm: cykliczny odczyt co 12 s, single-flight, timeout renderera nie wywołuje restartu; przycisk wyłączenia kopiowania.
+- [DONE] SATANAMD Debug build 0 błędów, Node testy DOM 5 PASS + snapshot 5 PASS. Tryb rejestru project selftest PASS.
+- [PARTIAL] Pierwszy eksperymentalny test CryptProtectData/CryptUnprotectData przez PowerShell 7 na SATANAMD wywołał obie funkcje i zwrócił ciphertext 326 bajtów, ale porównanie wywołało błąd skryptu (AsSpan nie jest PowerShell method). Nie uznawać testu round-trip za potwierdzony.
+- [BLOCKED] Próba RDC edit_block dodania 5 testów DPAPI do `LiteSelfTest.cs` była jedną małą modyfikacją tekstową, zablokowaną przez OpenAI safety. Nie powtórzono zmiany innym narzędziem.
+- [BLOCKED] Skorygowany test DPAPI PS7 przez LC MultiHost SATANAMD wisiał ponad 100 s; `cancel_current_command` zakończył go i odtworzył sesję. Wynik testu nieznany; nie powtarzać identycznej operacji. Sam kod aplikacji nadal nie był wdrożony produkcyjnie na PBOX1.
+
+## Checkpoint pakiet D — ręczny odczyt archiwum
+- [DONE] Dodano `LiteArchiveViewer.cs`: ręcznie otwierany lokalny panel 300 najnowszych zaszyfrowanych kopii; odszyfrowanie DPAPI na żądanie, tekst tylko w read-only TextBox i przycisk kopiowania do schowka. Nie wstrzykuje kopii z powrotem do web ChatGPT.
+- [DONE] W ChatGptLiteForm.cs przycisk `Archiwum` i `Kopie: włączone/wyłączone` oraz jeden aktywny WebView2. Zapis nie jest uzależniony od API zewnętrznego ani działania chatu narzędzi.
+- [DONE] SATANAMD: Node DOM test 5 PASS, Node Snapshot test 5 PASS, dotnet Debug build 0 błędów / 1 historyczne MSB3277, `--lite-projects-selftest` 0.
+- [PARTIAL] Szyfrowanie w lokalnym .NET Windows wymaga jeszcze potwierdzenia odczytu kompletnego archiwum użytkownika na PBOX1 po aktywacji wersji; wcześniejsze dwie próby diagnostyczne PS7 były niejednoznaczne/zawieszone. Nie oznaczać end-to-end snapshot decrypt jako PASS.
+- [NEXT] Bezpieczny rollout PBOX1 side-by-side z zachowaniem profilu i bez przerywania aktywnego czatu, weryfikacja procesów/logów po naturalnym uruchomieniu wersji.

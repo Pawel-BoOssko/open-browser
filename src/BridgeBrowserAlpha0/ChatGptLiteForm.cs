@@ -24,6 +24,7 @@ internal sealed partial class ChatGptLiteForm : Form
     private readonly Button _forward = new() { Text = "Dalej", Width = 85 };
     private readonly Button _reload = new() { Text = "Odśwież", Width = 95 };
     private readonly Button _home = new() { Text = "ChatGPT", Width = 95 };
+    private readonly Button _openArchive = new() { Text = "Archiwum", Width = 90 };
     private readonly Label _status = new()
     {
         AutoSize = true,
@@ -47,7 +48,7 @@ internal sealed partial class ChatGptLiteForm : Form
             WrapContents = false,
             AutoScroll = true
         };
-        toolbar.Controls.AddRange(new Control[] { _back, _forward, _reload, _home, _domToggle, _status, _domInfo });
+        toolbar.Controls.AddRange(new Control[] { _back, _forward, _reload, _home, _domToggle, _archiveToggle, _openArchive, _status, _domInfo });
         var content = new SplitContainer
         {
             Dock = DockStyle.Fill,
@@ -66,6 +67,7 @@ internal sealed partial class ChatGptLiteForm : Form
         _forward.Enabled = false;
         _reload.Click += (_, _) => _browser.CoreWebView2?.Reload();
         _home.Click += (_, _) => _browser.CoreWebView2?.Navigate(HomeUrl);
+        _openArchive.Click += (_, _) => new LiteArchiveViewer().Show(this);
         _back.Click += (_, _) =>
         {
             if (_browser.CanGoBack) _browser.GoBack();
@@ -83,6 +85,7 @@ internal sealed partial class ChatGptLiteForm : Form
             await ApplyDomModeAsync();
         };
         _domMonitor.Tick += async (_, _) => await PollDomAsync();
+        InitializeCapture();
 
         LiteEventLog.PruneOldFiles();
         LiteEventLog.Write("window_constructed", new { version = Application.ProductVersion });
@@ -97,6 +100,7 @@ internal sealed partial class ChatGptLiteForm : Form
         {
             _heartbeat.Stop();
             _domMonitor.Stop();
+            _captureTimer.Stop();
             LiteEventLog.Write("window_closing");
         };
         Load += async (_, _) => await InitializeBrowserAsync();
@@ -126,6 +130,7 @@ internal sealed partial class ChatGptLiteForm : Form
             string domScript = await File.ReadAllTextAsync(domScriptFile);
             await core.AddScriptToExecuteOnDocumentCreatedAsync(domScript);
             LiteEventLog.Write("dom_observer_installed");
+            await InstallCaptureScriptAsync(core);
 
             core.NavigationStarting += (_, e) =>
             {
@@ -155,6 +160,7 @@ internal sealed partial class ChatGptLiteForm : Form
 
             core.Navigate(HomeUrl);
             _domMonitor.Start();
+            _captureTimer.Start();
         }
         catch (Exception ex)
         {
