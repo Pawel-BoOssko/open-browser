@@ -39,15 +39,19 @@ internal sealed class LiteLunaAdvisor
     internal static string? ConfiguredModel =>
         Environment.GetEnvironmentVariable("OPENBROWSER_LUNA_MODEL",
             EnvironmentVariableTarget.User) ??
-        Environment.GetEnvironmentVariable("OPENBROWSER_LUNA_MODEL");
+        Environment.GetEnvironmentVariable("OPENBROWSER_LUNA_MODEL") ??
+        "gpt-6-luna"; // Model configured in OpenFill; overridable.
 
     internal static bool HasCredentials =>
-        !string.IsNullOrWhiteSpace(GetKey()) &&
+        (!string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("OPENAI_API_KEY")) ||
+         !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("OPENAI_API_KEY", EnvironmentVariableTarget.User)) ||
+         LiteApiCredential.IsSharedKeyAvailable()) &&
         !string.IsNullOrWhiteSpace(ConfiguredModel);
 
     private static string? GetKey() =>
         Environment.GetEnvironmentVariable("OPENAI_API_KEY") ??
-        Environment.GetEnvironmentVariable("OPENAI_API_KEY", EnvironmentVariableTarget.User);
+        Environment.GetEnvironmentVariable("OPENAI_API_KEY", EnvironmentVariableTarget.User) ??
+        LiteApiCredential.ReadSharedKey();
 
     internal async Task<Advice?> ProposeAsync(string lastAnswer,
         string backlogSummary, CancellationToken cancellation)

@@ -66,7 +66,7 @@ internal sealed partial class ChatGptLiteForm : Form
             WrapContents = false,
             AutoScroll = true
         };
-        toolbar.Controls.AddRange(new Control[] { _buildVersion, _resumeToggle, _resumeStatus, _back, _forward, _reload, _home, _domToggle, _hardPruneToggle, _archiveToggle, _openArchive, _status, _domInfo });
+        toolbar.Controls.AddRange(new Control[] { _buildVersion, _highIndicator, _resumeToggle, _resumeStatus, _back, _forward, _reload, _home, _domToggle, _hardPruneToggle, _archiveToggle, _openArchive, _status, _domInfo });
         var content = new SplitContainer
         {
             Dock = DockStyle.Fill,
@@ -117,6 +117,7 @@ internal sealed partial class ChatGptLiteForm : Form
         InitializeCapture();
         InitializeHardPruneUi();
         InitializeResumeUi();
+        InitializeHighUi();
 
         LiteEventLog.PruneOldFiles();
         LiteEventLog.Write("window_constructed", new { version = Application.ProductVersion });
@@ -140,6 +141,7 @@ internal sealed partial class ChatGptLiteForm : Form
             _captureTimer.Stop();
             _responseTimer.Stop();
             _resumeTimer.Stop();
+            _highTimer.Stop();
             _pruneReportTimer.Stop();
             _noteSaveTimer.Stop();
             DisposeWindowRecovery();
@@ -185,6 +187,7 @@ internal sealed partial class ChatGptLiteForm : Form
             await InstallResponseDiagnosticsAsync(core);
             await InstallHardPruneScriptAsync(core);
             await InstallResumeScriptsAsync(core);
+            await InstallHighScriptAsync(core);
 
             core.NavigationStarting += (_, e) =>
             {
@@ -220,6 +223,8 @@ internal sealed partial class ChatGptLiteForm : Form
             _responseTimer.Start();
             _pruneReportTimer.Start();
             _resumeTimer.Start();
+            _highTimer.Start();
+            _ = VerifyHighAsync();
         }
         catch (Exception ex)
         {

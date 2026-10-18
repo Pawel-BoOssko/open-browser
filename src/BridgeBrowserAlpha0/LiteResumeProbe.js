@@ -23,7 +23,9 @@
     const modelModes = Array.from(d.querySelectorAll('button')).slice(-45)
       .map(button => String(button.innerText || button.textContent || '').trim().toLowerCase())
       .filter(value => /^(high|instant|medium|extra high)$/.test(value));
-    const reasoningMode = modelModes.length ? modelModes[modelModes.length - 1] : 'unknown';
+    const verified = w.__OPENBROWSER_HIGH_GUARD__?.audit();
+    const reasoningMode = verified ? verified.mode :
+      (modelModes.length ? modelModes[modelModes.length - 1] : 'unknown');
     return {
       reasoningMode,
       location: w.location.pathname,
