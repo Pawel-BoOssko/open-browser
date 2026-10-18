@@ -60,7 +60,7 @@ Pola obowiązkowe dla wszystkich dalszych wpisów: identyfikator; czas; narzędz
 - Dalsza decyzja: nie powtarzać równoważnej edycji bez analizy.
 
 ## Rejestr od tej chwili
-Wszystkie kolejne problemy, odmowy i nieudane operacje zapisywać jako OB-10, OB-11 itd. Rozróżniać **odmowę zabezpieczeń** od błędu kodu, timeoutu, braku uprawnień i ostrzeżenia kompilacji. Brak informacji o przyczynie => „nieustalona”, bez wymyślania oceny zagrożenia.
+Historyczne wpisy OB-10 i OB-11 zachowują swój numer. Nowym zdarzeniom należy nadawać unikalne identyfikatory `OB-YYYYMMDD-HHMMSS-sufiks` zamiast ponownego używania OB-12–OB-15; zduplikowane stare numery zostały uporządkowane 18.10.2026 z zachowaniem aliasów historycznych. Rozróżniać **odmowę zabezpieczeń** od błędu kodu, timeoutu, braku uprawnień i ostrzeżenia kompilacji. Brak informacji o przyczynie => „nieustalona”, bez wymyślania oceny zagrożenia.
 
 ### OB-10 — 2026-10-18 ~15:11 — LC MultiHost PBOX1 — aktualizacja zadania startowego
 - Narzędzie: `functions.exec` -> `mcp__lc_multihost__execute_command(target=pbox1)`.
