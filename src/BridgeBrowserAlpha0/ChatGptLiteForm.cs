@@ -1,17 +1,24 @@
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
+using System.Text.Json;
 
 namespace BridgeBrowserAlpha0;
 
 /// <summary>
 /// One-tab ChatGPT test shell. Deliberately does not initialize the OpenBridge
-/// executor, PageTap, network inspection, conversation trimming, or injection.
+/// executor, PageTap, network inspection, or response interception.
+/// It has an isolated, non-destructive DOM paint optimization.
 /// </summary>
-internal sealed class ChatGptLiteForm : Form
+internal sealed partial class ChatGptLiteForm : Form
 {
     private const string HomeUrl = "https://chatgpt.com/";
     private readonly WebView2 _browser = new() { Dock = DockStyle.Fill };
     private readonly System.Windows.Forms.Timer _heartbeat = new() { Interval = 30000 };
+    private readonly System.Windows.Forms.Timer _domMonitor = new() { Interval = 30000 };
+    private readonly Button _domToggle = new() { Text = "DOM: włączony", Width = 125 };
+    private readonly Label _domInfo = new() { AutoSize = true, Padding = new Padding(8, 8, 0, 0), Text = "DOM: oczekiwanie" };
+    private bool _domEnabled = true;
+    private bool _domProbePending;
     private DateTimeOffset _lastHeartbeat = DateTimeOffset.UtcNow;
     private readonly Button _back = new() { Text = "Wstecz", Width = 90 };
     private readonly Button _forward = new() { Text = "Dalej", Width = 85 };
@@ -40,8 +47,18 @@ internal sealed class ChatGptLiteForm : Form
             WrapContents = false,
             AutoScroll = true
         };
-        toolbar.Controls.AddRange(new Control[] { _back, _forward, _reload, _home, _status });
-        Controls.Add(_browser);
+        toolbar.Controls.AddRange(new Control[] { _back, _forward, _reload, _home, _domToggle, _status, _domInfo });
+        var content = new SplitContainer
+        {
+            Dock = DockStyle.Fill,
+            Orientation = Orientation.Vertical,
+            SplitterDistance = 270,
+            Panel1MinSize = 205,
+            Panel2MinSize = 400
+        };
+        content.Panel1.Controls.Add(CreateProjectsUi());
+        content.Panel2.Controls.Add(_browser);
+        Controls.Add(content);
         Controls.Add(toolbar);
 
         _back.Enabled = false;
@@ -57,6 +74,15 @@ internal sealed class ChatGptLiteForm : Form
             if (_browser.CanGoForward) _browser.GoForward();
         };
 
+        _domToggle.Click += async (_, _) =>
+        {
+            _domEnabled = !_domEnabled;
+            _domToggle.Text = _domEnabled ? "DOM: włączony" : "DOM: wyłączony";
+            LiteEventLog.Write("dom_mode_changed", new { enabled = _domEnabled });
+            await ApplyDomModeAsync();
+        };
+        _domMonitor.Tick += async (_, _) => await PollDomAsync();
+
         LiteEventLog.PruneOldFiles();
         LiteEventLog.Write("window_constructed", new { version = Application.ProductVersion });
         _heartbeat.Tick += (_, _) =>
@@ -69,6 +95,7 @@ internal sealed class ChatGptLiteForm : Form
         FormClosing += (_, _) =>
         {
             _heartbeat.Stop();
+            _domMonitor.Stop();
             LiteEventLog.Write("window_closing");
         };
         Load += async (_, _) => await InitializeBrowserAsync();
@@ -94,6 +121,10 @@ internal sealed class ChatGptLiteForm : Form
             core.Settings.IsWebMessageEnabled = false;
             core.Settings.AreDevToolsEnabled = false;
             core.Settings.IsStatusBarEnabled = false;
+            string domScriptFile = Path.Combine(AppContext.BaseDirectory, "LiteDomOptimizer.js");
+            string domScript = await File.ReadAllTextAsync(domScriptFile);
+            await core.AddScriptToExecuteOnDocumentCreatedAsync(domScript);
+            LiteEventLog.Write("dom_observer_installed");
 
             core.NavigationStarting += (_, e) =>
             {
@@ -105,6 +136,7 @@ internal sealed class ChatGptLiteForm : Form
                 _status.Text = e.IsSuccess ? "Gotowe" : "Błąd: " + e.WebErrorStatus;
                 LiteEventLog.Write("navigation_completed", new { e.IsSuccess, webError = e.WebErrorStatus.ToString(), host = LiteEventLog.HostOnly(core.Source) });
                 UpdateNavigation();
+                if (!_domEnabled && e.IsSuccess) _ = ApplyDomModeAsync();
             };
             core.HistoryChanged += (_, _) => UpdateNavigation();
             core.ProcessFailed += (_, e) =>
@@ -116,10 +148,12 @@ internal sealed class ChatGptLiteForm : Form
                     exitCode = e.ExitCode
                 });
                 _status.Text = "Błąd procesu strony: " + e.ProcessFailedKind;
+                _domInfo.Text = "DOM: renderer niedostępny";
                 // Preserve session data. The user can use Odśwież to retry.
             };
 
             core.Navigate(HomeUrl);
+            _domMonitor.Start();
         }
         catch (Exception ex)
         {
@@ -127,6 +161,75 @@ internal sealed class ChatGptLiteForm : Form
             _status.Text = "Nie udało się uruchomić";
             MessageBox.Show(this, ex.Message, "Open Browser ChatGPT Lite",
                 MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
+
+    private async Task ApplyDomModeAsync()
+    {
+        var core = _browser.CoreWebView2;
+        if (core is null) return;
+        try
+        {
+            string value = _domEnabled ? "true" : "false";
+            var call = core.ExecuteScriptAsync(
+                "window.__OPENBROWSER_LITE_DOM__?.setEnabled(" + value + ")");
+            if (await Task.WhenAny(call, Task.Delay(5000)) != call)
+            {
+                LiteEventLog.Write("dom_mode_apply_timeout");
+                return;
+            }
+            await call;
+        }
+        catch (Exception ex)
+        {
+            LiteEventLog.Write("dom_mode_apply_failed", new { errorType = ex.GetType().Name });
+        }
+    }
+
+    private async Task PollDomAsync()
+    {
+        var core = _browser.CoreWebView2;
+        if (core is null || _domProbePending) return;
+        if (!Uri.TryCreate(core.Source, UriKind.Absolute, out var url) ||
+            url.Host != "chatgpt.com") return;
+
+        _domProbePending = true;
+        try
+        {
+            var call = core.ExecuteScriptAsync(
+                "window.__OPENBROWSER_LITE_DOM__ ? JSON.stringify(window.__OPENBROWSER_LITE_DOM__.getStatus()) : null");
+            if (await Task.WhenAny(call, Task.Delay(7000)) != call)
+            {
+                _domInfo.Text = "DOM: strona nie odpowiada";
+                LiteEventLog.Write("dom_probe_timeout");
+            }
+            // A single pending probe prevents piling up unresponsive script calls.
+            var raw = await call;
+            var decoded = JsonSerializer.Deserialize<string>(raw);
+            if (string.IsNullOrWhiteSpace(decoded)) return;
+            using var status = JsonDocument.Parse(decoded);
+            var root = status.RootElement;
+            int turns = root.GetProperty("turnCount").GetInt32();
+            int optimized = root.GetProperty("optimized").GetInt32();
+            int duration = root.GetProperty("lastDurationMs").GetInt32();
+            bool supported = root.GetProperty("supported").GetBoolean();
+            _domInfo.Text = supported
+                ? $"DOM: {turns} tur / {optimized} odciążonych"
+                : "DOM: brak content-visibility";
+            LiteEventLog.Write("dom_status", new
+            {
+                turns, optimized, duration, supported,
+                modeEnabled = root.GetProperty("enabled").GetBoolean(),
+                errorCount = root.GetProperty("errorCount").GetInt32()
+            });
+        }
+        catch (Exception ex)
+        {
+            LiteEventLog.Write("dom_probe_failed", new { errorType = ex.GetType().Name });
+        }
+        finally
+        {
+            _domProbePending = false;
         }
     }
 
