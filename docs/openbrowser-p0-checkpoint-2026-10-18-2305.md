@@ -31,3 +31,12 @@
 2. Publikacja v1.67.0 side by side na PBOX1 do nowego katalogu, nowy manifest, 16/16 selftestów, GUI WebView2 w interaktywnej sesji1, bez LIVE restartu.
 3. Jednorazowy helper `--lite-await-upgrade 18412` dopiero po pełnym PASS dla 1.67.0; nie przerywać pracy właściciela.
 4. Prawdziwy test nadzorcy na zalogowanym ChatGPT w Lite nadal do wykonania po zmianie LIVE, z wyraźnie zatwierdzonym czatem testowym, bez wyścigu z innymi czatami tworzącymi rozdziały.
+
+## Weryfikacja STAGED PBOX1 — 2026-10-18 ~23:07 CEST
+- Autosync z SATANAMD przekazał SOURCE na `autosync/SATANAMD` snapshot `22db028afc57c9ec337d1695f34bbe11280a5e8e`; klon PBOX1 czysty, `git pull --ff-only` PASS. Bez commit/push manual.
+- PBOX1 nowy side-by-side `%LOCALAPPDATA%\Programs\OpenBrowserChatGPTLite_v1.67.0_20261018_2305`, `dotnet publish Release` PASS (0 errors, 1 znane MSB3277).
+- EXE ProductVersion `1.67.0+build.20261018T210519Z.22db028...`, SHA256 `FDDA657AEFACC62A182DA593B8F31FAEFF94E4B2394774076740C3A9650D6C58`. `openbrowser-release-manifest.json` obok EXE, channel=staged, SHA+source commit PASS; `check-lite-p0-promotion.ps1` PASS.
+- PBOX1 16/16 headless .NET selftests PASS, w tym nowy trwały transport quarantine. SATANAMD 12/12 JS test suites PASS, promotion gate PASS, build Debug 0 errors.
+- Izolowany rzeczywisty WebView2 PBOX1 w interaktywnej sesji Windows1: `--lite-webview-integration-selftest` EXIT 0; 11 asercji obejmujących High, DIL, jedno wysłanie, potwierdzenie, brak duplikatu, wykrycie i ustąpienie błędu strony.
+- Po tych kontrolach uruchomiono JEDEN techniczny pomocnik `--lite-await-upgrade 18412` z nowego 1.67.0, PID `8444`, SessionId=1. Nie uruchomił drugiego WebView2 i **nie zamknął** procesu v1.64.0 PID18412 (Responding=True). Czeka, aż użytkownik NATURALNIE zamknie bieżące okno; następnie załaduje sprawdzone 1.67.0 tylko jeśli nie ma innej instancji. To nie jest automatyzacja/przypominajka ChatGPT i nie pracuje nad rozmowami bez użytkownika.
+- **Nie oznaczać LIVE=1.67 bez nowego sprawdzenia PID/EXE.** Do rzeczywistego E2E na zalogowanej rozmowie w Lite potrzebna jest jej obecność na ekranie w testowym czacie i brak konfliktu z innymi czatami piszącymi książkę; obecnie autorzy zdążyli już napisać rozdziały 8 i 9, więc nie wysyłać powtórnej prośby.
