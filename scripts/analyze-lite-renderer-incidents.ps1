@@ -1,8 +1,6 @@
 param(
-    [string]$EventsPath = (Join-Path $env:LOCALAPPDATA
-        ('OpenBrowser\ChatGPT-Lite\diagnostics\lite-events-' + (Get-Date -Format 'yyyy-MM-dd') + '.jsonl')),
-    [string]$ResourcesPath = (Join-Path $env:LOCALAPPDATA
-        ('OpenBrowser\ChatGPT-Lite\diagnostics\resources-' + (Get-Date -Format 'yyyy-MM-dd') + '.jsonl')),
+    [string]$EventsPath = (Join-Path $env:LOCALAPPDATA ('OpenBrowser\ChatGPT-Lite\diagnostics\lite-events-' + (Get-Date -Format 'yyyy-MM-dd') + '.jsonl')),
+    [string]$ResourcesPath = (Join-Path $env:LOCALAPPDATA ('OpenBrowser\ChatGPT-Lite\diagnostics\resources-' + (Get-Date -Format 'yyyy-MM-dd') + '.jsonl')),
     [ValidateRange(10,5000)][int]$EventTail = 1500,
     [ValidateRange(5,1000)][int]$ResourceTail = 150
 )

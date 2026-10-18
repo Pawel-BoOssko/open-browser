@@ -22,6 +22,12 @@ internal static class LiteDeliveryEvidenceSelfTest
                 "renderer_or_js_unresponsive", "renderer failure");
             Check(LiteDeliveryEvidence.Classify(O(js: false)).Code ==
                 "renderer_or_js_unresponsive", "JS failure");
+            var savedThenHung = LiteDeliveryEvidence.Classify(O(
+                renderer: false, visible: true, saved: true, http: 200));
+            Check(savedThenHung.Code == "renderer_or_js_unresponsive" &&
+                savedThenHung.ContentLocallyRecoverable &&
+                !savedThenHung.ServerDeliveryProven,
+                "previous snapshot must not hide current renderer failure");
             Check(LiteDeliveryEvidence.Classify(O(http: 502)).Code ==
                 "backend_http_error_observed", "HTTP 502");
             Check(LiteDeliveryEvidence.Classify(O(http: 200)).Code ==

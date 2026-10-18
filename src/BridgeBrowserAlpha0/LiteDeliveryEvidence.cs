@@ -19,15 +19,17 @@ internal static class LiteDeliveryEvidence
     internal static Assessment Classify(Observation o)
     {
         bool saved = o.SnapshotPersisted == true;
+        // Current renderer/JS failure takes precedence over an earlier local
+        // snapshot: a stale saved fragment cannot prove the current response.
+        if (o.RendererResponsive == false || o.JavaScriptResponsive == false)
+            return new("renderer_or_js_unresponsive", "medium_local", saved, false,
+                "Check WebView2 process lifecycle and memory pressure");
         if (saved && o.AnswerVisible == true)
             return new("visible_and_archived", "high_local", true, false,
                 "Compare later chat render with encrypted snapshot digest");
         if (saved && o.AnswerVisible == false)
             return new("archived_but_not_visible", "high_local", true, false,
                 "Inspect encrypted local archive and renderer state");
-        if (o.RendererResponsive == false || o.JavaScriptResponsive == false)
-            return new("renderer_or_js_unresponsive", "medium_local", saved, false,
-                "Check WebView2 process lifecycle and memory pressure");
         if (o.BackendHttpStatus is >= 400 and <= 599)
             return new("backend_http_error_observed", "high_http", saved, false,
                 "Correlate endpoint metadata and request timing");
