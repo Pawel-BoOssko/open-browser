@@ -26,7 +26,11 @@
       if (error) break;
     }
     if (!error) {
-      for (const node of Array.from(turns).slice(-3)) {
+      // Never interpret a user's quote of an error as a browser failure.
+      // Inline assistant failure placeholders are short; long assistant text
+      // discussing an error is not evidence that the UI itself failed.
+      for (const node of Array.from(assistants).slice(-3)) {
+        if (String(node.textContent || "").trim().length > 180) continue;
         error = inspectNode(node);
         if (error) break;
       }

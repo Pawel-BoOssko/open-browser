@@ -7,6 +7,7 @@ $checks = @(
     'lite-resume-agent.test.cjs',
     'lite-resume-send-race.test.cjs',
     'lite-high-guard.test.cjs',
+    'lite-response-signals.test.cjs',
     'lite-dom-default-contract.test.cjs',
     'lite-dom-hard-prune.test.cjs'
 )

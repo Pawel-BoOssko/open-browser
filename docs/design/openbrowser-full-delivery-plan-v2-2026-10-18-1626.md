@@ -27,9 +27,9 @@ Zakres: do ukończenia WSZYSTKICH omówionych funkcji. Priorytety uporządkowane
 ## P1: diagnostyka i zachowanie rozmów
 12. [PARTIAL] Zewnętrzny monitor CPU/RAM co 2 minuty przetrwał reboot, metryki i logowanie; rozszerzyć o normalized CPU/process trees, private bytes, commit, progi niedoboru RAM.
 13. [PARTIAL] Lite event log WebView2/lifecycle, DOM obserwatory, błędy renderowania, DPAPI archive; połączyć telemetrię etapów żądania -> UI -> snapshot, korelacje bez payloadów.
-14. [TODO] „Nie udało się wczytać odpowiedzi”: porównanie etapów transportu, WebSocket, React, renderera, archiwum oraz kodu błędu z confidence i dowodem tego, co realnie dotarło. Nie udawać wiedzy o backendzie.
+14. [PARTIAL: analizator incydentów SOURCE i realny odczyt logów PBOX1, dalsza korelacja nadal TODO] „Nie udało się wczytać odpowiedzi”: porównanie etapów transportu, WebSocket, React, renderera, archiwum oraz kodu błędu z confidence i dowodem tego, co realnie dotarło. Nie udawać wiedzy o backendzie.
 15. [TODO] Gwarantowany prywatny checkpoint widocznej odpowiedzi w trakcie streamu, samoweryfikacja i wybiórcze odtwarzanie fragmentów; osobne backupy, policy retencji.
-16. [PARTIAL] DOM: CSS content-visibility, hard prune starszych 24/90, porównać core-v06; testy React E2E, feature flag, rollback przy utracie responsywności.
+16. [PARTIAL / PROBLEM CONFIRMED] DOM: przy realnej długiej rozmowie PBOX1 w 136 ostatnich próbkach telemetrii występowało 0 rozpoznanych tur / 0 odciążonych, mimo obsługi CSS content-visibility — obecny selektor `[data-testid^="conversation-turn-"]` nie jest wiarygodny dla bieżącej struktury strony (albo w danym widoku tur nie ma). SOURCE LiteDomSelectorAudit.js jest wyłącznie metadanym odczytem alternatywnych selektorów, 4 syntetyczne testy PASS; do rzeczywistego DOM QA i korelacji z `[data-message-author-role]`, bez zawartości rozmów. Dopiero po weryfikacji React E2E bezpiecznie przycinać starsze wiadomości (24/90), z wyłączonym wysyłaniem w trakcie streamingu, zapisem checkpointów i rollbackiem.
 17. [TODO] Zasoby po awarii: eksport raportu dla operatora, timeline, błędy/stany/zwieszenia; zero zapisu sekretów do Git.
 
 ## P2: dashboard i projekty
@@ -39,7 +39,7 @@ Zakres: do ukończenia WSZYSTKICH omówionych funkcji. Priorytety uporządkowane
 21. [PARTIAL] Natywny per-chat panel notatek z Win+H; naprawić microphone permissions web ChatGPT, wznowienie dyktowania, copy, obsługę focus i zapisu.
 22. [PARTIAL] Zaszyfrowana kolejka notatek per czat oraz ack; dołączyć UI i bezpieczne **jednokrotne** przekazanie „Informacje od Pawła:” do właściwego czatu; nie przerywać trwającego tool call.
 23. [TODO] Karty pracy utrzymywane przez adaptacyjny bounded warm pool WebView2 (1 foreground + max 2 warm, według RAM); odstawianie tylko idles, UI notifies.
-24. [TODO] Własny wygląd: logo/ikony, pasek zadań i tray, Ctrl+Tab, widok techniczny, onboarding bez danych kont.
+24. [PARTIAL: SOURCE v1.64.0, Windows QA TODO] Własny wygląd: nowa prosta, czytelna ikona Open Browser w 8 rozmiarach (16–256 px) i embedded .ico w EXE; belka zadania ma pokazywać status Gotowe/Generowanie/Błąd (tooltip/taskbar title). Zgłoszenie operatora 18.10: poprzednia ikona jest brzydka/nieczytelna i na pasku zadań nie widać, co się dzieje. Pozostałe: realne QA przypięcia, aktualizacja pin/cache Windows, natywne nakładki stanu/progress/tray, Ctrl+Tab i onboarding bez danych kont.
 
 ## P3: koordynacja oraz odporność
 25. [TODO] Własny lokalny MCP server z register_chat/heartbeat/task_checkpoint/lead_handoff/report_blocker/notes_ack, z uprawnieniami i kontrolą kto jest kim; nie ufać bezkrytycznie samoopisowi.

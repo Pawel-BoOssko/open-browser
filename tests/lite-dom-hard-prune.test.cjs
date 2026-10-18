@@ -89,4 +89,12 @@ function setup(count, settings = {}) {
   assert.equal(t.list.length, 25);
   assert.equal(t.list.includes(focused), true);
 }
-console.log("LiteDomHardPrune: 9 PASS");
+{
+  const t = setup(10000);
+  const first = t.api.prune();
+  assert.equal(t.list.length, 24, "10k synthetic turns keep only newest 24");
+  assert.equal(first.lastRemoved, 9976);
+  assert.equal(t.list[0].id, 9976, "newest turns retained in correct order");
+  assert.equal(t.api.prune().lastRemoved, 0, "repeated cleanup is idempotent");
+}
+console.log("LiteDomHardPrune: 10 PASS");

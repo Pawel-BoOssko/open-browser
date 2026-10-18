@@ -30,6 +30,16 @@ internal static class LiteDeliveryEvidenceSelfTest
                 "previous snapshot must not hide current renderer failure");
             Check(LiteDeliveryEvidence.Classify(O(http: 502)).Code ==
                 "backend_http_error_observed", "HTTP 502");
+            var archivedButHttpFail = LiteDeliveryEvidence.Classify(O(
+                visible: true, saved: true, http: 502));
+            Check(archivedButHttpFail.Code == "backend_http_error_observed" &&
+                archivedButHttpFail.ContentLocallyRecoverable &&
+                !archivedButHttpFail.ServerDeliveryProven, "HTTP failure precedes saved snippet");
+            var archivedButUiFail = LiteDeliveryEvidence.Classify(O(
+                visible: true, saved: true, error: "delivery_timeout"));
+            Check(archivedButUiFail.Code == "ui_failure_reported" &&
+                archivedButUiFail.ContentLocallyRecoverable,
+                "visible page error precedes saved snippet");
             Check(LiteDeliveryEvidence.Classify(O(http: 200)).Code ==
                 "insufficient_evidence", "HTTP 200 not proof of answer");
             Check(LiteDeliveryEvidence.Classify(O(error: "delivery_timeout")).Code ==

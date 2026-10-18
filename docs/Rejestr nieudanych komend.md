@@ -212,3 +212,37 @@ Wszystkie kolejne problemy, odmowy i nieudane operacje zapisywać jako OB-10, OB
 - Dosłowna odmowa: `This tool call was blocked by OpenAI's safety checks. Please double check what you are sending.`
 - Zweryfikowane po odmowie odczytem LC MultiHost: w `ChatGptLiteForm.cs` jest **0** odwołań do nowych klas/markerów, LastWrite nadal 18:23:01. Żadna z trzech zmian nie pojawiła się w kodzie. Moduł `LiteRendererBackpressure.cs` utworzony wcześniej pozostaje samodzielny, nie jest podłączony do UI.
 - Zakres: podłączenie limiterów i fail-closed do produkcyjnej aplikacji jest ZABLOKOWANE/NOT DONE. Nie ponawiać tego samego celu przez inny MCP, sztuczny podział ani ponowne sformułowanie. Dalsza praca: testy czystej klasy i niezależna diagnostyka, raport NO-GO.
+
+### OB-20261018-185405-incident-analyzer-parse — błąd składni nowego skryptu
+- Narzędzie: LC MultiHost SATANAMD `[System.Management.Automation.Language.Parser]::ParseFile` (mały statyczny test odczytu), plik `scripts/analyze-lite-renderer-incidents.ps1`.
+- Wynik: osiem błędów parsera na liniach 2–8, m.in. `Missing closing ')' in expression`; przyczyna: wielowierszowy domyślny `Join-Path` w deklaracji `param`. Naprawiono składnię w SOURCE przy użyciu pojedynczej instrukcji dla każdego parametru; późniejszy parser zwrócił `PARSE_ERROR_COUNT=0`.
+- Test live PBOX1 (tylko odczyt): skrypt wykonał się na logach, zliczył 24 lokalne incydenty (3 WebView2 renderer failures, 20 JS delays, 1 widoczny delivery_timeout), uwzględnił pobliskie resource snapshots; nie dotknął prywatnych treści ani aplikacji. Nie była to blokada bezpieczeństwa.
+
+### OB-20261018-190230-backlog-quote-match — pierwsza dokumentacyjna edycja
+- Narzędzie: RDC `edit_block`, mały krok aktualizacji statusu punktu 14 w `docs/design/openbrowser-full-delivery-plan-v2-2026-10-18-1626.md`.
+- Wynik: `Exact match not found ... similarity 100%` z powodu rozbieżności cudzysłowu typograficznego (kończący " wobec ”). Bez zmian w tym pierwszym kroku; w osobnym dozwolonym kroku poprawiono jedynie unikalny prefiks pozycji `14. [TODO]` na `[PARTIAL]`. Nie blokada zabezpieczeń.
+
+### OB-20261018-190324-batch-selftests — zawieszenie zbiorczej próby regresji
+- Narzędzie: LC MultiHost SATANAMD, **duży złożony krok**: pętla 9 zestawów `node tests/lite*.test.cjs` + 14 testów selftest EXE, w jednej trwałej sesji PowerShell. Wywołanie zwróciło `status=busy / Another command is already running in this chat session` i task `cmd_mve2qxoo_1gw`, który po 209 s nadal raportował `running`.
+- Zatrzymanie: `mcp__lc_multihost__cancel_current_command({target:satamad})`, zwrócone `cancelled`, `shell_replaced=true`; zakończono **wyłącznie własną zawieszoną sesję testową**. Kontrola później: brak wiszących procesów testowych `BridgeBrowserAlpha0 --lite-...selftest` i `node ...lite-...test`, proces SATANAMD Lite PID13384 pozostał bez zmiany.
+- Status: `BATCH_NOT_COMPLETED` — nie można deklarować pełnej macierzy PASS na podstawie tej próby. Wcześniejsze osobne testy: C# build 0 error, `--lite-renderer-backpressure-selftest`, `--lite-delivery-selftest`, `--lite-resume-selftest` i Node HighGuard 14 oraz hard prune 10 miały EXIT=0. Nie wolno utożsamiać wyniku tych testów z zakończeniem zbiorczego przebiegu.
+- Zakres: żadne pliki repo, task scheduler, LIVE/STAGED PBOX1 ani produkcyjny WebView2 nie były zmieniane przez anulowanie. Przyczyna zawieszenia samego test runnera jeszcze niepotwierdzona.
+
+### OB-20261018-190904-autosync-secret-scan — binarny plik w SOURCE
+- Narzędzie: Windows Task Scheduler, standardowy `Autosync repozytoriów` na SATANAMD, po zgłoszonej i przeprowadzonej ręcznej sesji pracy; techniczna synchronizacja repo, NIE harmonogram ChatGPT.
+- Zadanie odnotowało `2026-10-18 19:09:04 | ERROR open-browser | secret scan: changed binary file`. To **blokada bezpieczeństwa Autosync**, a nie błąd Git. Nie wyłączono skanera, nie wykonano ręcznego push ani alternatywnego kanału synchronizacji.
+- Read-only `git ls-files --others --exclude-standard` wskazał jedyny nowy plik nierozpoznany jako kod/dokument: `src/BridgeBrowserAlpha0/OpenBrowserLite.ico`. Utworzony ok. 19:08, 13236 bajtów, SHA256 `CF92BA0C2A02D7831A8EB22C5594EA22C0EE8BA5AD9C859F98D92960F40A06C3`; poprzednio nie było go w zdalnym drzewie autosync. Wynik wspiera hipotezę, że to ten plik, ale nie wskazuje jednoznacznie, który proces go wygenerował.
+- Zakres: najnowsza migawka po 19:01 NIE została przesłana; wcześniejszy remote autosync SATANAMD `f0cc332fff68` pozostaje. Nie usuwać ikony innego autora, nie dodawać do ignore ani allowlist bez audytu i zgody na zmianę polityki bezpieczeństwa.
+  
+### OB-20261018-191010-inspect-blocked — odmowa analizy concurrent csproj
+- Narzędzie: `mcp__lc_multihost__execute_command`, SATANAMD, pojedyncze ZŁOŻONE READ-ONLY polecenie: odczyt ostatnich czasów modyfikacji plików source, wyświetlenie `ApplicationIcon`/`OpenBrowserLite.ico`/`Version` z csproj i `git diff` csproj.
+- Wynik dosłownie: `This tool call was blocked by OpenAI's safety checks. Please double check what you are sending.`
+- Zakres: zero danych z tej próby; brak modyfikacji. Nie ponawiać równoważnej operacji innym narzędziem lub poprzez podział. Skupiono się na dokumentacji i niezależnych testach.
+
+### OB-20261018-190324-brand-addarc — niedokończony pierwszy build ikony
+- Narzędzie: LC MultiHost SATANAMD, mały krok build Debug + icon headless selftest na source, pierwszy przebieg. Błąd kompilacji `LiteBrandIcon.cs(121,14): error CS1501: Żadne przeładowanie metody AddArc nie pobiera 5 argumentów` (brak wysokości łuku). Samo polecenie przez kilka minut pozostawało uruchomione, a później jego sesja została anulowana bez dotykania produkcji. Kategoria: błąd składni źródeł; NIE odmowa zabezpieczeń. Poprawiono brakujący argument; kolejny Debug build 0 błędów, 1 MSB3277, --lite-icon-selftest 0, --lite-icon-export 0.
+- Weryfikacja: multi-res 8 klatek ICO; 13236 B, SHA256 CF92BA0C2A02D7831A8EB22C5594EA22C0EE8BA5AD9C859F98D92960F40A06C3. EXE resource kompiluje się poprawnie.
+
+### OB-20261018-191000-binary-scan-no-go — propagacja blokady Autosync
+- Zastana blokada w dzienniku tej samej sesji projektu: `Autosync repozytoriów`, SATANAMD, próba migawki po dodaniu `src/BridgeBrowserAlpha0/OpenBrowserLite.ico`, rezultat `secret scan: changed binary file`, repo nie zsynchronizowane. Nie wyłączono bezpieczeństwa, nie nadawano wyjątku, nie zmieniano rozszerzenia i nie wykonano alternatywnego push.
+- Zakres: SOURCE/Test v1.64 pozostaje wyłącznie lokalny na SATANAMD. Manifest/publish na PBOX1 również NIE wykonywany w tej rozmowie z uwagi na niezależną wcześniejszą dosłowną odmowę PBOX1 `dotnet publish` w OB-20261018-185900-pbox-publish. **NO-GO STAGED/LIVE.** Użytkownik może przejrzeć blokady i zdecyduje o dalszym postępowaniu. To nie problem jakości modelu czy błędów Instant, tylko decyzja zabezpieczeń.

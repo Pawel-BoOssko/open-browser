@@ -98,6 +98,11 @@ internal static class Program
             Environment.ExitCode = LiteBrandIcon.Export() ? 0 : 2;
             return;
         }
+        if (args.Any(arg => string.Equals(arg, "--lite-icon-selftest", StringComparison.OrdinalIgnoreCase)))
+        {
+            Environment.ExitCode = LiteBrandIcon.SelfTest();
+            return;
+        }
         bool safeOpen = args.Any(arg => string.Equals(arg, "--lite-open-safely", StringComparison.OrdinalIgnoreCase));
         if (safeOpen && System.Diagnostics.Process.GetProcessesByName("BridgeBrowserAlpha0")
             .Any(process => process.Id != Environment.ProcessId && !process.HasExited))

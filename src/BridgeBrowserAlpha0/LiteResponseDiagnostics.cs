@@ -8,6 +8,7 @@ internal sealed partial class ChatGptLiteForm
     private readonly System.Windows.Forms.Timer _responseTimer = new() { Interval = 20000 };
     private bool _responseProbePending;
     private string _lastResponseFailure = "";
+    private DateTimeOffset? _responseFailureSinceUtc;
     private bool _lastGenerationSignal;
 
     private async Task InstallResponseDiagnosticsAsync(CoreWebView2 core)
@@ -39,6 +40,13 @@ internal sealed partial class ChatGptLiteForm
         };
         _responseTimer.Tick += async (_, _) => await PollResponseDiagnosticsAsync();
         LiteEventLog.Write("response_signals_installed");
+    }
+
+    private void UpdateTaskbarTitle(bool generating, string failure)
+    {
+        string state = failure.Length != 0 ? "Błąd: " + failure :
+            generating ? "Generowanie" : "Gotowe";
+        Text = "Open Browser Lite | " + state + " | " + LiteBuildInfo.Display();
     }
 
     private async Task PollResponseDiagnosticsAsync()
@@ -74,6 +82,10 @@ internal sealed partial class ChatGptLiteForm
                     BackendHttpStatus: null,
                     VisibleError: failure.Length == 0 ? null : failure,
                     GenerationActive: generating));
+                var nowUtc = DateTimeOffset.UtcNow;
+                double? displayedSeconds = failure.Length == 0 && _responseFailureSinceUtc.HasValue
+                    ? Math.Round((nowUtc - _responseFailureSinceUtc.Value).TotalSeconds)
+                    : null;
                 LiteEventLog.Write("response_error_transition", new
                 {
                     state = failure.Length == 0 ? "cleared" : failure,
@@ -81,10 +93,17 @@ internal sealed partial class ChatGptLiteForm
                     evidence = assessment.Code,
                     confidence = assessment.Confidence,
                     serverDeliveryProven = assessment.ServerDeliveryProven,
+                    displayDurationSeconds = displayedSeconds,
+                    phase = "visible_page_error_only",
                     turnCount = root.GetProperty("turnCount").GetInt32()
                 });
                 _lastResponseFailure = failure;
-                if (failure.Length > 0) _status.Text = "ChatGPT: " + failure;
+                _responseFailureSinceUtc = failure.Length > 0 ? nowUtc : null;
+                UpdateTaskbarTitle(generating, failure);
+                if (failure.Length > 0)
+                    _status.Text = "ChatGPT: " + failure + " (dostarczenie niepotwierdzone)";
+                else if (_status.Text.StartsWith("ChatGPT:", StringComparison.Ordinal))
+                    _status.Text = "Gotowe";
             }
             if (generating != _lastGenerationSignal)
             {
@@ -93,6 +112,7 @@ internal sealed partial class ChatGptLiteForm
                     assistantCount = root.GetProperty("assistantCount").GetInt32()
                 });
                 _lastGenerationSignal = generating;
+                UpdateTaskbarTitle(generating, failure);
             }
         }
         catch (Exception ex)

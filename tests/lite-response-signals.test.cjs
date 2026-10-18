@@ -4,7 +4,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
 const script = fs.readFileSync(path.join(__dirname, "../src/BridgeBrowserAlpha0/LiteResponseSignal.js"), "utf8");
-function run(text = "", busy = false, host = "chatgpt.com") {
+function run(text = "", busy = false, host = "chatgpt.com", speaker = "alert") {
   const node = { textContent: text };
   const window = {
     performance: { now: () => 100 },
@@ -12,9 +12,11 @@ function run(text = "", busy = false, host = "chatgpt.com") {
     document: {
       readyState: "complete",
       querySelectorAll(selector) {
-        if (selector.startsWith('[role="alert"]')) return text ? [node] : [];
+        if (selector.startsWith('[role="alert"]'))
+          return speaker === "alert" && text ? [node] : [];
         if (selector.startsWith('[data-testid^="conversation-turn-"]')) return [node];
-        if (selector.startsWith('[data-message-author-role')) return [node];
+        if (selector.startsWith('[data-message-author-role'))
+          return speaker === "user" ? [] : [node];
         throw new Error("Unknown selector: " + selector);
       },
       querySelector(selector) {
@@ -34,4 +36,10 @@ assert.equal(run("Przerwano rozumowanie").visibleError, "reasoning_interrupted")
 assert.equal(run("hello", true).generatingSignal, true);
 assert.equal(run("hello").visibleError, null);
 assert.equal(run("hello", false, "untrusted.com"), undefined);
-console.log("LiteResponseSignal: 7 PASS");
+assert.equal(run("Przekroczono limit czasu dostarczenia wiadomości", false,
+  "chatgpt.com", "user").visibleError, null,
+  "user quoting an error must never trigger a false UI failure");
+assert.equal(run("Przekroczono limit czasu dostarczenia wiadomości ".repeat(8),
+  false, "chatgpt.com", "assistant").visibleError, null,
+  "long assistant text discussing an error is not an error placeholder");
+console.log("LiteResponseSignal: 9 PASS");
