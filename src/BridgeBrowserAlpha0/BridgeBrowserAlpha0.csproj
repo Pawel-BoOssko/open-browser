@@ -23,11 +23,11 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
 
-    <None Include="..\..\..\..\config\humanizer.json">
+    <None Include="..\..\config\humanizer.json">
       <Link>config\humanizer.json</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <Content Include="..\..\app_icon.png">
+    <Content Include="..\..\releases\BridgeBrowserAlpha0\app_icon.png">
       <Link>app_icon.png</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>

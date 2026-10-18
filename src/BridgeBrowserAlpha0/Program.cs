@@ -6,9 +6,10 @@ namespace BridgeBrowserAlpha0;
 internal static class Program
 {
     [STAThread]
-    private static void Main()
+    private static void Main(string[] args)
     {
         ApplicationConfiguration.Initialize();
-        Application.Run(new MainForm());
+        var lite = args.Any(arg => string.Equals(arg, "--chatgpt-lite", StringComparison.OrdinalIgnoreCase));
+        Application.Run(lite ? new ChatGptLiteForm() : new MainForm());
     }
 }
