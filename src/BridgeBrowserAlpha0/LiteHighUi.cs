@@ -74,8 +74,10 @@ internal sealed partial class ChatGptLiteForm
                     LiteEventLog.Write("high_guard_switch_confirmed", new {
                         previous = _effortChangeFrom, actual = mode
                     });
+                    QueueHighReview(_effortChangeFrom, core.Source);
                     _effortChangeFrom = "";
                 }
+                await TryHighReviewAsync(core);
                 return;
             }
 

@@ -28,10 +28,14 @@
       .reverse().find(el => visible(el) &&
         clean(el.getAttribute("aria-label") || el.innerText || el.textContent) === current);
     if (!trigger) return { state: "no_picker", mode: current };
+    // Stop only a demonstrably active lower-effort generation. Never infer it.
+    const stop = w.document.querySelector?.('[data-testid="stop-button"]');
+    let stopped = false;
+    if (stop && !stop.disabled) { stop.click(); stopped = true; }
     trigger.click();
     // React may render the picker options on a later event-loop turn.
     w.setTimeout(chooseHigh, 250);
-    return { state: "high_selection_requested", previous: current };
+    return { state: "high_selection_requested", previous: current, stopRequested: stopped };
   }
   function chooseHigh() {
     const opts = Array.from(w.document.querySelectorAll(
