@@ -38,6 +38,16 @@ internal static class Program
             Environment.ExitCode = LiteNotesOutboxSelfTest.Run();
             return;
         }
+        if (args.Any(arg => string.Equals(arg, "--lite-tabs-selftest", StringComparison.OrdinalIgnoreCase)))
+        {
+            Environment.ExitCode = LiteTabResidencySelfTest.Run();
+            return;
+        }
+        if (args.Any(arg => string.Equals(arg, "--lite-transport-selftest", StringComparison.OrdinalIgnoreCase)))
+        {
+            Environment.ExitCode = LiteTransportSelfTest.Run();
+            return;
+        }
         if (args.Any(arg => string.Equals(arg, "--lite-tab-policy-selftest", StringComparison.OrdinalIgnoreCase)))
         {
             Environment.ExitCode = LiteTabResidencySelfTest.Run();

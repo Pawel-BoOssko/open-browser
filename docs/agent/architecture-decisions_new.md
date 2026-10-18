@@ -44,6 +44,13 @@ Latest:
 
 ## Accepted Decisions
 
+## 2026-10-18 | Encrypted notes queue, no implicit web retries, memory-aware chat tabs
+
+Decision: Keep per-chat operator notes in Windows user-scoped DPAPI storage and queue only new note fragments in an append-progress outbox with encrypted atomic replacements and a backup. Use irreversible delivery state transitions (`Queued` -> `Prepared` -> `DeliveryUncertain` -> `Confirmed`); never auto retry uncertain sends because ChatGPT may already have processed them. Preserve one live WebView2 until multi-WebView runtime is E2E tested; tab pool planner allows 0-2 warm tabs by free RAM but protects pending model generation/tool use/drafts/unsaved notes. Before navigating to another conversation check local notes and page busy state with a bounded probe. Passive network CDP telemetry must never capture request bodies, cookies, tokens, headers or complete URLs.
+
+Status: queue + planner and guard built/tested in SOURCE; queue button and CDP attachment blocked and not active in LIVE. Ref: docs/openbrowser-checkpoint-2026-10-18-1552.md and docs/Rejestr nieudanych komend.md.
+
+
 ## 2026-10-18 | ChatGPT Lite critical event diagnostics preserve message privacy
 
 Decision: Record WebView2 lifecycle failures, renderer hang reasons, navigation outcomes (host only) and UI heartbeat into local UTF-8 JSONL diagnostic files with bounded retention. Avoid capturing message bodies, full conversation URLs, passwords, cookies or tokens. Monitoring must not trigger automatic prompts, cancel model work, or reset the WebView profile. The Lite test shell remains separate from OpenBridge automation.

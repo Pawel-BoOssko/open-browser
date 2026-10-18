@@ -125,3 +125,9 @@ Wszystkie kolejne problemy, odmowy i nieudane operacje zapisywać jako OB-10, OB
 - Rozmiar: zastąpienie dwóch wierszy o instalacji obserwatora odpowiedzi i DOM blokiem ~9 wierszy; wywołanie `LiteTransportDiagnostics(core).InitializeAsync()` z lokalnym try/catch, bez ingerencji w ruch sieciowy.
 - Rezultat: `To wywołanie narzędzia zostało zablokowane przez zabezpieczenia OpenAI.` Nie potwierdzono wykonania zmiany w głównym formularzu.
 - Zakres: jedynie automatyczne podłączenie nowego pasywnego modułu CDP do aktywnego WebView2; odrębny kod `LiteTransportDiagnostics.cs` istnieje, ale nie jest aktywowany. Przyczyna blokady nieznana; nie powtarzać równoważnej zmiany innym narzędziem.
+
+### OB-15 — 2026-10-18, zgłoszenie aktualnych obserwacji do Field Notes
+- Narzędzie: `functions.exec` → `Remote_Desktop_Commander__edit_block`, jedna mała podmiana nagłówka `## Entries` na nagłówek i wpis operatora w `docs/feedback/field-notes_new.md` (~4 akapity).
+- Treść: uporządkowanie wymagań: szyfrowane notatki/dyktowanie per czat, ochrona przed dublowaniem, ograniczone karty WebView2, agresywny DOM, diagnoza znikających odpowiedzi, ikona i odzyskiwanie okna; wskazanie istniejących checkpointów i otwartych testów.
+- Wynik: `To wywołanie narzędzia zostało zablokowane przez zabezpieczenia OpenAI.` Bez potwierdzenia modyfikacji Field Notes.
+- Zakres: wyłącznie aktualizacja dokumentu Field Notes. Wymagania i ich status są wcześniej utrwalone w `docs/design/openbrowser-master-plan-2026-10-18.md` i `docs/openbrowser-checkpoint-2026-10-18-1552.md`. Nie wykonano próby obejścia.

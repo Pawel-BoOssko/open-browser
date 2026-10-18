@@ -20,6 +20,7 @@ Update rule:
 Update this file whenever the Operator, the model working inside OpenBrowser, or a developer agent records a real observation from use, testing, development, or documentation work.
 
 Latest:
+- 2026-10-18 15:51: Autosync SATANAMD pushed cef3a31221d6 (task result 0), PBOX1 fast-forward to cef3a31, Git clean, Debug build PBOX1 0 errors, 5 JS suites PASS. LIVE PBOX1 PID 15860 nadal telemetry, bez restartu. Nie publikowano nowego EXE.
 - 2026-10-18 15:49: Open Browser Lite Debug 0 errors; 8 headless .NET selftests exit=0, 5 JS suites PASS. Polityka kart sprawdzona na 10 000 syntetycznych czatów; core-v06 mapping test PASS, ale NIE aktywowano w Lite. Otwarty problem: niespójna flaga WinForms hard prune po odmowie edycji, nie wdrażać jako LIVE.
 - 2026-05-21: Test sources show unresolved PS stdout mojibake while PY UTF-8 works correctly.
 - This file is a working intake queue, not polished technical documentation.
