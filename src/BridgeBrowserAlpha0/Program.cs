@@ -8,6 +8,11 @@ internal static class Program
     [STAThread]
     private static void Main(string[] args)
     {
+        if (args.Length > 0 && string.Equals(args[0], "--lite-await-upgrade", StringComparison.OrdinalIgnoreCase))
+        {
+            Environment.ExitCode = LiteUpgradeHelper.Run(args);
+            return;
+        }
         if (args.Any(arg => string.Equals(arg, "--lite-version-selftest", StringComparison.OrdinalIgnoreCase)))
         {
             Environment.ExitCode = LiteBuildInfo.SelfTest();
