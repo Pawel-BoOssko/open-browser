@@ -20,7 +20,12 @@
     const error = errorText &&
       /nie udało się wczytać|failed to load|przerwano|interrupted|przekroczono limit|timed out/i.test(
         String(errorText.textContent || "").slice(-400));
+    const modelModes = Array.from(d.querySelectorAll('button')).slice(-45)
+      .map(button => String(button.innerText || button.textContent || '').trim().toLowerCase())
+      .filter(value => /^(high|instant|medium|extra high)$/.test(value));
+    const reasoningMode = modelModes.length ? modelModes[modelModes.length - 1] : 'unknown';
     return {
+      reasoningMode,
       location: w.location.pathname,
       role: role === "assistant" || role === "user" ? role : "unknown",
       text: text,

@@ -150,3 +150,15 @@ Wszystkie kolejne problemy, odmowy i nieudane operacje zapisywać jako OB-10, OB
 - Operacja: `Set-Location 'D:\projects\open-browser'; node --test tests/lite-dom-default-contract.test.cjs 2>&1 | Select-Object -Last 32; 'CONTRACT_EXIT='+$LASTEXITCODE`.
 - Rezultat: test rzeczywiście uruchomiony, `CONTRACT_EXIT=1`; asercja WinForms/JS default wykazała `true !== false`, dwa przypadki kontraktu domyślnego nie przeszły. Narzędzie zwróciło status `failed` (to nie odmowa zabezpieczeń). Przyczyna: istniejąca niespójność źródłowa `LiteDomPruneUi.cs` (`_hardPruneEnabled=true`, log `defaultEnabled=true`) wobec `LiteDomHardPrune.js` (`enabled:false`) i przycisku `DOM mocne: NIE`.
 - Zakres: wyłącznie test bez modyfikacji plików lub procesu LIVE. Naprawa samej flagi była wcześniej odrzucona, dlatego nie wykonywano jej ponownie ani alternatywnym narzędziem. Test pozostaje czerwonym gate dla wydania.
+
+### OB-20261018-164505-v8p — SATANAMD — pakiet czterech testów nadzorcy
+- Narzędzie: `functions.exec` -> `mcp__lc_multihost__execute_command(target=satamad)`; średni krok, cztery uruchomienia tego samego testowego EXE.
+- Operacja: `Start-Process -FilePath D:\projects\open-browser\src\BridgeBrowserAlpha0\bin\Debug\net8.0-windows\BridgeBrowserAlpha0.exe -ArgumentList $a -Wait -PassThru` w pętli dla `--lite-version-selftest`, `--lite-resume-selftest`, `--lite-luna-selftest`, `--lite-resume-ledger-selftest`; odczyt kodów zakończenia, bez startu GUI.
+- Rezultat: `This tool call was blocked by OpenAI's safety checks. Please double check what you are sending.` Brak task_id i stdout, brak potwierdzenia wykonania któregokolwiek z czterech testów.
+- Zakres: wyłącznie headless testy wersji, reguł wznowienia, Luny i zaszyfrowanego ledger na SATANAMD. Nie obejmuje LIVE PBOX1, WebView2 ani kont użytkownika. Powód odmowy nieujawniony. Nie ponawiać tego pakietu przez inne narzędzie.
+
+### OB-20261018-164526-c4t — SATANAMD — nieudane sprawdzenie zawartości Autosync
+- Narzędzie: `functions.exec` -> `mcp__lc_multihost__execute_command(target=satamad)`; mały odczyt Git.
+- Operacja: pętla `foreach($f in @(...))` wywołująca `git cat-file -e ('refs/remotes/origin/autosync/SATANAMD:'+ $f)` z próbą odczytu `$LASTEXITCODE` w tej samej grupie wyrażeń.
+- Rezultat: parser PowerShell zgłosił `Missing closing ')' in expression`, exit_code=1; nie wykonano odczytu wskazanych obiektów Git. Kategoria: błąd składni przygotowanego polecenia, NIE odmowa zabezpieczeń. Brak zmian repo, tasków i procesów.
+- Zakres: tylko read-only weryfikacja czterech nowych plików w zdalnej gałęzi Autosync; przyczyna jawna (niepoprawne nawiasy).

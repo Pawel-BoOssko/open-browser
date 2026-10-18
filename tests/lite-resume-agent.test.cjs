@@ -11,6 +11,7 @@ function page(overrides = {}) {
   let pending = "";
   const doc = {
     querySelectorAll(selector) {
+      if (selector === 'button') return [{ innerText: overrides.effort || 'High' }];
       if (selector === '[data-message-author-role]') {
         return overrides.lastUser ? [{
           getAttribute() { return "user"; }, innerText: "User's message"

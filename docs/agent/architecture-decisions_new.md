@@ -44,6 +44,13 @@ Latest:
 
 ## Accepted Decisions
 
+## 2026-10-18 | Build-time visible version and test-only Luna continuation supervisor
+
+Decision: generate informational assembly version from fixed semantic version and true build UTC timestamp, show exact build date/time with Warsaw UTC offset in titlebar and first toolbar control, and preserve it when copying/restarting. Resume supervisor is OFF by default, can operate only in a conversation explicitly identified as 'testowy' (bookmarked local project or exact ChatGPT document title); only after 3 stable observations >=40s after tools/generation idle, no draft/error, High effort verified, configured external Luna API model and key, validated JSON decision and DPAPI once-only receipt. Avoid automatic retry when submission acknowledgement is uncertain. Never claim internal server delivery from the rendered reply. The model alias Luna is not an official API ID; real ID must be configured. Keep model API content out of repo/logs and prompt injection from observed text untrusted.
+
+Evidence: docs/design/openbrowser-full-delivery-plan-v2-2026-10-18-1626.md, docs/openbrowser-checkpoint-2026-10-18-1643-v160.md; release needs browser E2E. User's requested High setting is a preference/target; tool blocks are not demonstrably caused by Instant.
+
+
 ## 2026-10-18 | Encrypted notes queue, no implicit web retries, memory-aware chat tabs
 
 Decision: Keep per-chat operator notes in Windows user-scoped DPAPI storage and queue only new note fragments in an append-progress outbox with encrypted atomic replacements and a backup. Use irreversible delivery state transitions (`Queued` -> `Prepared` -> `DeliveryUncertain` -> `Confirmed`); never auto retry uncertain sends because ChatGPT may already have processed them. Preserve one live WebView2 until multi-WebView runtime is E2E tested; tab pool planner allows 0-2 warm tabs by free RAM but protects pending model generation/tool use/drafts/unsaved notes. Before navigating to another conversation check local notes and page busy state with a bounded probe. Passive network CDP telemetry must never capture request bodies, cookies, tokens, headers or complete URLs.

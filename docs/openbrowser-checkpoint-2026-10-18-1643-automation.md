@@ -31,3 +31,20 @@
 ## Pakiet 3: nowy release gate agresywnego DOM
 - [SOURCE] Dodano `tests/lite-dom-default-contract.test.cjs` z 4 asercjami zgodności ustawienia WinForms, JS, tekstu przycisku i metadanych logu. Nie modyfikuje produkcyjnej implementacji ani wcześniej blokowanej flagi.
 - [TEST FAILED] Node uruchomił test, exit 1; wykryto `_hardPruneEnabled=true` w C# i `enabled:false` w JS, podczas gdy widoczny przycisk mówi `DOM mocne: NIE`. Dwa warunki default kontraktu nie przechodzą. Nie należy promować obecnego źródła do LIVE przed rozstrzygnięciem tej rozbieżności i testami React. Wpis w rejestrze: `OB-20261018-164334-m2r`. Jest to błąd istniejącego kodu, nie odmowa zabezpieczeń.
+
+## Weryfikacja gotowości nadzorcy i Autosync 16:44
+- PBOX1 lokalny rejestr projektów istnieje (1032 B), ale nie zawiera wpisu o tytule dokładnie `testowy`; nie ma dowodu, że nadzorca mógłby przypisać do niego czat. LIVE nadal notes_dom_voice. Bez tworzenia sztucznego czatu lub URL.
+- Autosync SATANAMD 16:44:15: ScheduledTask `Ready`, LastTaskResult=0, ostatni przebieg 16:44:09; lokalny HEAD master `374ed29`, origin/autosync/SATANAMD `2d82437`. Nasze cztery nowe pliki nadal `??` w głównym worktree. Nie twierdzić, że dotarły na PBOX1.
+
+## Pakiet 4: kontrola aktualnego C# i blokada testów
+- SATANAMD `dotnet build src/BridgeBrowserAlpha0/BridgeBrowserAlpha0.csproj -c Debug --no-restore -m:1 -v:q` 16:44:44: PASS, 0 errors, 1 znane ostrzeżenie MSB3277. Nie zmieniano źródeł C#.
+- Plan czterech headless selftestów nowego nadzorcy odrzucony przez safety przed wykonaniem: brak wyników; dokładny wpis `OB-20261018-164505-v8p`. Nie ponawiano. Nie oznaczać testów jako PASS.
+
+## Synchronizacja i weryfikacja PBOX1 16:46
+- Autosync remote commit `2d82437` z 16:44:13 zawiera wszystkie 4 nowe skrypty/testy (sprawdzono `git ls-tree`), PBOX1 clone już samodzielnie na `2d82437`, branch `autosync/SATANAMD`, working tree clean. Nie wykonywano ręcznego push ani pull.
+- PBOX1 `scripts/audit-lite-release-state.ps1` uruchomiony read-only PASS: schema=1, 1 LIVE, 6 katalogów instalacji, `taskLiveMismatch=True`, wolne 6321 MiB. LIVE `OpenBrowserChatGPTLite_20261018_notes_dom_voice`, ProductVersion `1.0.0+4be51a79...`, czyli stara wersja bez daty build; nowe źródłowe v1.60.0 nadal nie jest LIVE. Zadanie harmonogramu niezmienione.
+- PBOX1 `scripts/analyze-lite-resource-trends.ps1` read-only PASS: 79 próbek w 201 minut, min RAM 274 MiB, 1 krytyczna i 4 ostrzegawcze próbki, max pagefile 6299 MiB, WebView2 private delta +494,3 MiB, maksymalna przerwa próbek 1609,6 s. Ten delta nie dowodzi memory leak, ponieważ okno obejmuje restart/zmianę procesów.
+- Sprawdzenie zawartości remote początkowo nie przeszło z powodu literówki w nawiasach PowerShell; poprawione odczytowe `git ls-tree` PASS, wpis o błędzie `OB-20261018-164526-c4t` w rejestrze.
+
+## Dodatkowe testy regresji 16:46
+- SATANAMD Node PASS: LiteConversationSnapshot 5, LiteDomOptimizer 5, LiteResponseSignal 7, core-v06 compat 1, hard prune 9; razem 27 asercji/scenariuszy zgłoszonych przez skrypty, 5 plików testowych bez błędów. Nowy kontrakt default hard DOM pozostaje FAIL i jest osobną blokadą promocji, nie zaliczono go do PASS.

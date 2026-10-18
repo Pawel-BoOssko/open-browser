@@ -85,7 +85,8 @@ internal sealed class LiteLunaAdvisor
         {
             model,
             store = false,
-            max_output_tokens = 450,
+            max_output_tokens = 1100,
+            reasoning = new { effort = "high" },
             input = new object[]
             {
                 new { role = "developer", content = SystemPrompt },

@@ -67,6 +67,11 @@ internal sealed partial class ChatGptLiteForm
             !target.AbsolutePath.StartsWith("/c/", StringComparison.OrdinalIgnoreCase))
             return false;
         string path = target.GetLeftPart(UriPartial.Path);
+        string title = _browser.CoreWebView2?.DocumentTitle?.Trim() ?? "";
+        if (title.Equals("testowy", StringComparison.OrdinalIgnoreCase) ||
+            title.Equals("testowy - ChatGPT", StringComparison.OrdinalIgnoreCase) ||
+            title.Equals("testowy | ChatGPT", StringComparison.OrdinalIgnoreCase))
+            return true;
         return _projects?.Projects.Any(project => project.Chats.Any(chat =>
             chat.Url == path && string.Equals(chat.Title.Trim(), "testowy",
                 StringComparison.OrdinalIgnoreCase))) == true;
@@ -84,7 +89,9 @@ internal sealed partial class ChatGptLiteForm
                 "window.__OPENBROWSER_RESUME_PROBE__ ? JSON.stringify(window.__OPENBROWSER_RESUME_PROBE__.observe()) : null");
             if (await Task.WhenAny(read, Task.Delay(6500)) != read)
             {
-                _resumeStatus.Text = "Nadzór: renderer nie odpowiada";
+                _resumeEnabled = false;
+                _resumeToggle.Text = "Nadzór: WYŁ.";
+                _resumeStatus.Text = "Nadzór wyłączony: renderer nie odpowiada";
                 LiteEventLog.Write("resume_probe_timeout");
                 return;
             }
@@ -92,6 +99,13 @@ internal sealed partial class ChatGptLiteForm
             if (string.IsNullOrWhiteSpace(json)) return;
             using var parsed = JsonDocument.Parse(json);
             var node = parsed.RootElement;
+            string effort = node.GetProperty("reasoningMode").GetString() ?? "unknown";
+            if (effort != "high")
+            {
+                _resumeStatus.Text = "Nadzór: wymagany High (jest " + effort + ")";
+                LiteEventLog.Write("resume_high_effort_not_verified", new { detected = effort });
+                return;
+            }
             string text = node.GetProperty("text").GetString() ?? "";
             string chat = LiteChatNotes.NormalizeKey(core.Source);
             var observation = new LiteResumePolicy.Observation(
