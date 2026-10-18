@@ -81,6 +81,7 @@ internal sealed partial class ChatGptLiteForm
     {
         var core = _browser.CoreWebView2;
         if (core is null || _resumePolling || !_resumeEnabled ||
+            !string.IsNullOrEmpty(_lastResponseFailure) ||
             !IsApprovedTestChat(core.Source)) return;
         _resumePolling = true;
         try
@@ -146,6 +147,7 @@ internal sealed partial class ChatGptLiteForm
             });
             if (advice.Decision != "continue") return;
             if (!IsApprovedTestChat(core.Source) ||
+                !string.IsNullOrEmpty(_lastResponseFailure) ||
                 !await RevalidateResumeBeforeSendAsync(core, chat, decision.ResponseHash))
             {
                 LiteEventLog.Write("resume_preflight_rejected", new {

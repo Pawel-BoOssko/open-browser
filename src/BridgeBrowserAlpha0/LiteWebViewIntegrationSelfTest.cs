@@ -48,7 +48,8 @@ internal static class LiteWebViewIntegrationSelfTest
                         CoreWebView2HostResourceAccessKind.DenyCors);
                     phase = "install_document_scripts";
                     foreach (string name in new[] {
-                        "LiteHighGuard.js", "LiteResumeProbe.js", "LiteResumeSender.js"
+                        "LiteHighGuard.js", "LiteResponseSignal.js",
+                        "LiteResumeProbe.js", "LiteResumeSender.js"
                     }) {
                         string script = File.ReadAllText(Path.Combine(
                             AppContext.BaseDirectory, name));

@@ -250,3 +250,23 @@ Historyczne wpisy OB-10 i OB-11 zachowują swój numer. Nowym zdarzeniom należy
 - Zastana blokada w dzienniku tej samej sesji projektu: `Autosync repozytoriów`, SATANAMD, próba migawki po dodaniu `src/BridgeBrowserAlpha0/OpenBrowserLite.ico`, rezultat `secret scan: changed binary file`, repo nie zsynchronizowane. Nie wyłączono bezpieczeństwa, nie nadawano wyjątku, nie zmieniano rozszerzenia i nie wykonano alternatywnego push.
 - Zakres historyczny: w tamtej chwili v1.64 był wyłącznie SOURCE/Test; nie wykonywano publikacji na PBOX1 z uwagi na wcześniejszą odmowę dla v1.63.
 - **ZAMKNIĘTE / NO-GO NIEAKTUALNE 2026-10-18:** właściciel zezwolił Claude Code na przypięty do JEDNEGO bloba wyjątek skanera, Autosync przesłał kod i ikonę, a v1.64.0 została wdrożona oraz uruchomiona przez właściciela na PBOX1, PID 18412. Manifest `lite-release-manifest.json` i EXE SHA256 `F82A3F7D646AB67E24F484D04C9652A8900164784E6A1CBE10FC09E782EF4DA7` zweryfikowano. Oryginalnej odmowy OpenAI nie należy interpretować jako zgody na omijanie innych odmów.
+
+### OB-20261018-210104-duplicate-manifest — próba ponownej generacji manifestu przy istniejącym wydaniu STAGED
+- Narzędzie: LC MultiHost PBOX1, mały krok techniczny `new-lite-release-manifest.ps1` po rekompilacji tej samej wersji do `OpenBrowserChatGPTLite_v1.65.0_20261018`.
+- Błąd: `Manifest already exists with different metadata`; mechanizm prawidłowo wykrył kolizję zawartości, brak zmiany LIVE. Naprawa: utworzono osobny katalog side-by-side `OpenBrowserChatGPTLite_v1.65.0_20261018_2102`, a jego manifest SHA256 i gate zweryfikowano PASS. Nie obchodzono zabezpieczenia.
+
+### OB-20261018-213808-webview-session0 — rzeczywisty test WebView2 poza sesją pulpitu
+- Narzędzie: LC MultiHost SATANAMD w sesji Windows 0, samodzielne `--lite-webview-integration-selftest` uruchamiające wyłącznie nowy lokalny profil i fikcyjną stronę.
+- Wynik: `COMException 0x80070578 Nieprawidłowe dojście okna` już przy `EnsureCoreWebView2Async`; aplikacja użytkownika na PBOX1 nie była dotknięta. LC uruchamia skrypt w SessionId=0, Explorer użytkownika w SessionId=1. To błąd kontekstu GUI, nie odmowa bezpieczeństwa. Poprawa: test wykonano przez RDC w interaktywnej sesji 1, bez logowania do ChatGPT i bez profilu produkcji — inicjalizacja PASS.
+
+### OB-20261018-213940-offline-ack-harness — fałszywie czerwony test potwierdzenia
+- Narzędzie: RDC SATANAMD sesja 1, mały krok `--lite-webview-integration-selftest` w tymczasowej stronie lokalnej.
+- Po kliknięciu testowego 'Wyślij' wiadomość z identyfikatorem była obecna w 3. dymku DIL, ale `Ensure(...hasAck(... ) == "true")` mylnie zwracało false, bo C# `JsonElement.ToString()` dla bool dawał `True` zamiast `true`. To błąd adaptera testowego, nie transportu. Naprawa: jawna serializacja wartości JSON bool na `true`/`false`; prawdziwy WebView2 offline test przeszedł **EXIT 0**, 8 asercji, w tym brak drugiej wiadomości.
+
+### OB-20261018-213232-opentest-no-stable-snapshot — nie wysłano książki w OpenFill
+- Narzędzie: OpenFill PBOX1, odrębne jednorazowe zadanie na wskazanym czacie testowym książki. Tylko odczyt, brak wpisywania w produkcyjnym Lite.
+- Próba 1: potwierdzono High, idle i tytuł, ale nie można było porównać ostatniej odpowiedzi z wcześniejszą migawką; decyzja STOP bez wysłania.
+- Próba 2: stwierdzono jawny błąd `Nie udało się wczytać tej odpowiedzi`; decyzja STOP bez wysłania. W późniejszym odczycie 21:49 komunikat zniknął, więc błąd jest przynajmniej okresowy. **Nie wolno klikać Ponów ani powielać wiadomości.** E2E prawdziwego czatu pozostaje nieukończone, a test offline nie oznacza LIVE PASS.
+
+### OB-20261018-212650-chatgpt-delivery-timeout — nowy incydent operatora
+- Źródło: screen użytkownika i PBOX1 telemetry 1.64.0: `delivery_timeout` at 2026-10-18T19:26:50Z, `cleared` 2026-10-18T19:27:10Z (20 s), winforms host odpowiada. Nie ma dowodu, że odpowiedź dotarła do serwera. Nie jest to blokada zabezpieczeń modelu; to widoczny błąd dostarczenia w ChatGPT. Zapis bez automatycznego ponawiania.

@@ -36,10 +36,13 @@ assert.equal(run("Przerwano rozumowanie").visibleError, "reasoning_interrupted")
 assert.equal(run("hello", true).generatingSignal, true);
 assert.equal(run("hello").visibleError, null);
 assert.equal(run("hello", false, "untrusted.com"), undefined);
+assert.equal(run("Nie udało się wczytać tej odpowiedzi", false,
+  "chatgpt.com", "dil").visibleError, "response_load_failed",
+  "short DIL assistant failure should block the supervisor");
 assert.equal(run("Przekroczono limit czasu dostarczenia wiadomości", false,
   "chatgpt.com", "user").visibleError, null,
   "user quoting an error must never trigger a false UI failure");
 assert.equal(run("Przekroczono limit czasu dostarczenia wiadomości ".repeat(8),
   false, "chatgpt.com", "assistant").visibleError, null,
   "long assistant text discussing an error is not an error placeholder");
-console.log("LiteResponseSignal: 9 PASS");
+console.log("LiteResponseSignal: 10 PASS");
