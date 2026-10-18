@@ -33,6 +33,11 @@ internal static class Program
             Environment.ExitCode = LiteLunaConnectivitySelfTest.RunAsync().GetAwaiter().GetResult();
             return;
         }
+        if (args.Any(arg => string.Equals(arg, "--lite-luna-novel-scenario", StringComparison.OrdinalIgnoreCase)))
+        {
+            Environment.ExitCode = LiteLunaNovelScenario.RunAsync().GetAwaiter().GetResult();
+            return;
+        }
         if (args.Any(arg => string.Equals(arg, "--lite-resume-ledger-selftest", StringComparison.OrdinalIgnoreCase)))
         {
             Environment.ExitCode = LiteResumeLedgerSelfTest.Run();
