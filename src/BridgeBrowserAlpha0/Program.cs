@@ -108,6 +108,12 @@ internal static class Program
             Environment.ExitCode = LiteBrandIcon.SelfTest();
             return;
         }
+        if (args.Any(arg => string.Equals(arg, "--lite-webview-integration-selftest", StringComparison.OrdinalIgnoreCase)))
+        {
+            ApplicationConfiguration.Initialize();
+            Environment.ExitCode = LiteWebViewIntegrationSelfTest.Run();
+            return;
+        }
         bool safeOpen = args.Any(arg => string.Equals(arg, "--lite-open-safely", StringComparison.OrdinalIgnoreCase));
         if (safeOpen && System.Diagnostics.Process.GetProcessesByName("BridgeBrowserAlpha0")
             .Any(process => process.Id != Environment.ProcessId && !process.HasExited))

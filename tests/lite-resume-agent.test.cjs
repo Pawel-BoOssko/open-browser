@@ -20,7 +20,8 @@ function page(overrides = {}) {
           innerText: "Napisano rozdział pierwszy, pozostał rozdział drugi."
         }];
       }
-      if (selector === '[data-message-author-role="user"]')
+      if (selector === '[data-message-author-role="user"],[data-user-message-bubble]' ||
+          selector === '[data-message-author-role="user"]')
         return sent.map(value => ({ innerText: value }));
       throw new Error("Unknown selector " + selector);
     },

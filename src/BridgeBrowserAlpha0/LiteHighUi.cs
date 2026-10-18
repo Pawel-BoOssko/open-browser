@@ -17,6 +17,7 @@ internal sealed partial class ChatGptLiteForm
     };
     private readonly System.Windows.Forms.Timer _highTimer = new() { Interval = 6000 };
     private bool _highProbePending;
+    private readonly LiteRendererBackpressure _highProbeBackpressure = new();
     private string _lastEffort = "";
     private string _effortChangeFrom = "";
     private string _effortChangeChat = "";
@@ -38,7 +39,8 @@ internal sealed partial class ChatGptLiteForm
     private async Task VerifyHighAsync()
     {
         var core = _browser.CoreWebView2;
-        if (core is null || _highProbePending) return;
+        if (core is null || _highProbePending ||
+            !_highProbeBackpressure.MayProbe(DateTimeOffset.UtcNow)) return;
         if (!Uri.TryCreate(core.Source, UriKind.Absolute, out var address) ||
             address.Host != "chatgpt.com") return;
         _highProbePending = true;
@@ -49,13 +51,18 @@ internal sealed partial class ChatGptLiteForm
             if (await Task.WhenAny(query, Task.Delay(4000)) != query)
             {
                 _highIndicator.Text = "Tryb: BRAK ODPOWIEDZI";
-                LiteEventLog.Write("high_guard_probe_timeout");
+                var cooldown = _highProbeBackpressure.MarkFailed(DateTimeOffset.UtcNow);
+                LiteEventLog.Write("high_guard_probe_timeout", new {
+                    cooldownSeconds = cooldown.TotalSeconds,
+                    failures = _highProbeBackpressure.ConsecutiveFailures
+                });
                 _resumeEnabled = false;
                 _resumeToggle.Text = "Nadzór: WYŁ.";
                 return;
             }
             string? serialized = JsonSerializer.Deserialize<string>(await query);
             if (string.IsNullOrEmpty(serialized)) return;
+            _highProbeBackpressure.MarkNavigationRecovered();
             using var parsed = JsonDocument.Parse(serialized);
             string mode = parsed.RootElement.GetProperty("mode").GetString() ?? "unknown";
             if (mode != _lastEffort)
