@@ -181,3 +181,22 @@ Wszystkie kolejne problemy, odmowy i nieudane operacje zapisywać jako OB-10, OB
 - Narzędzie: LC MultiHost PBOX1, małe read-only sprawdzenie bool wartości zmiennych OPENBROWSER_LUNA_MODEL i OPENAI_API_KEY (bez odczytu sekretów).
 - Wynik: obie wartości FALSE. Brak możliwości uruchomienia API planner bez model ID i autoryzowanego klucza; nie wykonywano HTTP ani nie utworzono zastępczego fikcyjnego ID.
 - Zakres: tylko generowanie automatycznej kontynuacji; numer wersji, timer obserwacji, JS probe, DPAPI ledger i inne testy headless działają. Wymagana później poprawna konfiguracja konta API.
+### OB-20261018-181849-ps-syntax — audyt testów i parser PowerShell
+- Narzędzie: LC MultiHost / PowerShell SATANAMD; mały krok read-only wykonujący pętlę Node i bramkę testów.
+- Wynik: źródłowe testy wykazały początkowo 2 FAIL, ale złożone wywołanie zakończyło się exit1, gdy PowerShell potraktował stderr z testu jako błąd narzędzia. Nie był to zakaz zabezpieczeń. Wykonano niezależne testy z jawną obsługą exit code; dwa błędy poprawiono, 9 JS suites PASS i 13 .NET PASS. LIVE niezmieniony.
+
+### OB-20261018-181946-ps-empty-pipeline — błąd składni przy obliczaniu wielkości repo
+- Narzędzie: LC MultiHost SATANAMD, mały read-only command: foreach (...) {...} | Out-Null (niedozwolone bez ujęcia w wyrażenie PS).
+- Wynik: `An empty pipe element is not allowed.`, 0 mutacji. Poprawiono składnię agregacji, katalogi i ich rozmiary odczytane bez błędów.
+
+### OB-20261018-182833-rdc-field-notes — dopasowanie fragmentu dokumentu
+- Narzędzie: Remote Desktop Commander `edit_block`, mały krok dokumentacyjny `docs/feedback/field-notes_new.md`, próba zastąpienia samego nagłówka `## Entries`.
+- Wynik: `Search content not found ... closest match 19%`; bez zmian w tym kroku. Kolejna odrębna edycja unikalnej sekcji `Latest` się powiodła. Nie była to blokada bezpieczeństwa.
+
+### OB-20261018-183147-manifest-api — generator manifestu
+- Narzędzie: LC MultiHost PBOX1, mała operacja wydaniowa new-lite-release-manifest.ps1 dla STAGED 1.62.0.
+- Wynik: `Method invocation failed because [System.TimeZoneInfo] does not contain a method named 'GetUtcOffset'.` — błędna statyczna metoda w skrypcie, nie blokada bezpieczeństwa. Poprawiono w SATANAMD na `$zone.GetUtcOffset($built)`, SATANAMD test manifest test PASS, PBOX1 manifest created+verified i check-lite-p0-promotion PASS. LIVE PID21532 niezmieniony.
+
+### OB-20261018-183251-manifest-relative — walidator wymaga manifestu obok EXE
+- Narzędzie: LC MultiHost SATANAMD, mały test skryptu verify-lite-release-manifest.ps1 z manifestem w Recovery, a EXE w bin/Debug.
+- Wynik: `Manifest executable is missing`, zgodnie z wymogiem formatu manifestu (ścieżka EXE to basename). Poprawiono lokalizację testową do katalogu EXE, verified PASS. Nie była to blokada narzędzia.
