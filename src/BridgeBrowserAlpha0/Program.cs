@@ -13,6 +13,16 @@ internal static class Program
             Environment.ExitCode = LiteSelfTest.Run();
             return;
         }
+        if (args.Any(arg => string.Equals(arg, "--lite-archive-selftest", StringComparison.OrdinalIgnoreCase)))
+        {
+            Environment.ExitCode = LiteArchiveSelfTest.Run();
+            return;
+        }
+        if (args.Any(arg => string.Equals(arg, "--lite-lease-selftest", StringComparison.OrdinalIgnoreCase)))
+        {
+            Environment.ExitCode = LiteLeadLeaseSelfTest.Run();
+            return;
+        }
         ApplicationConfiguration.Initialize();
         var lite = args.Any(arg => string.Equals(arg, "--chatgpt-lite", StringComparison.OrdinalIgnoreCase));
         Application.Run(lite ? new ChatGptLiteForm() : new MainForm());

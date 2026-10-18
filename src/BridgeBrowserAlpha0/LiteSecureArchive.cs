@@ -63,7 +63,12 @@ internal sealed class LiteSecureArchive
         string temporary = path + ".tmp";
         try
         {
-            File.WriteAllBytes(temporary, ciphertext);
+            using (var stream = new FileStream(temporary, FileMode.Create,
+                FileAccess.Write, FileShare.None))
+            {
+                stream.Write(ciphertext);
+                stream.Flush(flushToDisk: true);
+            }
             File.Move(temporary, path);
             _lastHashes[id] = digest;
             LiteEventLog.Write("assistant_snapshot_saved", new

@@ -43,14 +43,24 @@ internal sealed partial class ChatGptLiteForm
               uri.AbsolutePath.StartsWith("/g/", StringComparison.OrdinalIgnoreCase))) return;
 
         _capturePending = true;
+        bool timedOut = false;
         try
         {
             var call = core.ExecuteScriptAsync(
                 "window.__OPENBROWSER_LITE_SNAPSHOT__ ? JSON.stringify(window.__OPENBROWSER_LITE_SNAPSHOT__.collect()) : null");
             if (await Task.WhenAny(call, Task.Delay(7000)) != call)
+            {
+                timedOut = true;
                 LiteEventLog.Write("archive_probe_timeout");
-
-            // Allow at most one pending script to avoid piling up hung renderer calls.
+                // Do not await a hung renderer on the UI path or start another probe.
+                _ = call.ContinueWith(t =>
+                {
+                    _ = t.Exception;
+                    _capturePending = false;
+                }, CancellationToken.None, TaskContinuationOptions.None,
+                    TaskScheduler.FromCurrentSynchronizationContext());
+                return;
+            }
             string result = await call;
             if (!_archiveEnabled || IsDisposed) return;
             string? json = JsonSerializer.Deserialize<string>(result);
@@ -77,7 +87,7 @@ internal sealed partial class ChatGptLiteForm
         }
         finally
         {
-            _capturePending = false;
+            if (!timedOut) _capturePending = false;
         }
     }
 }
