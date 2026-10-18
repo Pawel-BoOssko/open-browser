@@ -28,6 +28,12 @@
     <None Update="LiteResponseSignal.js">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <None Update="LiteResumeProbe.js">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="LiteResumeSender.js">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <None Update="LiteDomHardPrune.js">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>

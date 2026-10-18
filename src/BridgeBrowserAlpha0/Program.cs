@@ -13,6 +13,21 @@ internal static class Program
             Environment.ExitCode = LiteBuildInfo.SelfTest();
             return;
         }
+        if (args.Any(arg => string.Equals(arg, "--lite-resume-selftest", StringComparison.OrdinalIgnoreCase)))
+        {
+            Environment.ExitCode = LiteResumeSelfTest.Run();
+            return;
+        }
+        if (args.Any(arg => string.Equals(arg, "--lite-luna-selftest", StringComparison.OrdinalIgnoreCase)))
+        {
+            Environment.ExitCode = LiteLunaSelfTest.Run();
+            return;
+        }
+        if (args.Any(arg => string.Equals(arg, "--lite-resume-ledger-selftest", StringComparison.OrdinalIgnoreCase)))
+        {
+            Environment.ExitCode = LiteResumeLedgerSelfTest.Run();
+            return;
+        }
         if (args.Any(arg => string.Equals(arg, "--lite-projects-selftest", StringComparison.OrdinalIgnoreCase)))
         {
             Environment.ExitCode = LiteSelfTest.Run();
