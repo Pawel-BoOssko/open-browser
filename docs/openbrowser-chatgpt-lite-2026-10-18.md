@@ -21,10 +21,10 @@ Warunki: nie kasowac i nie nadpisywac istniejących zmian w drzewie roboczym (38
 5. DONE: release zbudowany bez bledow, skrypt scripts/launch-chatgpt-lite.ps1 gotowy, task 'OpenBrowser ChatGPT Lite' uruchomil okno w sesji 1 SATANAMD. Stworzono i zweryfikowano skrot na pulpicie 'Open Browser - ChatGPT Lite.lnk'.
 6. DONE: Debug i Release build PASS; 3 smoke PASS po odswiezeniu dotnet restore; proces aplikacji w sesji 1 oraz 6 procesow WebView2 Lite potwierdzone. Pelny test logowania ChatGPT wymaga oceny widocznej strony przez uzytkownika.
 7. DONE: instrukcja testow na SATANAMD i zapis architektury w docs/agent/architecture-decisions_new.md, aktualizacja current-state i development-rules; skrypt dokumentacyjny PASS, scoped git diff --check PASS.
-8. DOING: wywolanie wspolnego Autosync, bez manualnego push, oraz weryfikacja zdalnej migawki.
+8. DONE: wspolny Autosync wykonal synchronizacje z kodem wyniku 0. Zdalna galaz autosync/SATANAMD zawiera aplikacje Lite, skrypt startowy i plan. Ostatnia zweryfikowana migawka przed zamknieciem: c72e5011c082; bez prywatnych pobran, profilow i plikow binarnych. Bez manualnego push.
 
 ## Ostatni checkpoint
-2026-10-18: Etapy 1-7 DONE, etap 8 w toku. Release 0 bledow, trzy smoke PASS, gate dokumentacyjny PASS. Aplikacja Lite uruchomiona w sesji 1 SATANAMD i skrot na pulpicie. Nastepnie uruchomic istniejacy Autosync (bez manualnego push) i potwierdzic zdalny hash. Nie modyfikowac istniejacych 7 roboczych zmian funkcjonalnych.
+2026-10-18: Etapy 1-8 DONE. Release 0 bledow, trzy smoke PASS, gate dokumentacyjny PASS. Aplikacja Lite uruchomiona na SATANAMD, skrot na pulpicie. Autosync zweryfikowany na GitHubie, ostatni sprawdzony hash c72e5011c082, wynik 0. Po zapisaniu tego koncowego checkpointu wspolny Autosync dostarczy jego ostatnia wersje w nastepnej migawce. Istniejace robocze zmiany funkcjonalne pozostawiono; nie wykonywano recznego push.
 - 2026-10-18: Kompilacja Debug po wprowadzeniu trybu --chatgpt-lite: 0 bledow, ostrzezenie MSB3277 WindowsBase. Stary tryb domyslny bez zmian w logice.
 - 2026-10-18: W trybie Lite nie powstaje MainForm, LogWriter, OpenBridgeHost, BrowserTabRuntime ani ConversationTrimmer. Profil uzytkownika: %LOCALAPPDATA%\\OpenBrowser\\ChatGPT-Lite\\Profile (poza synchronizowanym repo).
 - 2026-10-18: Kompilacja Release: 0 errors, 1 MSB3277 warning. EXE: src/BridgeBrowserAlpha0/bin/Release/net8.0-windows/BridgeBrowserAlpha0.exe.
