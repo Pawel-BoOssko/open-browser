@@ -95,7 +95,9 @@ internal sealed partial class ChatGptLiteForm
         _notesLoading = true;
         try
         {
-            _noteEditor.Text = _noteStore.Load(target);
+            string text = _noteStore.Load(target);
+            _noteEditor.ReadOnly = false;
+            _noteEditor.Text = text;
             _notesDirty = false;
             _noteState.Text = "Zapis lokalny, zaszyfrowany. Nie przekazano do modelu.";
             _noteChat.Text = target == "inbox"

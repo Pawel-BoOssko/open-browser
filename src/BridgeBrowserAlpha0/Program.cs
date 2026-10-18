@@ -33,6 +33,11 @@ internal static class Program
             Environment.ExitCode = LiteNotesSelfTest.Run();
             return;
         }
+        if (args.Any(arg => string.Equals(arg, "--lite-icon-export", StringComparison.OrdinalIgnoreCase)))
+        {
+            Environment.ExitCode = LiteBrandIcon.Export() ? 0 : 2;
+            return;
+        }
         ApplicationConfiguration.Initialize();
         var lite = args.Any(arg => string.Equals(arg, "--chatgpt-lite", StringComparison.OrdinalIgnoreCase));
         Application.Run(lite ? new ChatGptLiteForm() : new MainForm());

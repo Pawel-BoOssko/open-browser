@@ -39,6 +39,17 @@ internal sealed partial class ChatGptLiteForm : Form
         Height = 850;
         MinimumSize = new Size(980, 600);
         StartPosition = FormStartPosition.CenterScreen;
+        try
+        {
+            Icon = LiteBrandIcon.Create();
+            LiteBrandIcon.Export();
+        }
+        catch (Exception ex)
+        {
+            LiteEventLog.Write("brand_window_icon_failed", new { errorType = ex.GetType().Name });
+        }
+
+        InitializeWindowRecovery();
 
         var toolbar = new FlowLayoutPanel
         {
@@ -48,7 +59,7 @@ internal sealed partial class ChatGptLiteForm : Form
             WrapContents = false,
             AutoScroll = true
         };
-        toolbar.Controls.AddRange(new Control[] { _back, _forward, _reload, _home, _domToggle, _archiveToggle, _openArchive, _status, _domInfo });
+        toolbar.Controls.AddRange(new Control[] { _back, _forward, _reload, _home, _domToggle, _hardPruneToggle, _archiveToggle, _openArchive, _status, _domInfo });
         var content = new SplitContainer
         {
             Dock = DockStyle.Fill,
@@ -97,6 +108,7 @@ internal sealed partial class ChatGptLiteForm : Form
         };
         _domMonitor.Tick += async (_, _) => await PollDomAsync();
         InitializeCapture();
+        InitializeHardPruneUi();
 
         LiteEventLog.PruneOldFiles();
         LiteEventLog.Write("window_constructed", new { version = Application.ProductVersion });
@@ -113,8 +125,10 @@ internal sealed partial class ChatGptLiteForm : Form
             _domMonitor.Stop();
             _captureTimer.Stop();
             _responseTimer.Stop();
+            _pruneReportTimer.Stop();
             FlushNotes();
             _noteSaveTimer.Stop();
+            DisposeWindowRecovery();
             LiteEventLog.Write("window_closing");
         };
         Load += async (_, _) => await InitializeBrowserAsync();
@@ -155,6 +169,7 @@ internal sealed partial class ChatGptLiteForm : Form
             LiteEventLog.Write("dom_observer_installed");
             await InstallCaptureScriptAsync(core);
             await InstallResponseDiagnosticsAsync(core);
+            await InstallHardPruneScriptAsync(core);
 
             core.NavigationStarting += (_, e) =>
             {
@@ -167,6 +182,7 @@ internal sealed partial class ChatGptLiteForm : Form
                 LiteEventLog.Write("navigation_completed", new { e.IsSuccess, webError = e.WebErrorStatus.ToString(), host = LiteEventLog.HostOnly(core.Source) });
                 UpdateNavigation();
                 if (!_domEnabled && e.IsSuccess) _ = ApplyDomModeAsync();
+                if (!_hardPruneEnabled && e.IsSuccess) _ = ApplyHardPruneModeAsync();
             };
             core.HistoryChanged += (_, _) => UpdateNavigation();
             core.SourceChanged += (_, _) => SwitchNotesForUrl(core.Source);
@@ -187,6 +203,7 @@ internal sealed partial class ChatGptLiteForm : Form
             _domMonitor.Start();
             _captureTimer.Start();
             _responseTimer.Start();
+            _pruneReportTimer.Start();
         }
         catch (Exception ex)
         {
