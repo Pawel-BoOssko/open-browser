@@ -270,3 +270,9 @@ Historyczne wpisy OB-10 i OB-11 zachowują swój numer. Nowym zdarzeniom należy
 
 ### OB-20261018-212650-chatgpt-delivery-timeout — nowy incydent operatora
 - Źródło: screen użytkownika i PBOX1 telemetry 1.64.0: `delivery_timeout` at 2026-10-18T19:26:50Z, `cleared` 2026-10-18T19:27:10Z (20 s), winforms host odpowiada. Nie ma dowodu, że odpowiedź dotarła do serwera. Nie jest to blokada zabezpieczeń modelu; to widoczny błąd dostarczenia w ChatGPT. Zapis bez automatycznego ponawiania.
+
+### OB-20261018-225018-pbox-powershell-select-join — błąd składni odczytu procesów
+- Narzędzie: LC MultiHost PBOX1. Mały, niezależny krok diagnostyczny, tylko odczyt listy PID przed przygotowaniem upgrade. Błąd: `Select-Object -ExpandProperty ProcessId -Unique -join ','` — `A parameter cannot be found that matches parameter name 'join'`. Żadne pliki ani procesy nie zmienione. Poprawiono przez `(@(...)) -join ','`, odczyt PIDs=18412 i UPGRADERS=0 PASS. Błąd PowerShell, NIE blokada bezpieczeństwa.
+
+### OB-20261018-225400-replaced-upgrade-waiter — celowe wycofanie starego oczekującego wydania
+- Narzędzie: LC MultiHost PBOX1, mały krok celowego zakończenia **wyłącznie** technicznego pomocnika `BridgeBrowserAlpha0.exe --lite-await-upgrade 18412` v1.66.0 PID18832; sprawdzono commandLine i ścieżkę v1.66 przed Stop-Process. Nie był to renderer/okno LIVE. Wynik: helper wycofany, PID18412 LIVE nadal odpowiada. Powód: przed realnym automatycznym wznawianiem odkryto lukę: wcześniejszy `delivery_timeout` mógł przestać być widoczny, ale wynik odpowiedzi pozostać nieznany. Niepromowana v1.67.0 dodaje durable transport quarantine. Nie ponawiać starego helpera, zamiast tego nowe STAGED po 16 PASS i WebView2.

@@ -42,7 +42,9 @@ internal sealed partial class ChatGptLiteForm
             }
             if (!_resumeEnabled && _browser.CoreWebView2 is { } activeCore)
             {
-                string chatKey = LiteChatNotes.NormalizeKey(activeCore.Source);
+                try
+                {
+                    string chatKey = LiteChatNotes.NormalizeKey(activeCore.Source);
                 if (_resumeLedger.IsTransportQuarantined(chatKey))
                 {
                     if (!string.IsNullOrEmpty(_lastResponseFailure))
@@ -63,6 +65,15 @@ internal sealed partial class ChatGptLiteForm
                         LiteEventLog.Write("resume_transport_manual_clear", new {
                             userConfirmed = true
                         });
+                }
+                }
+                catch (Exception ex)
+                {
+                    LiteEventLog.Write("resume_transport_ledger_unavailable", new {
+                        errorType = ex.GetType().Name
+                    });
+                    _resumeStatus.Text = "Nadzór zablokowany: błąd rejestru";
+                    return;
                 }
             }
             _resumeEnabled = !_resumeEnabled;
