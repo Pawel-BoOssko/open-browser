@@ -21,6 +21,7 @@
     if (attempted.has(receiptId)) return "already_attempted";
     const el = composer();
     if (!el || busy() || String(el.value || el.innerText || "").trim()) return "busy";
+    const targetPath = w.location.pathname;
     attempted.add(receiptId);
     const payload = "[OB-" + receiptId + "]\n" + text;
     el.focus();
@@ -35,10 +36,14 @@
       if (!w.document.execCommand("insertText", false, payload))
         return "unsupported";
     }
-    // Next tick allows React to update the enabled state; uncertain after this point.
+    // Recheck state just before clicking: React may replace the composer, the
+    // operator can type a draft, or the user may navigate during this delay.
     w.setTimeout(() => {
+      if (w.location.hostname !== "chatgpt.com" ||
+          w.location.pathname !== targetPath || composer() !== el || busy() ||
+          String(el.value || el.innerText || "") !== payload) return;
       const btn = w.document.querySelector('[data-testid="send-button"]');
-      if (btn && !btn.disabled && !busy()) btn.click();
+      if (btn && !btn.disabled) btn.click();
     }, 250);
     return "submission_requested";
   }

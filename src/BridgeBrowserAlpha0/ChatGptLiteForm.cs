@@ -200,7 +200,7 @@ internal sealed partial class ChatGptLiteForm : Form
                 LiteEventLog.Write("navigation_completed", new { e.IsSuccess, webError = e.WebErrorStatus.ToString(), host = LiteEventLog.HostOnly(core.Source) });
                 UpdateNavigation();
                 if (!_domEnabled && e.IsSuccess) _ = ApplyDomModeAsync();
-                if (!_hardPruneEnabled && e.IsSuccess) _ = ApplyHardPruneModeAsync();
+                if (e.IsSuccess) _ = ApplyHardPruneModeAsync();
             };
             core.HistoryChanged += (_, _) => UpdateNavigation();
             core.SourceChanged += (_, _) => SwitchNotesForUrl(core.Source);

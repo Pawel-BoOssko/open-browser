@@ -13,7 +13,7 @@ internal sealed partial class ChatGptLiteForm
     {
         Interval = 60000
     };
-    private bool _hardPruneEnabled = true;
+    private bool _hardPruneEnabled = false;
     private bool _pruneProbePending;
     private int _lastReportedPruned;
 
@@ -35,7 +35,7 @@ internal sealed partial class ChatGptLiteForm
         string script = await File.ReadAllTextAsync(
             Path.Combine(AppContext.BaseDirectory, "LiteDomHardPrune.js"));
         await core.AddScriptToExecuteOnDocumentCreatedAsync(script);
-        LiteEventLog.Write("hard_dom_script_installed", new { defaultEnabled = true,
+        LiteEventLog.Write("hard_dom_script_installed", new { defaultEnabled = false,
             keepNewest = 24, threshold = 90 });
     }
 

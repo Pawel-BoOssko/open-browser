@@ -44,6 +44,11 @@ Latest:
 
 ## Accepted Decisions
 
+## 2026-10-18 18:28 — No ChatGPT scheduled development until operator revokes
+
+Owner directly prohibited creating or running any ChatGPT reminder/automation. All 32 existing ChatGPT automations were found disabled. This overrides older documents referring to a recurring hourly helper; no future developer should re-enable it without a new explicit user instruction. Development takes place in the current operator-supervised chat only. Existing Windows Autosync and read-only resource-monitoring tasks are independent maintenance components, not ChatGPT reminder triggers. Source/test/staged/live remain separate; no automatic promotion of staged releases with failing test gates. Backup and audit evidence: docs/openbrowser-audit-recovery-2026-10-18-1828.md.
+
+
 ## 2026-10-18 | Build-time visible version and test-only Luna continuation supervisor
 
 Decision: generate informational assembly version from fixed semantic version and true build UTC timestamp, show exact build date/time with Warsaw UTC offset in titlebar and first toolbar control, and preserve it when copying/restarting. Resume supervisor is OFF by default, can operate only in a conversation explicitly identified as 'testowy' (bookmarked local project or exact ChatGPT document title); only after 3 stable observations >=40s after tools/generation idle, no draft/error, High effort verified, configured external Luna API model and key, validated JSON decision and DPAPI once-only receipt. Avoid automatic retry when submission acknowledgement is uncertain. Never claim internal server delivery from the rendered reply. The model alias Luna is not an official API ID; real ID must be configured. Keep model API content out of repo/logs and prompt injection from observed text untrusted.

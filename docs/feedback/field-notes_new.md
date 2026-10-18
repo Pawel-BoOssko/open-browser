@@ -20,6 +20,7 @@ Update rule:
 Update this file whenever the Operator, the model working inside OpenBrowser, or a developer agent records a real observation from use, testing, development, or documentation work.
 
 Latest:
+- 2026-10-18 18:28: Operator forbids all ChatGPT reminders until further notice; all 32 disabled. Development manual chat only. PBOX1 v1.61 pending helper canceled, active v1.60 retained. Recovery inventory: docs/openbrowser-audit-recovery-2026-10-18-1828.md. Source repairs: delayed auto-send race and hard prune default mismatch corrected, 9 JS suites and 13 .NET selftests PASS, staged 1.62 still pending.
 - 2026-10-18 15:51: Autosync SATANAMD pushed cef3a31221d6 (task result 0), PBOX1 fast-forward to cef3a31, Git clean, Debug build PBOX1 0 errors, 5 JS suites PASS. LIVE PBOX1 PID 15860 nadal telemetry, bez restartu. Nie publikowano nowego EXE.
 - 2026-10-18 15:49: Open Browser Lite Debug 0 errors; 8 headless .NET selftests exit=0, 5 JS suites PASS. Polityka kart sprawdzona na 10 000 syntetycznych czatów; core-v06 mapping test PASS, ale NIE aktywowano w Lite. Otwarty problem: niespójna flaga WinForms hard prune po odmowie edycji, nie wdrażać jako LIVE.
 - 2026-05-21: Test sources show unresolved PS stdout mojibake while PY UTF-8 works correctly.

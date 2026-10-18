@@ -3,6 +3,8 @@
 Zakres: do ukończenia WSZYSTKICH omówionych funkcji. Priorytety uporządkowane, ale żaden etap końcowy nie znika z backlogu. Każdy punkt przechodzi SOURCE -> TEST -> STAGED -> LIVE VERIFIED; niedowodnione nie jest DONE.
 
 ## Reguły wykonania
+- **NOWE nadrzędne polecenie 18.10.2026 18:16 CEST:** żadnych automatycznych przypominajek ani nowych zadań ChatGPT. Wszystkie 32 zapisane automatyzacje ChatGPT są wyłączone. Rozwój tej aplikacji wyłącznie w bieżącej rozmowie do odwołania. Usługi techniczne Autosync/monitor zasobów nie są przypominajkami.
+- Zweryfikowane odzyskiwanie: `docs/openbrowser-audit-recovery-2026-10-18-1828.md` wraz z sumami SHA256 i rozróżnieniem LIVE/STAGED/SOURCE.
 - SATANAMD `D:\projects\open-browser` to źródło; PBOX1 klon i wersjonowane wydania; Autosync na autosync/SATANAMD bez ręcznych push.
 - Nie wstrzymuj pracy przy pierwszym blockerze. Realizuj inne niezależne zadania, loguj dokładnie odmowy w `docs/Rejestr nieudanych komend.md` z unikalnym ID, nie obchodź odmów alternatywnym narzędziem.
 - Każdy krok prowadź od małej implementacji do testów negatywnych, side-by-side release i realnej obserwacji; nie przerywaj aktywnej odpowiedzi aktualnego WebView2.
@@ -42,7 +44,7 @@ Zakres: do ukończenia WSZYSTKICH omówionych funkcji. Priorytety uporządkowane
 ## P3: koordynacja oraz odporność
 25. [TODO] Własny lokalny MCP server z register_chat/heartbeat/task_checkpoint/lead_handoff/report_blocker/notes_ack, z uprawnieniami i kontrolą kto jest kim; nie ufać bezkrytycznie samoopisowi.
 26. [TODO] Obsługa autoryzacji, ról lead/worker/support, handoff do nowego czatu i archiwizacja starych danych bez przypadkowego przecieku.
-27. [TODO] Rozpoznawanie zatrzymania czynności a nie zatrzymania UI, bezpieczne kontynuowanie po restarcie i w godzinowej automatyzacji niezależnej od webowego ChataGPT.
+27. [TODO] Rozpoznawanie zakończenia zadania, nie jedynie zatrzymania UI; bezpieczne kontynuowanie po restarcie przez własny nadzorca Open Browser. **Bez godzinowych przypominajek ChatGPT.** Przed E2E supervisor jest OFF/opt-in.
 28. [TODO] Panel dodawania MCP, test dostępności/instalacji, brak wklejania sekretów do czatu; infrastruktura pluginów zgodna z aktualną platformą.
 29. [TODO] API Luna/niższy model jako konfigurowalne strategie, monitor rachunków/timeout/429, fallback na WAIT lub model zatwierdzony, logger kosztów bez ujawniania promptu.
 
