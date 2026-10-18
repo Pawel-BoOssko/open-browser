@@ -119,6 +119,17 @@ internal sealed class LiteProjectRegistry
         return chat;
     }
 
+    internal void PromoteLead(string projectId, string chatId)
+    {
+        var project = _store.Projects.FirstOrDefault(p => p.Id == projectId)
+            ?? throw new ArgumentException("Unknown project");
+        if (!project.Chats.Any(c => c.Id == chatId))
+            throw new ArgumentException("Unknown chat");
+        foreach (var chat in project.Chats)
+            chat.Role = chat.Id == chatId ? "lead" : "worker";
+        Save();
+    }
+
     internal void Save()
     {
         string? folder = Path.GetDirectoryName(_file);

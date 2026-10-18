@@ -74,3 +74,13 @@ Dokument źródłowy: docs/design/openbrowser-control-center-analysis-2026-10-18
 - Wyraźnie pokazane potwierdzone wyniki i niepewności; alarmy i bezpieczne rejestrowanie CPU/RAM/DOM; zamknięta ścieżka diagnostyki.
 - Automatyka działa dopiero po testach dublowania, stanów długiego tool call, błędów serwera, awarii podczas checkpointu.
 - Testy wszystkich komponentów PASS, wdrożenie PBOX1, rollback, Autosync, aktualne instrukcje operatorskie.
+
+## Checkpoint implementacji 2026-10-18 / pakiet A
+- [DONE] Kod `src/BridgeBrowserAlpha0/LiteDomOptimizer.js`: analiza liczby tur ChatGPT, nieinwazyjny `content-visibility:auto` z `contain-intrinsic-size` dla starszych tur, bez usuwania rozmów; chroni ostatnie 40 tur, skupiony element i stany busy, opt-in przełączany w toolbar.
+- [DONE] Dodano `tests/lite-dom-optimizer.test.cjs`: pięć scenariuszy (poniżej progu, >progu, wyłączanie/włączanie, focus/streaming, nieobsługiwana CSS / obca domena), 5 PASS. Node --check PASS.
+- [DONE] Integracja Lite z jednym WebView2: osadzenie skryptu dokumentu, pomiary DOM przez bounded single-flight ExecuteScriptAsync, logi dom_status / dom_probe_timeout, toolbar z ON/OFF.
+- [DONE] Podstawowy rejestr `LiteProjectRegistry.cs` i WinForms `LiteProjectsUi.cs`: dowolna liczba projektów, 7 startowych, przypięcie bieżącego adresu ChatGPT, role lead/worker wybierane ręcznie; serializacja atomowa w osobnym `%LOCALAPPDATA%\OpenBrowser\ChatGPT-Lite\projects.json`.
+- [DONE] SATANAMD dotnet build Debug 0 błędów, 1 istniejące ostrzeżenie MSB3277.
+- [TODO] Zrealizować instalację side-by-side na PBOX1 i test po bezpiecznym uruchomieniu; nie przerywać aktualnie aktywnego strumienia czatu.
+- [TODO] Uzupełnić oddzielne testy regresji rejestru i scenariuszy nadzoru. Pełnego dashboardu statusu pracy, backlogów i historii NIE należy jeszcze raportować jako ukończonego.
+- [BLOCKED] Narzędzie: `functions.exec` -> Remote Desktop Commander `create_directory` oraz planowane `write_file` dla nowego `tests/LiteProjectsSmoke/LiteProjectsSmoke.csproj`. Jedna złożona operacja utworzenia folderu testowego i pliku projektu została zablokowana zabezpieczeniem. Zakres blokady: utworzenie nowego katalogu projektu smoke test; nie potwierdzono wykonania żadnej modyfikacji. Nie powtarzano tej operacji innym narzędziem; nie jest to blokada testów JS ani build C#.

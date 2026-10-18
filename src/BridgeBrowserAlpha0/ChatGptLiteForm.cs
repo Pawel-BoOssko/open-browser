@@ -52,10 +52,11 @@ internal sealed partial class ChatGptLiteForm : Form
         {
             Dock = DockStyle.Fill,
             Orientation = Orientation.Vertical,
-            SplitterDistance = 270,
-            Panel1MinSize = 205,
-            Panel2MinSize = 400
+            Size = new Size(1150, 750)
         };
+        content.Panel1MinSize = 205;
+        content.Panel2MinSize = 400;
+        content.SplitterDistance = 270;
         content.Panel1.Controls.Add(CreateProjectsUi());
         content.Panel2.Controls.Add(_browser);
         Controls.Add(content);
