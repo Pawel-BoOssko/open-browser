@@ -66,7 +66,7 @@ internal sealed partial class ChatGptLiteForm : Form
             WrapContents = false,
             AutoScroll = true
         };
-        toolbar.Controls.AddRange(new Control[] { _buildVersion, _highIndicator, _resumeToggle, _resumeStatus, _back, _forward, _reload, _home, _domToggle, _hardPruneToggle, _archiveToggle, _openArchive, _status, _domInfo });
+        toolbar.Controls.AddRange(new Control[] { _buildVersion, _highIndicator, _devWakeToggle, _devWakeStatus, _resumeToggle, _resumeStatus, _back, _forward, _reload, _home, _domToggle, _hardPruneToggle, _archiveToggle, _openArchive, _status, _domInfo });
         var content = new SplitContainer
         {
             Dock = DockStyle.Fill,
@@ -118,6 +118,7 @@ internal sealed partial class ChatGptLiteForm : Form
         InitializeHardPruneUi();
         InitializeResumeUi();
         InitializeHighUi();
+        InitializeDevWake();
 
         LiteEventLog.PruneOldFiles();
         LiteEventLog.Write("window_constructed", new { version = Application.ProductVersion });
@@ -141,6 +142,7 @@ internal sealed partial class ChatGptLiteForm : Form
             _captureTimer.Stop();
             _responseTimer.Stop();
             _resumeTimer.Stop();
+            _devWakeTimer.Stop();
             _highTimer.Stop();
             _pruneReportTimer.Stop();
             _noteSaveTimer.Stop();
@@ -217,12 +219,15 @@ internal sealed partial class ChatGptLiteForm : Form
                 // Preserve session data. The user can use Odśwież to retry.
             };
 
-            core.Navigate(HomeUrl);
+            var startUrl = _devWake.Enabled && LiteDevWakeState.IsChatUrl(_devWake.TargetUrl)
+                ? _devWake.TargetUrl : HomeUrl;
+            core.Navigate(startUrl);
             _domMonitor.Start();
             _captureTimer.Start();
             _responseTimer.Start();
             _pruneReportTimer.Start();
             _resumeTimer.Start();
+            _devWakeTimer.Start();
             _highTimer.Start();
             _ = VerifyHighAsync();
         }

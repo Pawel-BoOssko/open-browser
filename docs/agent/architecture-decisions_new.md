@@ -44,6 +44,11 @@ Latest:
 
 ## Accepted Decisions
 
+## 2026-10-19 — Owner-run Open Browser wake (not ChatGPT reminders)
+
+Owner replaces the previous opt-in-only book supervisor priority with a persistent, application-local single-chat development wake. The timer runs inside Open Browser Lite at ~25-minute intervals, tied to exactly one user-approved ChatGPT conversation by its URL in DPAPI local settings; no ChatGPT scheduled Tasks, no Windows hourly ChatGPT wake tasks, and no task packet selection by the watcher. Wake message merely reminds the same chat to read its own durable master plan and continue choosing work autonomously. User explicitly authorizes running this cycle unattended overnight. It is permitted only when the browser is running, the correct conversation is active, the last assistant response is stable, High is verified, there is no generation, user draft, or UI delivery error, and the prior answer has not already been prompted. Persist receipt before sending; no retries on uncertain delivery. Completion marker stops the watcher. Plan: docs/design/openbrowser-master-roadmap-v3-2026-10-19.md. This is distinct from the disallowed ChatGPT reminders: those remain disabled.
+
+
 ## 2026-10-18 18:28 — No ChatGPT scheduled development until operator revokes
 
 Owner directly prohibited creating or running any ChatGPT reminder/automation. All 32 existing ChatGPT automations were found disabled. This overrides older documents referring to a recurring hourly helper; no future developer should re-enable it without a new explicit user instruction. Development takes place in the current operator-supervised chat only. Existing Windows Autosync and read-only resource-monitoring tasks are independent maintenance components, not ChatGPT reminder triggers. Source/test/staged/live remain separate; no automatic promotion of staged releases with failing test gates. Backup and audit evidence: docs/openbrowser-audit-recovery-2026-10-18-1828.md.

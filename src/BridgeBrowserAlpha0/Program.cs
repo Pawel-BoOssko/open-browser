@@ -13,6 +13,34 @@ internal static class Program
             Environment.ExitCode = LiteUpgradeHelper.Run(args);
             return;
         }
+        if (args.Length >= 2 && string.Equals(args[0], "--lite-dev-wake-arm", StringComparison.OrdinalIgnoreCase))
+        {
+            try
+            {
+                var chat = LiteDevWakeState.NormalizeUrl(args[1]);
+                var current = LiteDevWakeState.Read();
+                if (!string.Equals(current.TargetUrl, chat, StringComparison.Ordinal))
+                    current = new LiteDevWakeState.Record { TargetUrl = chat };
+                current.Enabled = true;
+                current.IntervalMinutes = 25;
+                current.NextDueUtc = DateTimeOffset.UtcNow.AddMinutes(25);
+                current.LastState = "armed";
+                LiteDevWakeState.Write(current);
+                LiteEventLog.Write("dev_wake_armed", new { intervalMinutes = 25, boundToOneChat = true });
+                Environment.ExitCode = 0;
+            }
+            catch (Exception ex)
+            {
+                LiteEventLog.Write("dev_wake_arm_failed", new { errorType = ex.GetType().Name });
+                Environment.ExitCode = 3;
+            }
+            return;
+        }
+        if (args.Any(arg => string.Equals(arg, "--lite-dev-wake-selftest", StringComparison.OrdinalIgnoreCase)))
+        {
+            Environment.ExitCode = LiteDevWakeState.SelfTest();
+            return;
+        }
         if (args.Any(arg => string.Equals(arg, "--lite-version-selftest", StringComparison.OrdinalIgnoreCase)))
         {
             Environment.ExitCode = LiteBuildInfo.SelfTest();
