@@ -80,8 +80,10 @@ After changes to OpenBridgeProtocol:
 After changes to OpenBridgeHost or executors:
 - run dotnet run --project tests/OpenBridgeHostSmoke/OpenBridgeHostSmoke.csproj.
 
-Full build command:
-- dotnet build D:\projects\open-browser\releases\BridgeBrowserAlpha0\src\BridgeBrowserAlpha0\BridgeBrowserAlpha0.csproj
+Full build command (after 2026-10-18 source relocation):
+- dotnet build D:\projects\open-browser\src\BridgeBrowserAlpha0\BridgeBrowserAlpha0.csproj
+
+ChatGPT Lite mode can be launched using --chatgpt-lite and must not automatically execute model commands or load the normal MainForm runtime. See docs/openbrowser-chatgpt-lite-2026-10-18.md.
 
 ## Commit rules summary
 

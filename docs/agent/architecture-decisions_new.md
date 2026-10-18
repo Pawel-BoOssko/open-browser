@@ -44,6 +44,27 @@ Latest:
 
 ## Accepted Decisions
 
+## 2026-10-18 | Lightweight ChatGPT test mode is separate from automation
+
+Decision:
+Provide an optional --chatgpt-lite startup mode in OpenBrowser. It uses a single WebView2 with basic navigation, separate local user profile and no OpenBridge command execution or response injection. Keep legacy MainForm behavior unchanged.
+
+Reason:
+The owner wants to test ChatGPT inside a lighter browser before developing independent task continuation and chat resilience.
+
+Applies to:
+- src/BridgeBrowserAlpha0/Program.cs and ChatGptLiteForm.cs
+- Windows desktop launcher and scripts/launch-chatgpt-lite.ps1
+
+Impacts:
+- docs/agent/current-state_new.md
+- docs/openbrowser-chatgpt-lite-2026-10-18.md
+- the development build and smoke test references
+
+Do not reintroduce:
+- OpenBridge command execution or DOM interception into Lite by default
+- treating the Lite preview as an implemented durable conversation archive or unattended task dispatcher
+
 ## 2026-05-20 | Documentation governance uses one trigger document
 
 Decision:
