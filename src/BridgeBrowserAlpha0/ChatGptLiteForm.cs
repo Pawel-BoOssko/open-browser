@@ -37,7 +37,7 @@ internal sealed partial class ChatGptLiteForm : Form
         Text = "Open Browser | ChatGPT Lite";
         Width = 1280;
         Height = 850;
-        MinimumSize = new Size(700, 450);
+        MinimumSize = new Size(980, 600);
         StartPosition = FormStartPosition.CenterScreen;
 
         var toolbar = new FlowLayoutPanel
@@ -60,7 +60,18 @@ internal sealed partial class ChatGptLiteForm : Form
         content.SplitterDistance = 270;
         content.Panel1.Controls.Add(CreateProjectsUi());
         content.Panel2.Controls.Add(_browser);
-        Controls.Add(content);
+        var workspace = new SplitContainer
+        {
+            Dock = DockStyle.Fill,
+            Orientation = Orientation.Vertical,
+            Size = new Size(1200, 780)
+        };
+        workspace.Panel1MinSize = 660;
+        workspace.Panel2MinSize = 225;
+        workspace.SplitterDistance = 900;
+        workspace.Panel1.Controls.Add(content);
+        workspace.Panel2.Controls.Add(CreateNotesUi());
+        Controls.Add(workspace);
         Controls.Add(toolbar);
 
         _back.Enabled = false;
@@ -101,6 +112,9 @@ internal sealed partial class ChatGptLiteForm : Form
             _heartbeat.Stop();
             _domMonitor.Stop();
             _captureTimer.Stop();
+            _responseTimer.Stop();
+            FlushNotes();
+            _noteSaveTimer.Stop();
             LiteEventLog.Write("window_closing");
         };
         Load += async (_, _) => await InitializeBrowserAsync();
@@ -126,11 +140,21 @@ internal sealed partial class ChatGptLiteForm : Form
             core.Settings.IsWebMessageEnabled = false;
             core.Settings.AreDevToolsEnabled = false;
             core.Settings.IsStatusBarEnabled = false;
+            core.PermissionRequested += (_, e) =>
+            {
+                if (e.PermissionKind != CoreWebView2PermissionKind.Microphone) return;
+                bool chatGpt = Uri.TryCreate(e.Uri, UriKind.Absolute, out var origin) &&
+                    (origin.Host == "chatgpt.com" || origin.Host == "www.chatgpt.com");
+                e.State = chatGpt ? CoreWebView2PermissionState.Allow : CoreWebView2PermissionState.Deny;
+                e.Handled = true;
+                LiteEventLog.Write("microphone_permission", new { host = LiteEventLog.HostOnly(e.Uri), allowed = chatGpt });
+            };
             string domScriptFile = Path.Combine(AppContext.BaseDirectory, "LiteDomOptimizer.js");
             string domScript = await File.ReadAllTextAsync(domScriptFile);
             await core.AddScriptToExecuteOnDocumentCreatedAsync(domScript);
             LiteEventLog.Write("dom_observer_installed");
             await InstallCaptureScriptAsync(core);
+            await InstallResponseDiagnosticsAsync(core);
 
             core.NavigationStarting += (_, e) =>
             {
@@ -145,6 +169,7 @@ internal sealed partial class ChatGptLiteForm : Form
                 if (!_domEnabled && e.IsSuccess) _ = ApplyDomModeAsync();
             };
             core.HistoryChanged += (_, _) => UpdateNavigation();
+            core.SourceChanged += (_, _) => SwitchNotesForUrl(core.Source);
             core.ProcessFailed += (_, e) =>
             {
                 LiteEventLog.Write("webview_process_failed", new
@@ -161,6 +186,7 @@ internal sealed partial class ChatGptLiteForm : Form
             core.Navigate(HomeUrl);
             _domMonitor.Start();
             _captureTimer.Start();
+            _responseTimer.Start();
         }
         catch (Exception ex)
         {
