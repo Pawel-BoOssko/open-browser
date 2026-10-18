@@ -7,7 +7,7 @@ internal sealed partial class ChatGptLiteForm
 {
     private readonly Button _hardPruneToggle = new()
     {
-        Text = "DOM mocne: TAK", Width = 128
+        Text = "DOM mocne: NIE", Width = 128
     };
     private readonly System.Windows.Forms.Timer _pruneReportTimer = new()
     {

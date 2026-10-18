@@ -76,3 +76,52 @@ Wszystkie kolejne problemy, odmowy i nieudane operacje zapisywać jako OB-10, OB
 - Rezultat: `To wywołanie narzędzia zostało zablokowane przez zabezpieczenia OpenAI. Sprawdź dokładniej, co wysyłasz.`; nie otrzymano potwierdzenia rejestracji żadnego hosta.
 - Zakres: wyłącznie złożona rejestracja obu sesji; nie obejmuje repozytorium ani kodu. Przyczyna decyzji zabezpieczeń nie została ujawniona.
 - Dalsze postępowanie: bez ponawiania tej samej podwójnej operacji; zadania czytania i edycji plików przez RDC pozostają niezależne od tej rejestracji.
+
+### OB-12 — 2026-10-18, drobna edycja inicjalizacji notatek
+- Narzędzie: `functions.exec` -> `Remote_Desktop_Commander__edit_block` (drugie wywołanie tego samego skryptu; pierwsze wykonano i potwierdzono odczytem).
+- Rozmiar: jedna mała zmiana 1 linii w `src/BridgeBrowserAlpha0/LiteNotesUi.cs` (`_noteKey` ustawiany początkowo na pusty zamiast `inbox`), aby odczytać notatki ogólne przy starcie.
+- Rezultat: `To wywołanie narzędzia zostało zablokowane przez zabezpieczenia OpenAI.` Odczyt pliku potwierdził, że linia pozostała `_noteKey = "inbox"`, a wcześniejszy, odrębny dodany field `_notesOutbox` jest obecny.
+- Zakres: tylko inicjalizacja odczytu ogólnych notatek, NIE zapis szyfrowanej kolejki ani dotychczasowe dane; przyczyna blokady nieudostępniona. Nie ponowiono równoważnej zmiany alternatywnym narzędziem.
+
+### OB-12 — 2026-10-18 ~15:43 — LC MultiHost SATANAMD — publikacja STAGED
+- Narzędzie: `functions.exec` -> `mcp__lc_multihost__execute_command(target=satamad)`.
+- Rozmiar: jeden średni krok systemowy: `dotnet publish src/BridgeBrowserAlpha0/BridgeBrowserAlpha0.csproj -c Release --no-restore -m:1 -v:q -p:OutputPath="$build\\" -p:PublishDir="$base\\"`, gdzie `$build=%TEMP%\\ob-lite-build-1543`, `$base=%LOCALAPPDATA%\\Programs\\OpenBrowserChatGPTLite_20261018_1543_outbox_tabpolicy`; następnie odczyt statusu i istnienia EXE.
+- Wynik dosłowny: `This tool call was blocked by OpenAI's safety checks. Please double check what you are sending.` Nie otrzymano wyników polecenia ani potwierdzenia rozpoczęcia publish.
+- Zakres: wyłącznie próba przygotowania odrębnego wydania STAGED na SATANAMD; LIVE, profil WebView2 i procesy nie były celem operacji. Nie potwierdzono jakiegokolwiek zapisu.
+- Kategoria: jawna odmowa zabezpieczeń; przyczyna nieujawniona, nie dowiedziono ryzyka samej kompilacji ani uprawnień systemu.
+- Decyzja: nie powtarzać równoważnej publikacji innym narzędziem. Kontynuować niezależne testy i dokumentację; status STAGED dla tego pakietu pozostaje NIEPOTWIERDZONY.
+
+### OB-13 — 2026-10-18 ~15:44 — LC MultiHost PBOX1 — testy headless STAGED i odczyt monitora
+- Narzędzie: `functions.exec` -> `mcp__lc_multihost__execute_command(target=pbox1)`.
+- Rozmiar: jeden średni krok zawierający pięć niezależnych uruchomień `Start-Process -Wait -WindowStyle Hidden` dla istniejącego STAGED `OpenBrowserChatGPTLite_20261018_notes_dom_voice\\BridgeBrowserAlpha0.exe` z argumentami `--lite-notes-selftest`, `--lite-archive-selftest`, `--lite-projects-selftest`, `--lite-lease-selftest`, `--lite-journal-selftest`; następnie odczyt `Get-ScheduledTask` i `Get-ScheduledTaskInfo` dla `OpenBrowser Lite Resource Monitor`.
+- Wynik dosłowny: `This tool call was blocked by OpenAI's safety checks. Please double check what you are sending.` Nie otrzymano wyników testów ani stanu monitora.
+- Zakres: próba uruchomienia bezinterfejsowych testów istniejącego STAGED i odczytu harmonogramu; bez ingerencji w LIVE PID 15860, bez zmiany tasków i bez dostępu do rozmów.
+- Kategoria: odmowa zabezpieczeń, przyczyna nieujawniona. Nie twierdzić, że testy w tym wywołaniu się wykonały.
+- Decyzja: nie ponawiać tych testów innym narzędziem w tej iteracji; odrębne działania dokumentacyjne i testy SATANAMD pozostają dostępne.
+
+### OB-14 — 2026-10-18 ~15:44 — RDC SATANAMD — nowy checkpoint
+- Narzędzie: `functions.exec` -> `mcp__Remote_Desktop_Commander__write_file(mode=rewrite)`.
+- Rozmiar: jeden duży zapis nowego pliku `docs/openbrowser-checkpoint-2026-10-18-1544.md`, około 50 linii. Treść: SOURCE/BUILD/STAGED/LIVE, 17 testów outbox, 12 testów polityki kart, 25 scenariuszy JS, konflikt równoległych edycji, OB-12/OB-13 i następne etapy. Bez sekretów ani treści rozmów.
+- Wynik dosłowny: `This tool call was blocked by OpenAI's safety checks. Please double check what you are sending.` Nie otrzymano potwierdzenia zapisu.
+- Zakres: wyłącznie nowy plik checkpointu, brak wpływu na kod i procesy; przyczyna zabezpieczenia nieujawniona.
+- Decyzja: nie powtarzać równoważnego tworzenia tego checkpointu innym narzędziem. Pozostałe niezależne prace trwają; szczegółowy stan z tej iteracji pozostaje w rejestrze i wynikach testów.
+
+### OB-13 — 2026-10-18, panel ręcznego kierowania notatek do kolejki
+- Narzędzie: `functions.exec` → `Remote_Desktop_Commander__write_file`, jeden nowy plik `src/BridgeBrowserAlpha0/LiteNotesOutboxUi.cs`.
+- Rozmiar: jedno zadanie zapisu około 48 linii C#, dwa przyciski WinForms (`Do kolejki`, `Zobacz kolejkę`), dołączenie nowych dopisków do lokalnego zaszyfrowanego outboxu, bez wysyłania promptów ani zmiany danych na serwerze.
+- Rezultat: `To wywołanie narzędzia zostało zablokowane przez zabezpieczenia OpenAI.` Brak potwierdzenia zapisu pliku.
+- Zakres: tylko warstwa UI dla kolejki; istniejący magazyn `LiteNotesOutbox.cs`, test i osobne okno `LiteOutboxWindow.cs` nie były częścią zablokowanej operacji. Przyczyna zabezpieczenia nieujawniona.
+- Dalsze postępowanie: nie ponawiać równoważnej edycji alternatywnym narzędziem; UI kolejki pozostaje niewdrożone, a rozwój pozostałych komponentów jest kontynuowany.
+
+### OB-15 — 2026-10-18 ~15:45 — RDC SATANAMD — aktualizacja master planu
+- Narzędzie: `functions.exec` -> `mcp__Remote_Desktop_Commander__write_file(mode=append)`.
+- Rozmiar: jeden średni zapis 9 linii do `docs/design/openbrowser-master-plan-2026-10-18.md`: status kolejki DPAPI, polityki kart, 17+12 testów, 25 testów JS, konfliktu równoległych zapisów, blokad i statusu LIVE.
+- Wynik dosłowny: `This tool call was blocked by OpenAI's safety checks. Please double check what you are sending.` Nie potwierdzono zapisu.
+- Zakres: aktualizacja dokumentacji planu, bez zmian w źródłach, procesach i zadaniach. Powód odmowy nieujawniony.
+- Decyzja: nie ponawiać tej aktualizacji przez inne narzędzie; nie deklarować planu jako zaktualizowanego.
+
+### OB-14 — 2026-10-18, uruchomienie diagnostyki CDP w Lite
+- Narzędzie: `functions.exec` → `Remote_Desktop_Commander__edit_block`, jedna chirurgiczna zmiana `ChatGptLiteForm.cs`.
+- Rozmiar: zastąpienie dwóch wierszy o instalacji obserwatora odpowiedzi i DOM blokiem ~9 wierszy; wywołanie `LiteTransportDiagnostics(core).InitializeAsync()` z lokalnym try/catch, bez ingerencji w ruch sieciowy.
+- Rezultat: `To wywołanie narzędzia zostało zablokowane przez zabezpieczenia OpenAI.` Nie potwierdzono wykonania zmiany w głównym formularzu.
+- Zakres: jedynie automatyczne podłączenie nowego pasywnego modułu CDP do aktywnego WebView2; odrębny kod `LiteTransportDiagnostics.cs` istnieje, ale nie jest aktywowany. Przyczyna blokady nieznana; nie powtarzać równoważnej zmiany innym narzędziem.

@@ -66,10 +66,11 @@ internal sealed partial class ChatGptLiteForm
             FlushNotes();
             try
             {
-                var item = _notesOutbox.Enqueue(_noteKey, _noteEditor.Text);
-                _noteState.Text = "W kolejce lokalnej #" + item.Sequence +
-                    ". Nie wysłano do ChatGPT.";
-                LiteEventLog.Write("notes_outbox_queued", new { sequence = item.Sequence });
+                var item = _notesOutbox.EnqueueDraft(_noteKey, _noteEditor.Text);
+                _noteState.Text = item is null
+                    ? "Treść już jest w kolejce; nie wysłano do ChatGPT."
+                    : "Dodano do kolejki lokalnej; nie wysłano do ChatGPT.";
+                LiteEventLog.Write("notes_outbox_queued", new { newItem = item is not null });
             }
             catch (Exception ex)
             {
@@ -110,7 +111,11 @@ internal sealed partial class ChatGptLiteForm
     {
         string target = LiteChatNotes.NormalizeKey(url);
         if (target == _noteKey && !_notesLoading) return;
-        FlushNotes();
+        if (!FlushNotes())
+        {
+            _noteState.Text = "Nie można zmienić notatnika: poprzednia notatka nie została zapisana.";
+            return;
+        }
         _noteKey = target;
         _notesLoading = true;
         try
@@ -134,10 +139,10 @@ internal sealed partial class ChatGptLiteForm
         finally { _notesLoading = false; }
     }
 
-    private void FlushNotes()
+    private bool FlushNotes()
     {
         _noteSaveTimer.Stop();
-        if (!_notesDirty || _noteEditor.ReadOnly) return;
+        if (!_notesDirty || _noteEditor.ReadOnly) return true;
         try
         {
             _noteStore.Save(_noteKey, _noteEditor.Text);
@@ -145,11 +150,13 @@ internal sealed partial class ChatGptLiteForm
             _noteState.Text = "Zapisano lokalnie • " + DateTime.Now.ToString("HH:mm:ss") +
                 ". Oczekuje na ręczne przekazanie.";
             LiteEventLog.Write("notes_saved", new { length = _noteEditor.TextLength });
+            return true;
         }
         catch (Exception ex)
         {
             _noteState.Text = "Błąd zapisu! Notatki nadal pozostają w oknie.";
             LiteEventLog.Write("notes_save_failed", new { errorType = ex.GetType().Name });
+            return false;
         }
     }
 

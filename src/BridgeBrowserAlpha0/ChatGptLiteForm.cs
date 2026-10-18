@@ -119,14 +119,19 @@ internal sealed partial class ChatGptLiteForm : Form
             _lastHeartbeat = now;
         };
         _heartbeat.Start();
-        FormClosing += (_, _) =>
+        FormClosing += (_, e) =>
         {
+            if (!FlushNotes())
+            {
+                e.Cancel = true;
+                LiteEventLog.Write("window_close_blocked", new { reason = "notes_not_saved" });
+                return;
+            }
             _heartbeat.Stop();
             _domMonitor.Stop();
             _captureTimer.Stop();
             _responseTimer.Stop();
             _pruneReportTimer.Stop();
-            FlushNotes();
             _noteSaveTimer.Stop();
             DisposeWindowRecovery();
             LiteEventLog.Write("window_closing");

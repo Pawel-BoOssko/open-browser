@@ -33,7 +33,15 @@ function setup(count, settings = {}) {
     getSelection() { return settings.selection || ""; }
   };
   vm.runInNewContext(script, { window: win, Date });
+  if (settings.optIn !== false && win.__OPENBROWSER_HARD_PRUNE__)
+    win.__OPENBROWSER_HARD_PRUNE__.enable(true);
   return { list, doc, win, api: win.__OPENBROWSER_HARD_PRUNE__ };
+}
+{
+  const t = setup(100, { optIn: false });
+  assert.equal(t.api.status().enabled, false);
+  t.win.initial();
+  assert.equal(t.list.length, 100);
 }
 {
   const t = setup(89);
@@ -81,4 +89,4 @@ function setup(count, settings = {}) {
   assert.equal(t.list.length, 25);
   assert.equal(t.list.includes(focused), true);
 }
-console.log("LiteDomHardPrune: 8 PASS");
+console.log("LiteDomHardPrune: 9 PASS");

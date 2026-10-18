@@ -68,10 +68,19 @@ internal sealed partial class ChatGptLiteForm
             bool generating = root.GetProperty("generatingSignal").GetBoolean();
             if (failure != _lastResponseFailure)
             {
+                var assessment = LiteDeliveryEvidence.Classify(new(
+                    RendererResponsive: true, JavaScriptResponsive: true,
+                    AnswerVisible: null, SnapshotPersisted: null,
+                    BackendHttpStatus: null,
+                    VisibleError: failure.Length == 0 ? null : failure,
+                    GenerationActive: generating));
                 LiteEventLog.Write("response_error_transition", new
                 {
                     state = failure.Length == 0 ? "cleared" : failure,
                     generating,
+                    evidence = assessment.Code,
+                    confidence = assessment.Confidence,
+                    serverDeliveryProven = assessment.ServerDeliveryProven,
                     turnCount = root.GetProperty("turnCount").GetInt32()
                 });
                 _lastResponseFailure = failure;

@@ -20,6 +20,7 @@ Update rule:
 Update this file whenever the Operator, the model working inside OpenBrowser, or a developer agent records a real observation from use, testing, development, or documentation work.
 
 Latest:
+- 2026-10-18 15:49: Open Browser Lite Debug 0 errors; 8 headless .NET selftests exit=0, 5 JS suites PASS. Polityka kart sprawdzona na 10 000 syntetycznych czatów; core-v06 mapping test PASS, ale NIE aktywowano w Lite. Otwarty problem: niespójna flaga WinForms hard prune po odmowie edycji, nie wdrażać jako LIVE.
 - 2026-05-21: Test sources show unresolved PS stdout mojibake while PY UTF-8 works correctly.
 - This file is a working intake queue, not polished technical documentation.
 - Entries are written close to the moment of observation.
@@ -168,3 +169,6 @@ Observed issues to keep visible:
 - text transport and encoding must be treated as an architecture issue in both directions: model to executor and executor to model;
 - models need one factual place for operational observations after tasks.
 <!-- /COMPLETE_DOC_UPDATE_FIELD_NOTES_20260521 -->
+
+## 2026-10-18 15:47 | developer-agent | Open Browser Lite | partial
+Observation: testy 8 bezinterfejsowych modułów .NET zakończone exit=0; 26 scenariuszy JavaScript PASS. Nowy planista rezydencji kart i klasyfikator dowodów dostarczenia są w SOURCE, lecz nie sterują jeszcze rzeczywistym WebView2. Domyślne usuwanie DOM w JavaScript ustawiono na opt-in, ale flaga WinForms nadal wymaga uzgodnienia, ponieważ edycja pola została odrzucona przez zabezpieczenia. Nie wdrażać nowego EXE do LIVE bez sprawdzenia zgodności UI i testu React. Wystąpiły równoległe edycje kolejki notatek, chwilowo psujące kompilację; ostatni build Debug PASS. Pełny rejestr blokad: docs/Rejestr nieudanych komend.md.

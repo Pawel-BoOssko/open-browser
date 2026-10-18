@@ -129,10 +129,10 @@ internal sealed partial class ChatGptLiteForm
                         Text = (chat.Role == "lead" ? "★ " : "  ") + chat.Title
                     };
                     string url = chat.Url;
-                    link.Click += (_, _) =>
+                    link.Click += async (_, _) =>
                     {
                         LiteEventLog.Write("project_chat_opened");
-                        _browser.CoreWebView2?.Navigate(url);
+                        await NavigateToProjectChatAsync(url);
                     };
                     var makeLead = new Button
                     {

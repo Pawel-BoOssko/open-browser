@@ -3,7 +3,7 @@
   if (global.__OPENBROWSER_HARD_PRUNE__) return;
   if (!global.document || global.location.hostname !== "chatgpt.com") return;
 
-  const config = { enabled: true, threshold: 90, keepNewest: 24, intervalMs: 120000 };
+  const config = { enabled: false, threshold: 90, keepNewest: 24, intervalMs: 120000 };
   const state = { removedTotal: 0, lastRemoved: 0, lastCheckedAt: null, skipped: null, failures: 0 };
 
   function isBusy(doc) {

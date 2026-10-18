@@ -5,167 +5,140 @@ using System.Text.Json;
 namespace BridgeBrowserAlpha0;
 
 /// <summary>
-/// Encrypted, per-chat durable outbox. It NEVER sends a message.
-/// An in-flight entry is not automatically retried after a crash.
+/// Encrypted, crash-resistant notes inbox for each ChatGPT conversation.
+/// No network calls. An uncertain delivery is never retried automatically.
 /// </summary>
 internal sealed class LiteNotesOutbox
 {
+    internal enum Phase { Queued, Prepared, DeliveryUncertain, Confirmed }
+
     internal sealed class Item
     {
-        public string Id { get; set; } = "";
-        public long Sequence { get; set; }
-        public string Digest { get; set; } = "";
+        public string Id { get; set; } = Guid.NewGuid().ToString("N");
         public string Text { get; set; } = "";
-        public string State { get; set; } = "pending";
-        public long LeaseEpoch { get; set; }
-        public DateTimeOffset CreatedUtc { get; set; }
+        public string FullDraftSnapshot { get; set; } = "";
+        public Phase Status { get; set; } = Phase.Queued;
+        public DateTimeOffset CreatedUtc { get; set; } = DateTimeOffset.UtcNow;
+        public DateTimeOffset ChangedUtc { get; set; } = DateTimeOffset.UtcNow;
+        public int DeliveryAttempts { get; set; }
     }
 
     private sealed class Envelope
     {
         public int Version { get; set; } = 1;
-        public string ChatKey { get; set; } = "";
-        public long NextSequence { get; set; } = 1;
         public List<Item> Items { get; set; } = new();
     }
 
-    internal readonly record struct IdleEvidence(
-        string ChatKey, DateTimeOffset FirstUtc, DateTimeOffset SecondUtc,
-        bool? Generating, bool? ToolActive, bool? ComposerReady,
-        bool? NavigationActive, bool? ProjectLeadConfirmed, long LeaseEpoch);
+    private readonly string _folder;
 
-    private readonly string _directory;
-    internal LiteNotesOutbox(string? directory = null)
+    internal LiteNotesOutbox(string? folder = null)
     {
-        _directory = directory ?? Path.Combine(
+        _folder = folder ?? Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "OpenBrowser", "ChatGPT-Lite", "notes-outbox");
+            "OpenBrowser", "ChatGPT-Lite", "outbox");
     }
 
-    internal Item Enqueue(string chatKey, string text)
+    private string FileFor(string chatKey)
     {
-        if (string.IsNullOrWhiteSpace(text) || text.Length > 20000)
-            throw new ArgumentException("Outbox note must contain 1..20000 characters");
-        using var guard = Lock(chatKey, out string path);
-        var box = Read(path, chatKey);
-        string digest = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(text)));
-        var duplicate = box.Items.FirstOrDefault(i => i.Digest == digest &&
-            i.State is "pending" or "dispatching" or "delivered" or "uncertain");
-        if (duplicate is not null) return duplicate;
-        if (box.Items.Count >= 16)
-            throw new InvalidOperationException("Outbox full; review existing items");
-        var item = new Item {
-            Id = Guid.NewGuid().ToString("N"), Sequence = box.NextSequence++,
-            Digest = digest, Text = text, State = "pending",
-            CreatedUtc = DateTimeOffset.UtcNow
-        };
-        box.Items.Add(item);
-        Write(path, box);
-        return item;
+        if (string.IsNullOrWhiteSpace(chatKey) || chatKey.Length > 2000)
+            throw new ArgumentException("Invalid conversation key");
+        string digest = Convert.ToHexString(
+            SHA256.HashData(Encoding.UTF8.GetBytes(chatKey)));
+        return Path.Combine(_folder, digest + ".dpapi");
+    }
+
+    private Envelope Read(string chatKey)
+    {
+        string path = FileFor(chatKey);
+        if (!File.Exists(path)) return new Envelope();
+        var encrypted = File.ReadAllBytes(path);
+        byte[] clear = LiteSecureArchive.Unprotect(encrypted);
+        try
+        {
+            var value = JsonSerializer.Deserialize<Envelope>(clear);
+            if (value?.Version != 1 || value.Items == null ||
+                value.Items.Any(item => item == null || item.Id.Length != 32))
+                throw new InvalidDataException("Invalid notes outbox schema");
+            return value;
+        }
+        finally { CryptographicOperations.ZeroMemory(clear); }
+    }
+
+    private void Write(string chatKey, Envelope envelope)
+    {
+        Directory.CreateDirectory(_folder);
+        string path = FileFor(chatKey);
+        byte[] plain = JsonSerializer.SerializeToUtf8Bytes(envelope);
+        byte[] encrypted;
+        try { encrypted = LiteSecureArchive.Protect(plain); }
+        finally { CryptographicOperations.ZeroMemory(plain); }
+        string staging = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        try
+        {
+            File.WriteAllBytes(staging, encrypted);
+            if (File.Exists(path))
+                File.Replace(staging, path, path + ".backup");
+            else
+                File.Move(staging, path);
+        }
+        finally { if (File.Exists(staging)) File.Delete(staging); }
     }
 
     internal IReadOnlyList<Item> List(string chatKey)
     {
-        using var guard = Lock(chatKey, out string path);
-        return Read(path, chatKey).Items;
+        return Read(chatKey).Items;
     }
 
-    internal bool TryBeginDispatch(string chatKey, string id,
-        IdleEvidence evidence, DateTimeOffset? nowUtc = null)
+    /// <summary>
+    /// Queues only the suffix typed since the last queued snapshot.
+    /// An edited earlier paragraph is queued as a complete replacement, never silently lost.
+    /// </summary>
+    internal Item? EnqueueDraft(string chatKey, string draft)
     {
-        var now = nowUtc ?? DateTimeOffset.UtcNow;
-        if (evidence.ChatKey != chatKey || evidence.Generating != false ||
-            evidence.ToolActive != false || evidence.ComposerReady != true ||
-            evidence.NavigationActive != false ||
-            evidence.ProjectLeadConfirmed != true || evidence.LeaseEpoch < 1 ||
-            evidence.SecondUtc - evidence.FirstUtc < TimeSpan.FromSeconds(5) ||
-            evidence.SecondUtc - evidence.FirstUtc > TimeSpan.FromSeconds(20) ||
-            evidence.SecondUtc > now ||
-            now - evidence.SecondUtc > TimeSpan.FromSeconds(10))
-            return false;
-        using var guard = Lock(chatKey, out string path);
-        var box = Read(path, chatKey);
-        var item = box.Items.FirstOrDefault(i => i.Id == id);
-        if (item is null || item.State != "pending") return false;
-        item.State = "dispatching";
-        item.LeaseEpoch = evidence.LeaseEpoch;
-        Write(path, box);
+        if (draft.Length > 200000) throw new ArgumentException("Note too large");
+        if (string.IsNullOrWhiteSpace(draft)) return null;
+        var data = Read(chatKey);
+        var last = data.Items.LastOrDefault();
+        if (last != null && last.FullDraftSnapshot == draft) return null;
+        string delta = last != null && draft.StartsWith(last.FullDraftSnapshot,
+            StringComparison.Ordinal) ? draft[last.FullDraftSnapshot.Length..] : draft;
+        if (string.IsNullOrWhiteSpace(delta)) return null;
+        var item = new Item
+        {
+            Text = delta, FullDraftSnapshot = draft
+        };
+        data.Items.Add(item);
+        Write(chatKey, data);
+        LiteEventLog.Write("notes_queued", new { characters = delta.Length });
+        return item;
+    }
+
+    internal bool Transition(string chatKey, string itemId, Phase from, Phase to)
+    {
+        bool permitted = (from, to) switch
+        {
+            (Phase.Queued, Phase.Prepared) => true,
+            (Phase.Prepared, Phase.DeliveryUncertain) => true,
+            (Phase.DeliveryUncertain, Phase.Confirmed) => true,
+            _ => false
+        };
+        if (!permitted) return false;
+        var data = Read(chatKey);
+        var item = data.Items.FirstOrDefault(i => i.Id == itemId && i.Status == from);
+        if (item == null) return false;
+        item.Status = to;
+        item.ChangedUtc = DateTimeOffset.UtcNow;
+        if (to == Phase.DeliveryUncertain) item.DeliveryAttempts++;
+        Write(chatKey, data);
+        LiteEventLog.Write("notes_queue_transition", new { from = from.ToString(), to = to.ToString() });
         return true;
     }
 
-    internal bool MarkResult(string chatKey, string id, long epoch,
-        bool externallyConfirmedDelivered)
+    internal Item? NextSafelyQueued(string chatKey)
     {
-        using var guard = Lock(chatKey, out string path);
-        var box = Read(path, chatKey);
-        var item = box.Items.FirstOrDefault(i => i.Id == id);
-        if (item is null || item.State != "dispatching" ||
-            item.LeaseEpoch != epoch || epoch < 1) return false;
-        item.State = externallyConfirmedDelivered ? "delivered" : "uncertain";
-        Write(path, box);
-        return true;
-    }
-
-    internal int RecoverInterrupted(string chatKey)
-    {
-        using var guard = Lock(chatKey, out string path);
-        var box = Read(path, chatKey);
-        int count = 0;
-        foreach (var item in box.Items.Where(i => i.State == "dispatching"))
-        {
-            item.State = "uncertain";
-            count++;
-        }
-        if (count > 0) Write(path, box);
-        return count;
-    }
-
-    private FileStream Lock(string key, out string path)
-    {
-        if (key.Length is < 1 or > 300 ||
-            !(key == "inbox" || key.StartsWith("chatgpt.com/c/", StringComparison.Ordinal) ||
-              key.StartsWith("chatgpt.com/g/", StringComparison.Ordinal)))
-            throw new ArgumentException("Invalid chat key");
-        Directory.CreateDirectory(_directory);
-        string hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(key)));
-        path = Path.Combine(_directory, hash + ".dpapi");
-        return new FileStream(path + ".lock", FileMode.OpenOrCreate,
-            FileAccess.ReadWrite, FileShare.None);
-    }
-
-    private static Envelope Read(string path, string chatKey)
-    {
-        if (!File.Exists(path)) return new Envelope { ChatKey = chatKey };
-        byte[] plain = LiteSecureArchive.Unprotect(File.ReadAllBytes(path));
-        try
-        {
-            var box = JsonSerializer.Deserialize<Envelope>(plain);
-            if (box is null || box.Version != 1 || box.ChatKey != chatKey ||
-                box.Items is null || box.NextSequence < 1 || box.Items.Count > 16 ||
-                box.Items.Any(i => i.State is not ("pending" or "dispatching" or "delivered" or "uncertain")))
-                throw new InvalidDataException("Invalid outbox schema");
-            return box;
-        }
-        finally { CryptographicOperations.ZeroMemory(plain); }
-    }
-
-    private static void Write(string path, Envelope box)
-    {
-        byte[] plain = JsonSerializer.SerializeToUtf8Bytes(box);
-        byte[] cipher;
-        try { cipher = LiteSecureArchive.Protect(plain); }
-        finally { CryptographicOperations.ZeroMemory(plain); }
-        string temp = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
-        try
-        {
-            using (var stream = new FileStream(temp, FileMode.CreateNew,
-                FileAccess.Write, FileShare.None))
-            {
-                stream.Write(cipher);
-                stream.Flush(flushToDisk: true);
-            }
-            File.Move(temp, path, overwrite: true);
-        }
-        finally { if (File.Exists(temp)) File.Delete(temp); }
+        var data = Read(chatKey);
+        // A delivery of unknown outcome blocks further automatic dispatch.
+        if (data.Items.Any(i => i.Status == Phase.DeliveryUncertain)) return null;
+        return data.Items.FirstOrDefault(i => i.Status == Phase.Queued);
     }
 }
