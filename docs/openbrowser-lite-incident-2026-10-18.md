@@ -36,3 +36,11 @@ Cel: zachowac ustalenia przed restartem, zbadac przyczyny i wprowadzic diagnosty
 3. Dodac bezpieczny sposob recznej rekonstrukcji WebView2, nie kasujac profilu ani aktywnej rozmowy.
 4. Walidacja kompilacji, instalacja nowej wersji na PBOX1 dopiero po kontroli i odnotowaniu checkpointu. Zasady repo: edycja plików przez RDC, system commands przez LC, Autosync bez recznego push.
 5. Niezależne od tego etap późniejszy: monitoring zmian/odpowiedzi widocznych w interfejsie, checkpointy i handoffy, świadoma polityka prywatności; nigdy nie obiecywać odzyskiwania danych niezapisanych po stronie usługi.
+
+## Checkpoint wdrozenia instrumentacji
+- Dodano `src/BridgeBrowserAlpha0/LiteEventLog.cs`: trwałe JSONL (UTF-8 bez BOM), rotacja dzienna i maksymalny rozmiar 10 MiB na dzien, retencja 14 dni, bez tresci rozmów, pelnych URL, cookies i tokenow.
+- `ChatGptLiteForm.cs` emituje: window_constructed, ui_heartbeat co 30 s, window_closing, webview_initializing, webview_initialized (dokladna wersja Chromium), navigation_start (tylko host), navigation_completed (sukces/bląd), webview_process_failed (kind/reason/exitCode), webview_initialization_failed (typ błędu/HResult).
+- Plik docelowy na komputerze uruchomieniowym: %LOCALAPPDATA%\OpenBrowser\ChatGPT-Lite\diagnostics\lite-events-YYYY-MM-DD.jsonl.
+- Kompilacja Debug SATANAMD: 0 błędów, znane ostrzezenie MSB3277. Release build przez LC MultiHost SATANAMD `dotnet build ... --configuration Release --no-restore` zablokowany: MSB3021/MSB3027, exe zajety przez istniejący proces PID 13384. Zakres: zamiana jednego pliku hosta, inne skompilowane zrodla pozostały nietknięte. Nie probowano ponawiac tej samej operacji.
+- Aktualna wersja PBOX1 pozostaje starsza: kod po kompilacji Debug na SATANAMD NIE JEST JESZCZE WDROŻONY na PBOX1 i nie wolno twierdzić inaczej.
+- Zapytanie LC MultiHost o eventy PBOX1 zablokowalo sie na ponad 200 s; sesja zakończona jako crashed; brak danych WER; nie ponawiano zapytania w innym narzędziu.

@@ -57,6 +57,20 @@ internal sealed class ChatGptLiteForm : Form
             if (_browser.CanGoForward) _browser.GoForward();
         };
 
+        LiteEventLog.PruneOldFiles();
+        LiteEventLog.Write("window_constructed", new { version = Application.ProductVersion });
+        _heartbeat.Tick += (_, _) =>
+        {
+            var now = DateTimeOffset.UtcNow;
+            LiteEventLog.Write("ui_heartbeat", new { gapSeconds = (int)(now - _lastHeartbeat).TotalSeconds });
+            _lastHeartbeat = now;
+        };
+        _heartbeat.Start();
+        FormClosing += (_, _) =>
+        {
+            _heartbeat.Stop();
+            LiteEventLog.Write("window_closing");
+        };
         Load += async (_, _) => await InitializeBrowserAsync();
     }
 
@@ -71,23 +85,36 @@ internal sealed class ChatGptLiteForm : Form
             Directory.CreateDirectory(profile);
 
             _status.Text = "Uruchamianie silnika WebView2...";
+            LiteEventLog.Write("webview_initializing");
             var environment = await CoreWebView2Environment.CreateAsync(null, profile);
             await _browser.EnsureCoreWebView2Async(environment);
+            LiteEventLog.Write("webview_initialized", new { browserVersion = environment.BrowserVersionString });
 
             var core = _browser.CoreWebView2;
             core.Settings.IsWebMessageEnabled = false;
             core.Settings.AreDevToolsEnabled = false;
             core.Settings.IsStatusBarEnabled = false;
 
-            core.NavigationStarting += (_, _) => _status.Text = "Ładowanie...";
+            core.NavigationStarting += (_, e) =>
+            {
+                _status.Text = "Ładowanie...";
+                LiteEventLog.Write("navigation_start", new { host = LiteEventLog.HostOnly(e.Uri) });
+            };
             core.NavigationCompleted += (_, e) =>
             {
                 _status.Text = e.IsSuccess ? "Gotowe" : "Błąd: " + e.WebErrorStatus;
+                LiteEventLog.Write("navigation_completed", new { e.IsSuccess, webError = e.WebErrorStatus.ToString(), host = LiteEventLog.HostOnly(core.Source) });
                 UpdateNavigation();
             };
             core.HistoryChanged += (_, _) => UpdateNavigation();
             core.ProcessFailed += (_, e) =>
             {
+                LiteEventLog.Write("webview_process_failed", new
+                {
+                    kind = e.ProcessFailedKind.ToString(),
+                    reason = e.Reason.ToString(),
+                    exitCode = e.ExitCode
+                });
                 _status.Text = "Błąd procesu strony: " + e.ProcessFailedKind;
                 // Preserve session data. The user can use Odśwież to retry.
             };
@@ -96,6 +123,7 @@ internal sealed class ChatGptLiteForm : Form
         }
         catch (Exception ex)
         {
+            LiteEventLog.Write("webview_initialization_failed", new { errorType = ex.GetType().Name, ex.HResult });
             _status.Text = "Nie udało się uruchomić";
             MessageBox.Show(this, ex.Message, "Open Browser ChatGPT Lite",
                 MessageBoxButtons.OK, MessageBoxIcon.Error);

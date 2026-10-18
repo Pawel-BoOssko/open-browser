@@ -28,6 +28,14 @@ Latest:
 
 ## Entries
 
+## 2026-10-18 | operator | problem | in progress
+
+Observation: ChatGPT Lite on PBOX1 showed WebView2 RenderProcessUnresponsive and blocked chat switching. In parallel ChatGPT Desktop showed a missing response after 6m46s. PBOX1 had ~85 MiB free physical RAM and ~6.4 GiB pagefile occupied; a Get-WinEvent query timed out and LC MultiHost's PowerShell crashed. Unknown whether the missing server response was transmitted.
+
+Expected: persistent WebView2 failure logs and independent CPU/RAM metrics without recording account secrets or conversation content. Debug instrumentation builds; not yet deployed to PBOX1.
+
+Evidence: docs/openbrowser-lite-incident-2026-10-18.md.
+
 ## 2026-05-21 09:25 | developer-agent | problem | new
 
 Context:

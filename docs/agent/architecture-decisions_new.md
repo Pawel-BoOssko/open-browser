@@ -44,6 +44,14 @@ Latest:
 
 ## Accepted Decisions
 
+## 2026-10-18 | ChatGPT Lite critical event diagnostics preserve message privacy
+
+Decision: Record WebView2 lifecycle failures, renderer hang reasons, navigation outcomes (host only) and UI heartbeat into local UTF-8 JSONL diagnostic files with bounded retention. Avoid capturing message bodies, full conversation URLs, passwords, cookies or tokens. Monitoring must not trigger automatic prompts, cancel model work, or reset the WebView profile. The Lite test shell remains separate from OpenBridge automation.
+
+Reason: PBOX1 renderer became unresponsive while the ChatGPT response was not visible; without a separate durable event log we cannot distinguish renderer failure from server-side interruption.
+
+Applies to: src/BridgeBrowserAlpha0/LiteEventLog.cs and ChatGptLiteForm.cs; docs/openbrowser-lite-incident-2026-10-18.md.
+
 ## 2026-10-18 | Lightweight ChatGPT test mode is separate from automation
 
 Decision:
