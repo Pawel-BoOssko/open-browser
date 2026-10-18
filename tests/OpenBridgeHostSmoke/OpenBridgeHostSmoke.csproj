@@ -9,7 +9,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\releases\BridgeBrowserAlpha0\src\BridgeBrowserAlpha0\BridgeBrowserAlpha0.csproj" />
+    <ProjectReference Include="..\..\src\BridgeBrowserAlpha0\BridgeBrowserAlpha0.csproj" />
   </ItemGroup>
 
 </Project>
