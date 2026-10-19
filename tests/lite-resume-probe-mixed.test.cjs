@@ -24,7 +24,7 @@ function observe(legacy, modern) {
         if (selector === "button") return [{ innerText: "High" }];
         return [];
       },
-      querySelector(selector) { return selector === 'textarea,[contenteditable="true"]' ? {} : null; }
+      querySelector(selector) { return selector === '#prompt-textarea' ? {} : null; }
     }
   };
   vm.runInNewContext(source, { window: w });

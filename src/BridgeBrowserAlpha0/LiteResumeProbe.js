@@ -32,7 +32,12 @@
       '[data-testid="stop-button"],button[aria-label*="Stop generating"],button[aria-label*="Przerwij generowanie"]');
     const toolBusy = !!d.querySelector(
       '[data-testid*="tool-running"],[data-state="running"],[aria-busy="true"]');
-    const editor = d.querySelector('textarea,[contenteditable="true"]');
+    // Use the same composer priority as LiteResumeSender: a hidden textarea
+    // must not mask a user's draft in the active ChatGPT editor.
+    const editor = d.querySelector('#prompt-textarea') ||
+      d.querySelector('[data-testid="composer-text-input"]') ||
+      d.querySelector('textarea') ||
+      d.querySelector('[contenteditable="true"]');
     const draft = editor && String(editor.value || editor.innerText || "").trim().length > 0;
     const errorText = d.querySelector('[role="alert"],[data-testid*="error"]');
     const alertError = !!errorText &&

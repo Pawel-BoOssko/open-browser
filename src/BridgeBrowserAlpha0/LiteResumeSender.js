@@ -7,7 +7,12 @@
     return !!w.document.querySelector('[data-testid="stop-button"],[aria-busy="true"]');
   }
   function composer() {
-    return w.document.querySelector('#prompt-textarea,[data-testid="composer-text-input"],textarea');
+    // Prefer the actual ChatGPT editor over unrelated or hidden textareas.
+    // Keep this order in sync with LiteResumeProbe.observe().
+    return w.document.querySelector('#prompt-textarea') ||
+      w.document.querySelector('[data-testid="composer-text-input"]') ||
+      w.document.querySelector('textarea') ||
+      w.document.querySelector('[contenteditable="true"]');
   }
   function hasAck(receiptId) {
     // ChatGPT DIL renderer uses data-user-message-bubble (verified 2026-10-18).
