@@ -12,7 +12,10 @@
     return phases.get(receiptId) || "not_attempted";
   }
   function stopVisible() {
-    const button = w.document.querySelector('[data-testid="stop-button"]');
+    // Match the probe's supported Stop controls, including ChatGPT variants
+    // that expose only an accessible label and no data-testid.
+    const button = w.document.querySelector(
+      '[data-testid="stop-button"],button[aria-label*="Stop generating"],button[aria-label*="Przerwij generowanie"]');
     if (!button || button.disabled || button.hidden ||
         button.getAttribute?.('aria-hidden') === 'true') return false;
     if (typeof button.getClientRects === 'function' &&

@@ -38,6 +38,9 @@ function setup(options = {}) {
       if (selector === 'form[data-chatgpt-composer]')
         return options.formButton ? form : null;
       if (selector === 'button[aria-label="Tryb głosowy"]') return voice;
+      // Simulate a DIL Stop control identified by aria-label only.
+      if (options.alternateStopLabel && selector.includes('stop-button'))
+        return selector.includes('Stop generating') && busy ? {} : null;
       if (selector.includes("stop-button") || selector.includes("aria-busy"))
         return busy ? {} : null;
       return null;
@@ -167,4 +170,19 @@ function setup(options = {}) {
   assert.equal(p.sender.phase(id), 'draft_button_disabled');
   assert.equal(p.count(), 0);
 }
-console.log("LiteResumeSenderRace: 14 PASS");
+{
+  const p = setup({ alternateStopLabel: true });
+  assert.equal(p.sender.send(prompt, id), 'submission_requested');
+  p.setBusy(true);
+  p.run();
+  assert.equal(p.count(), 0, 'aria-label-only Stop blocks delayed send');
+  assert.equal(p.sender.phase(id), 'blocked_generation');
+}
+{
+  const p = setup({ alternateStopLabel: true });
+  p.setBusy(true);
+  assert.equal(p.sender.send(prompt, id), 'busy_generating',
+    'aria-label-only Stop blocks initial send');
+  assert.equal(p.count(), 0);
+}
+console.log("LiteResumeSenderRace: 16 PASS");

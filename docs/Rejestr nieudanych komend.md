@@ -349,3 +349,19 @@ Historyczne wpisy OB-10 i OB-11 zachowują swój numer. Nowym zdarzeniom należy
 
 ### OB-20261019-1106-roadmap-append
 - Narzędzie: RDC `write_file append`, SATANAMD. Mały zapis sekcji postępu OB3-007/011/QA do `docs/design/openbrowser-master-roadmap-v3-2026-10-19.md`. Wynik: `This tool call was blocked by OpenAI's safety checks`. Brak potwierdzenia dopisania; szczegółowej przyczyny nie podano. Odrębny checkpoint 11:06 zapisano pomyślnie.
+
+### OB-20261019-1208-stage-manifest-gates
+- Narzędzie: LC MultiHost `execute_command`, SATANAMD. Operacja: utworzenie manifestu SHA256 dla nowego STAGED 1.72.4, weryfikacja manifestu i uruchomienie `check-lite-p0-promotion.ps1` (9 bramek JS); pojedynczy pakiet wydaniowy, bez zmian LIVE, bez commit/push.
+- Wynik: `This tool call was blocked by OpenAI's safety checks`. Polecenie nie zostało uruchomione, brak manifestu i wyniku bramek z tej próby. Powód szczegółowy nieudostępniony; blokada dotyczyła tego wywołania. Nie ponawiano go innym narzędziem. Niezależnie potwierdzono 16+10+3 PASS oraz `dotnet publish` exit 0.
+
+### OB-20261019-1209-staged-devwake-selftest
+- Narzędzie: LC MultiHost `execute_command`, SATANAMD. Operacja: pojedynczy headless `Start-Process -Wait -PassThru` dla STAGED 1.72.4 z `--lite-dev-wake-selftest`, odczyt kodu wyjścia; mały test bez WebView2, bez zmiany LIVE i bez wysyłania wiadomości.
+- Wynik: `This tool call was blocked by OpenAI's safety checks`. Brak uruchomienia i kodu wyjścia, przyczyna szczegółowa niepodana. Nie ponawiano inną drogą. Wcześniejsze wywołanie WinExe przez operator `&` zwróciło pusty `LASTEXITCODE`, dlatego nie jest dowodem PASS.
+
+### OB-20261019-1210-checkpoint-write
+- Narzędzie: RDC `write_file` SATANAMD. Operacja: utworzenie checkpointu `docs/openbrowser-checkpoint-2026-10-19-1209-stop-aria.md` o objętości ok. 2,4 KB, opisującego implementację, testy, STAGED, LIVE i blokady. Jeden zapis dokumentu, bez zmian aplikacji.
+- Wynik: `This tool call was blocked by OpenAI's safety checks`. Plik niepotwierdzony; szczegółowej przyczyny nie udostępniono. Nie ponawiano tej operacji innym narzędziem.
+
+### OB-20261019-1212-roadmap-append
+- Narzędzie: RDC `write_file append`, SATANAMD. Operacja: dopisanie krótkiej aktualizacji OB3-007/014 do `docs/design/openbrowser-master-roadmap-v3-2026-10-19.md`; pojedyncza zmiana dokumentacji.
+- Wynik: `This tool call was blocked by OpenAI's safety checks`. Brak dopisania; powód szczegółowy nieudostępniony. Nie ponawiano inną drogą. Aktualny stan zachowano w checkpointcie 12:11.
