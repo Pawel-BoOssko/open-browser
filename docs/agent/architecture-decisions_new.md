@@ -44,6 +44,10 @@ Latest:
 
 ## Accepted Decisions
 
+## 2026-10-19 02:24 — Permit bounded repeats of unconfirmed wake messages
+
+The owner now prefers an occasional duplicate message to a stopped development chat. An ambiguous send, lack of visible ACK, or renderer timeout must NOT permanently disable the application-local wake. Retry after the normal ~25-minute interval, only in the bound chat when High, a stable finished assistant response, no draft and idle UI are verified. Check for the previous receipt before retry, keep encrypted delivery history and the existing daily limit. No native ChatGPT scheduled Tasks; this decision supersedes the older no-retry rule below.
+
 ## 2026-10-19 — Owner-run Open Browser wake (not ChatGPT reminders)
 
 Owner replaces the previous opt-in-only book supervisor priority with a persistent, application-local single-chat development wake. The timer runs inside Open Browser Lite at ~25-minute intervals, tied to exactly one user-approved ChatGPT conversation by its URL in DPAPI local settings; no ChatGPT scheduled Tasks, no Windows hourly ChatGPT wake tasks, and no task packet selection by the watcher. Wake message merely reminds the same chat to read its own durable master plan and continue choosing work autonomously. User explicitly authorizes running this cycle unattended overnight. It is permitted only when the browser is running, the correct conversation is active, the last assistant response is stable, High is verified, there is no generation, user draft, or UI delivery error, and the prior answer has not already been prompted. Persist receipt before sending; no retries on uncertain delivery. Completion marker stops the watcher. Plan: docs/design/openbrowser-master-roadmap-v3-2026-10-19.md. This is distinct from the disallowed ChatGPT reminders: those remain disabled.

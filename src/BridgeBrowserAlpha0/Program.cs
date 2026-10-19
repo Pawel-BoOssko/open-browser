@@ -36,6 +36,37 @@ internal static class Program
             }
             return;
         }
+        if (args.Any(arg => string.Equals(arg, "--lite-dev-wake-rearm", StringComparison.OrdinalIgnoreCase)))
+        {
+            try
+            {
+                var state = LiteDevWakeState.Read();
+                if (!LiteDevWakeState.IsChatUrl(state.TargetUrl))
+                {
+                    Environment.ExitCode = 3;
+                    return;
+                }
+                var now = DateTimeOffset.UtcNow;
+                LiteDevWakeState.RecoverLegacyDefinitelyNotSent(state, now);
+                state.Enabled = true;
+                state.NextDueUtc = now.AddMinutes(2);
+                if (!LiteDevWakeState.MayRetryUncertain(state))
+                    state.LastState = "armed";
+                LiteDevWakeState.Write(state);
+                LiteEventLog.Write("dev_wake_rearmed", new {
+                    intervalMinutes = state.IntervalMinutes, firstCheckMinutes = 2
+                });
+                Environment.ExitCode = 0;
+            }
+            catch (Exception ex)
+            {
+                LiteEventLog.Write("dev_wake_rearm_failed", new {
+                    errorType = ex.GetType().Name
+                });
+                Environment.ExitCode = 4;
+            }
+            return;
+        }
         if (args.Any(arg => string.Equals(arg, "--lite-dev-wake-selftest", StringComparison.OrdinalIgnoreCase)))
         {
             Environment.ExitCode = LiteDevWakeState.SelfTest();
