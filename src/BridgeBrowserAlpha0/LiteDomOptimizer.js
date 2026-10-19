@@ -42,6 +42,13 @@
       // A mixed page can retain legacy wrappers alongside DIL messages.
       // Prefer modern counts, but never optimize a mixed React subtree.
       const modern = modernTurns.length > 0;
+      // When a page switches from legacy turns to DIL, clear only flags
+      // previously installed by this optimizer. DIL stays observe-only.
+      if (modern) {
+        for (const oldTurn of oldTurns) {
+          if (oldTurn.hasAttribute(flag)) oldTurn.removeAttribute(flag);
+        }
+      }
       const turns = modern ? modernTurns : oldTurns;
       state.domVariant = modern ? 'dil_observe_only' : 'legacy';
       state.turnCount = turns.length;

@@ -21,7 +21,7 @@ function createTest(turnCount, options = {}) {
   const document = {
     readyState: "complete", activeElement: options.focus ?? null,
     querySelectorAll(selector) {
-      if (selector === '[data-user-message-bubble],[data-chatgpt-selection-message-id]') return [];
+      if (selector === '[data-user-message-bubble],[data-chatgpt-selection-message-id]') return this.modernNodes || [];
       assert.equal(selector, '[data-testid^="conversation-turn-"]');
       return nodes;
     },
@@ -79,4 +79,16 @@ function createTest(turnCount, options = {}) {
   const t = createTest(100, { host: "example.com" });
   assert.equal(t.api, undefined, "other domains cannot be optimized");
 }
-console.log("LiteDomOptimizer: 5 PASS");
+{
+  const t = createTest(65);
+  const flag = "data-ob-lite-offscreen";
+  assert.equal(t.api.getStatus().optimized, 25);
+  t.document.modernNodes = t.nodes.slice(-5);
+  t.api.check();
+  assert.equal(t.api.getStatus().domVariant, "dil_observe_only");
+  assert.equal(t.api.getStatus().optimized, 0);
+  assert.equal(t.nodes.filter(n => n.hasAttribute(flag)).length, 0,
+    "legacy optimization flags must be cleared after DIL migration");
+  assert.equal(t.nodes.length, 65, "no nodes may be removed");
+}
+console.log("LiteDomOptimizer: 6 PASS");

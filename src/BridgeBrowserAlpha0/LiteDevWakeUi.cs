@@ -192,13 +192,14 @@ internal sealed partial class ChatGptLiteForm
                 return;
             }
             string returned = JsonSerializer.Deserialize<string>(await send) ?? "";
-            if (returned == "busy") {
+            if (returned == "busy" || returned.StartsWith("busy_", StringComparison.Ordinal)) {
                 // Sender returned before touching the editor or scheduling a click:
                 // this is a confirmed NOT-SENT, unlike a renderer timeout.
                 LiteDevWakeState.DeferDefinitelyUnsentBusy(
                     _devWake, receipt, DateTimeOffset.UtcNow);
                 LiteEventLog.Write("dev_wake_deferred_busy", new {
-                    confirmedNotSent = true, retryMinutes = 2
+                    confirmedNotSent = true, retryMinutes = 2,
+                    reason = returned
                 });
                 UpdateDevWakeStatus();
                 return;

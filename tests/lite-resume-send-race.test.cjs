@@ -11,11 +11,14 @@ function setup() {
   let clicks = 0;
   let busy = false;
   let userBubbles = [];
+  let unrelatedAriaBusy = false;
   const editor = { innerText: "", focus() {} };
   let activeEditor = editor;
   const doc = {
     querySelectorAll(selector) {
-      return selector.includes('data-user-message-bubble') ? userBubbles : [];
+      if (selector.includes('data-user-message-bubble')) return userBubbles;
+      if (selector === '[aria-busy="true"]' && unrelatedAriaBusy) return [{}];
+      return [];
     },
     querySelector(selector) {
       if (selector.startsWith("#prompt-textarea")) return activeEditor;
@@ -38,6 +41,7 @@ function setup() {
     win, editor, sender, run() { assert.equal(typeof scheduled, "function"); scheduled(); },
     count() { return clicks; }, setBusy(value) { busy = value; },
     showAcknowledgment(text) { userBubbles = [{ innerText: text }]; },
+    showUnrelatedBusy(value) { unrelatedAriaBusy = value; },
     replaceComposer() { activeEditor = { innerText: "", focus() {} }; }
   };
 }
@@ -89,4 +93,21 @@ function setup() {
   p.showAcknowledgment("Different message without the receipt");
   assert.equal(p.sender.hasAck(id), false);
 }
-console.log("LiteResumeSenderRace: 7 PASS");
+{
+  const p = setup();
+  p.showUnrelatedBusy(true);
+  assert.equal(p.sender.diagnose().reason, 'ready');
+  assert.equal(p.sender.diagnose().globalAriaBusyCount, 1);
+  assert.equal(p.sender.send(prompt, id), 'submission_requested',
+    'unrelated aria-busy sidebar must not block sending');
+  p.run();
+  assert.equal(p.count(), 1);
+}
+{
+  const p = setup();
+  p.editor.innerText = 'private draft';
+  assert.equal(p.sender.send(prompt, id), 'busy_draft_present');
+  assert.equal(p.sender.diagnose().reason, 'draft_present');
+  assert.equal(p.count(), 0);
+}
+console.log("LiteResumeSenderRace: 9 PASS");

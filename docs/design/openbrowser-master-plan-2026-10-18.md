@@ -135,3 +135,9 @@ Status: decyzje architektury zatwierdzone jako kierunek, dopiero poszczególne e
 - [DONE-TEST] 25 testów Node PASS (8 hard prune+7 response+5 DOM CSS+5 snapshot), Debug C# build 0 błędów / historyczne MSB3277, selftests notes, projects, archive, lead all exit 0.
 - [TODO] Po synchronizacji PBOX1 wykonaj side-by-side publish do osobnego katalogu, wszystkie testy headless i eksport ikony; nie restartuj na siłę bieżącej aktywnej rozmowy.
 - [TODO] Bounded warm tabs, trwała kolejka notatek i idempotentne dostarczenie po potwierdzonym zakończeniu, diagnostyka cyklu błędu od prompt->transport->render->persisted, agresywna optymalizacja snapshot payload po testach portowanego conversation-trimmer.
+
+## Postęp 2026-10-19 07:24, DOM P1
+- [DONE-SOURCE/TEST] Migracja legacy -> DIL czyści własne znaczniki `data-ob-lite-offscreen` ze starych wrapperów, bez ingerencji w nowe wiadomości i bez usuwania DOM. Test regresyjny dodany; Node 18/18 PASS, w tym DOM 6/6.
+- [PENDING] SOURCE 1.71.0, PBOX1 LIVE 1.70.0. Nadzorca nadal zgłasza `dev_wake_deferred_busy`; brak `dev_wake_ack`. Nie wykonywano restartu ani retry.
+- [BLOCKED] Zbiorczy odczyt i test LC MultiHost, próba dopisania do rejestru oraz utworzenia nowego checkpointu przez RDC zostały odrzucone przez zabezpieczenia narzędzi. Szczegółowa przyczyna nieznana. Ten wpis zachowuje zakres blokad; nie ponawiać tych operacji innymi narzędziami.
+- [FAILED] LC MultiHost SATANAMD: pojedynczy odczyt `rg -n RevalidateResumeBeforeSendAsync` nie wykonał się, ponieważ `rg` nie jest zainstalowany (`The term 'rg' is not recognized`). Nie była to blokada bezpieczeństwa. Rejestr główny nadal nieprzyjmujący dopisania.

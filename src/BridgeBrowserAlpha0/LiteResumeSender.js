@@ -3,8 +3,35 @@
   if (w.__OPENBROWSER_RESUME_SENDER__) return;
   if (!w.document || w.location.hostname !== "chatgpt.com") return;
   const attempted = new Set();
-  function busy() {
-    return !!w.document.querySelector('[data-testid="stop-button"],[aria-busy="true"]');
+  function stopVisible() {
+    const button = w.document.querySelector('[data-testid="stop-button"]');
+    if (!button || button.disabled || button.hidden ||
+        button.getAttribute?.('aria-hidden') === 'true') return false;
+    if (typeof button.getClientRects === 'function' &&
+        button.getClientRects().length === 0) return false;
+    return true;
+  }
+  // Aria-busy on an unrelated sidebar or hidden streaming placeholder is
+  // not evidence that the current composer cannot submit a new message.
+  function busy() { return stopVisible(); }
+  function busyReason() {
+    const el = composer();
+    if (!el) return 'missing_composer';
+    if (busy()) return 'generating';
+    if (String(el.value || el.innerText || '').trim()) return 'draft_present';
+    return '';
+  }
+  function diagnose() {
+    const el = composer();
+    return {
+      reason: busyReason() || 'ready',
+      editorTag: el?.tagName || 'unknown',
+      editorChars: String(el?.value || el?.innerText || '').length,
+      stopPresent: !!w.document.querySelector('[data-testid="stop-button"]'),
+      stopVisible: busy(),
+      // Only counts; never copies user drafts or page content.
+      globalAriaBusyCount: w.document.querySelectorAll?.('[aria-busy="true"]')?.length || 0
+    };
   }
   function composer() {
     // Prefer the actual ChatGPT editor over unrelated or hidden textareas.
@@ -27,8 +54,9 @@
         text.length < 16 || text.length > 1700) return "invalid";
     if (hasAck(receiptId)) return "already_visible";
     if (attempted.has(receiptId)) return "already_attempted";
+    const reason = busyReason();
+    if (reason) return 'busy_' + reason;
     const el = composer();
-    if (!el || busy() || String(el.value || el.innerText || "").trim()) return "busy";
     const targetPath = w.location.pathname;
     attempted.add(receiptId);
     const payload = "[OB-" + receiptId + "]\n" + text;
@@ -55,5 +83,5 @@
     }, 250);
     return "submission_requested";
   }
-  w.__OPENBROWSER_RESUME_SENDER__ = { send, hasAck };
+  w.__OPENBROWSER_RESUME_SENDER__ = { send, hasAck, diagnose };
 })(window);
