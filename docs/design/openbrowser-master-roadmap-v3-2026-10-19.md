@@ -208,3 +208,9 @@ SOURCE v1.71.0: liczniki ról DIL w produkcyjnie ładowanym `LiteDomOptimizer.js
 - **OB3-021: SOURCE+STAGED+LIVE UI, częściowo.** Wersja 1.72.7 w PBOX1 PID20956 od 15:15:28. Nowy przycisk `Techniczne` widoczny w rzeczywistym pasku, manifest LIVE ma source SHA `671ed94dac64183307bd73cc99bed4ed5c0aec8e`, kanał live i poprawny hash EXE. Tekst okna po kliknięciu nie został potwierdzony przez automatyczny test GUI.
 - **OB3-023: SOURCE+TEST (rozszerzenie analizy).** Analizator trendów rozróżnia surową zmianę RAM między restartami od zmiany w nieprzerwanym okresie z identycznymi PID-ami procesów. Wprowadzono 9 testów regresyjnych PASS; prawdziwe próbki PBOX1 do weryfikacji. Nie oznaczamy pełnego 5m/1h/24h dashboardu jako ukończonego.
 - Checkpoint: `docs/openbrowser-checkpoint-2026-10-19-1512-second-wake.md`. Bez przypominajek ChatGPT, ręcznych commitów i pushy.
+
+## Aktualizacja 2026-10-19 15:26 CEST: OB3-023/029
+
+- **OB3-023 (PARTIAL):** analizator wspiera teraz osobne okna `5m`, `1h`, `24h`, każde z faktycznym czasem pokrycia, próbkami, minimum dostępnego RAM, maksimum pamięci prywatnej hosta/WebView2 i szczytem CPU. Zachowuje osobny wskaźnik nieprzerwanej serii PID. 16 testów PASS.
+- **OB3-029 (PARTIAL):** lokalna, statyczna strona HTML z trzema oknami i stanem stabilności procesów wygenerowana oraz zweryfikowana na PBOX1: `%LOCALAPPDATA%\OpenBrowser\ChatGPT-Lite\diagnostics\resources-dashboard.html`. Brak zewnętrznego JavaScript lub eksportu treści rozmów. Nadal brak UI w samej aplikacji i osi zdarzeń diagnostycznych.
+- **Rzeczywiste dane PBOX1:** okno 5m: 3 próbki/4m, 1h: 33/58m, 24h: 404/800m, wyraźnie oznaczone niepełne 24h; 24h peak private WebView2 1103,7 MiB. Weryfikacja `docs/openbrowser-checkpoint-2026-10-19-1512-second-wake.md`.

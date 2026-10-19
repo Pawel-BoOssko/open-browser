@@ -55,3 +55,14 @@ Prioritize OB3-021: readable production technical identity (version/build time/s
 - Reports `stableHostSampleCount`, `stableWebviewSampleCount`, `stableWebviewDurationMinutes`, `stableWebviewPrivateDeltaMiB` or null, `hasWebviewChurnOrRestart`.
 - Added `tests/test-lite-resource-trends.ps1`, 9 checks PASS on unchanged-PID fixture and WebView2 PID change. Both PowerShell files AST syntax 0 errors. Production sample verification pending.
 - No changes to running browser, resource sampler or existing ChatGPT/Windows task schedules for the analyzer change.
+
+## 15:26 CEST: 5m/1h/24h trend windows and local HTML dashboard
+
+- `scripts/analyze-lite-resource-trends.ps1` now returns aggregated `windows.5m`, `windows.1h`, `windows.24h`: actual sample count/coverage, min free RAM, max host/WebView2 private MiB and max observed WebView2 CPU single-core percentage. The report exposes actual observed minutes separately from requested window minutes.
+- Added `scripts/export-lite-resource-dashboard.ps1`: generates local static HTML with three time-window rows, resource status, timestamp ranges and a stable-PID RAM summary. UTF-8 file, no JavaScript, no external resources, no chat text/cookies/session URLs.
+- Updated `tests/test-lite-resource-trends.ps1`: 16 PASS, including fixture with WebView2 PID churn, windows, HTML output/no active scripts. Agent documentation gate PASS.
+- PBOX1 fetched Autosync snapshot 9d8266b and installed only local diagnostics scripts, not a new EXE. First dashboard run failed due to missing local `analyze-lite-resource-trends.ps1`; corrected by writing the synchronized script next to exporter, rerun PASS. No browser restart or task creation.
+- PBOX1 live numeric report at 15:22:58 using 404 samples: window5m 3 samples/4min minFree 2435MiB peakWeb 1068.4MiB; window1h 33 samples/58min peakWeb 1068.4MiB; window24h 404 samples/800min peakWeb 1103.7MiB. Stable-tail last 3 WebView2 samples had -305.2MiB private RAM, process churn detected. 24h window has only 800m coverage, NOT 24h.
+- At 15:25:48, local static report created and validated at `%LOCALAPPDATA%\OpenBrowser\ChatGPT-Lite\diagnostics\resources-dashboard.html`, 1993 bytes, all three windows present, no active scripts.
+- OB3-029 PARTIAL: local machine-readable/offline dashboard exists, but no inside-app navigation or event timelines yet. OB3-023 PARTIAL: 5m/1h/24h summaries exist, but sustained monitoring/peak commit accuracy still under development.
+- No manual commit/push, no ChatGPT Tasks. Existing blocked Windows startup task OB3-081 was not touched.
