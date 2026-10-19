@@ -262,6 +262,11 @@ internal sealed partial class ChatGptLiteForm
                 if (await Task.WhenAny(phaseQuery, Task.Delay(2500)) == phaseQuery)
                     sendPhase = JsonSerializer.Deserialize<string>(await phaseQuery)
                         ?? "phase_unknown";
+                LiteEventLog.Write("dev_wake_delivery_phase", new {
+                    phase = sendPhase, ackConfirmed = false,
+                    triedClick = sendPhase == "click_invoked",
+                    deliveryStillUnknown = true
+                });
                 bool unsentDraft = sendPhase.StartsWith("draft_", StringComparison.Ordinal) ||
                     sendPhase.StartsWith("blocked_", StringComparison.Ordinal) ||
                     sendPhase is "preparing";

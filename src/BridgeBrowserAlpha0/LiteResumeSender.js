@@ -31,8 +31,11 @@
   }
   function diagnose() {
     const el = composer();
+    const button = sendButton(el);
     return {
       reason: busyReason() || 'ready',
+      sendButtonFound: !!button,
+      sendButtonDisabled: !!(button?.disabled || button?.getAttribute?.('aria-disabled') === 'true'),
       editorTag: el?.tagName || 'unknown',
       editorChars: String(el?.value || el?.innerText || '').length,
       stopPresent: !!w.document.querySelector('[data-testid="stop-button"]'),
@@ -48,6 +51,22 @@
       w.document.querySelector('[data-testid="composer-text-input"]') ||
       w.document.querySelector('textarea') ||
       w.document.querySelector('[contenteditable="true"]');
+  }
+  // Find Send next to the actual editor, not a similarly labelled button
+  // elsewhere on the page (or the adjacent voice-mode control).
+  function sendButton(editor) {
+    const form = editor?.closest?.('form') ||
+      w.document.querySelector('form[data-chatgpt-composer]');
+    const query = 'button[type="submit"][aria-label="Wyślij"],'+
+      'button[type="submit"][aria-label="Send"],'+
+      'button[type="submit"][aria-label="Send message"]';
+    const local = form?.querySelector?.(query);
+    if (local) return local;
+    // Older ChatGPT sends through data-testid; only use it if it belongs
+    // to the editor form or the editor has no discoverable form.
+    const legacy = w.document.querySelector('[data-testid="send-button"]');
+    if (!legacy) return null;
+    return !form || form.contains?.(legacy) ? legacy : null;
   }
   function hasAck(receiptId) {
     // ChatGPT DIL renderer uses data-user-message-bubble (verified 2026-10-18).
@@ -101,13 +120,7 @@
       // Observed ChatGPT DIL composer on 2026-10-19: the Send button has
       // no data-testid. Scope the exact submit action to the composer form;
       // never mistake the purple voice button for Send.
-      const btn = w.document.querySelector('[data-testid="send-button"]') ||
-        w.document.querySelector(
-          'form[data-chatgpt-composer] button[type="submit"][aria-label="Wyślij"]') ||
-        w.document.querySelector(
-          'form[data-chatgpt-composer] button[type="submit"][aria-label="Send"]') ||
-        w.document.querySelector(
-          'form[data-chatgpt-composer] button[type="submit"][aria-label="Send message"]');
+      const btn = sendButton(el);
       if (!btn) {
         phases.set(receiptId, "draft_button_missing"); return;
       }

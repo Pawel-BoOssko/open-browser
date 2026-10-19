@@ -12,7 +12,18 @@ function setup(options = {}) {
   let busy = false;
   let userBubbles = [];
   let unrelatedAriaBusy = false;
-  const editor = { innerText: "", focus() {} };
+  let voiceClicks = 0;
+  const submit = {disabled: !!options.disabledSendButton, click() { clicks++; }};
+  const voice = { click() {voiceClicks++;} };
+  const form = {
+    querySelector(selector) {
+      if (selector.includes('button[type="submit"]')) return options.disabledSendButton ? submit : submit;
+      return null;
+    },
+    contains(node) { return node === submit; }
+  };
+  const editor = { innerText: "", focus() {},
+    closest(selector) { return options.formButton && selector === 'form' ? form : null; } };
   let activeEditor = editor;
   const doc = {
     querySelectorAll(selector) {
@@ -23,8 +34,10 @@ function setup(options = {}) {
     querySelector(selector) {
       if (selector.startsWith("#prompt-textarea")) return activeEditor;
       if (selector === '[data-testid="send-button"]')
-        return options.missingSendButton ? null :
-          { disabled: !!options.disabledSendButton, click() { clicks++; } };
+        return options.missingSendButton || options.formButton ? null : submit;
+      if (selector === 'form[data-chatgpt-composer]')
+        return options.formButton ? form : null;
+      if (selector === 'button[aria-label="Tryb głosowy"]') return voice;
       if (selector.includes("stop-button") || selector.includes("aria-busy"))
         return busy ? {} : null;
       return null;
@@ -43,7 +56,8 @@ function setup(options = {}) {
   const sender = win.__OPENBROWSER_RESUME_SENDER__;
   return {
     win, editor, sender, run() { assert.equal(typeof scheduled, "function"); scheduled(); },
-    count() { return clicks; }, setBusy(value) { busy = value; },
+    count() { return clicks; }, voiceCount() { return voiceClicks; },
+    setBusy(value) { busy = value; },
     showAcknowledgment(text) { userBubbles = [{ innerText: text }]; },
     showUnrelatedBusy(value) { unrelatedAriaBusy = value; },
     replaceComposer() { activeEditor = { innerText: "", focus() {} }; }
@@ -136,4 +150,21 @@ function setup(options = {}) {
   assert.equal(p.sender.phase(id), 'draft_button_disabled');
   assert.equal(p.count(), 0);
 }
-console.log("LiteResumeSenderRace: 12 PASS");
+{
+  const p = setup({ formButton: true, missingSendButton: true });
+  assert.equal(p.sender.diagnose().sendButtonFound, true,
+    'exact form submit button must be detected before any draft modification');
+  assert.equal(p.sender.send(prompt, id), 'submission_requested');
+  p.run();
+  assert.equal(p.count(), 1, 'ChatGPT DIL form submit without data-testid works');
+  assert.equal(p.voiceCount(), 0, 'never click adjacent purple voice button');
+  assert.equal(p.sender.phase(id), 'click_invoked');
+}
+{
+  const p = setup({ formButton: true, disabledSendButton: true });
+  p.sender.send(prompt, id);
+  p.run();
+  assert.equal(p.sender.phase(id), 'draft_button_disabled');
+  assert.equal(p.count(), 0);
+}
+console.log("LiteResumeSenderRace: 14 PASS");
