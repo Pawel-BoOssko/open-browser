@@ -156,3 +156,13 @@ SOURCE 1.71.0: poprawiono licznik mieszanego DOM legacy+DIL, preferując rzeczyw
 ## Aktualizacja 2026-10-19 06:17 CEST: OB3-031/032
 
 SOURCE v1.71.0: liczniki ról DIL w produkcyjnie ładowanym `LiteDomOptimizer.js` (`dilAssistantCount`, `dilUserCount`), wyłącznie odczyt DOM. Osobny testowy `LiteDomSelectorAudit.js` obsługuje DIL/mixed i deduplikację. Testy Node: 18/18 PASS, 0 FAIL. LIVE PBOX1 nadal v1.70.0, PID 8704; nadzorca do 06:11:51 CEST odmawia `busy`, `dev_wake_ack` niepotwierdzony. Wydanie i realny QA nadal TODO. Szczegóły: `docs/openbrowser-checkpoint-2026-10-19-0617-dom-roles.md`.
+
+## Aktualizacja 2026-10-19 08:08 CEST: OB3-009/073, pasywny late ACK
+
+- [DONE-SOURCE] v1.71.1: CanReconcileReceipt/ConfirmVisibleReceipt w LiteDevWakeState oraz pasywny odczyt DIL user bubble w LiteDevWakeUi. Wykrywa spóźniony ACK po niepewnej wysyłce bez ponowienia; nie znosi blokady tego samego hash odpowiedzi.
+- [DONE-TEST] SATANAMD: Node 18/18 plików PASS; Debug build 0 errors; dev-wake selftest 30 checks EXIT 0; Release publish, 9 bramek JS, manifest, 5 headless selftestów PASS.
+- [STAGED] SATANAMD: %LOCALAPPDATA%\OpenBrowser\staged\OpenBrowserLite_v1.71.1_20261019_0805. SHA256 5DD94EA237F049DF86BD46397B6FB7706F9B2A481031D3C042ADFB3DBAF79738.
+- [LIVE-VERIFIED] PBOX1 v1.71.0 PID 21560, Responding=True od 07:44:50. O 07:57:56 dev_wake_submission_uncertain no_visible_ack, brak dowodu skutecznego budzenia. Nie restartowano, nie ponawiano.
+- [BLOCKED] Izolowany test WebView2 oraz późniejszy odczyt kontrolny PBOX1 odrzucone przez safety checks LC MultiHost. Szczegóły w rejestrze i checkpointcie.
+- [NEXT] Po Autosync PBOX1 STAGED 1.71.1, izolowany WebView2 QA, kontrolowany upgrade, potwierdzenie realnego ACK i no-duplicate. Nie zamykać OB3-009/018/073 jako LIVE_VERIFIED przed dowodami.
+- Checkpoint: docs/openbrowser-checkpoint-2026-10-19-0808-late-ack.md.

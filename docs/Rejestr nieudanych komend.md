@@ -304,3 +304,15 @@ Historyczne wpisy OB-10 i OB-11 zachowują swój numer. Nowym zdarzeniom należy
 ### OB-20261019-0614-pbox-batch-diagnostics
 - Narzędzie: LC MultiHost `execute_command` na PBOX1. Operacja: pojedyncze złożone polecenie odczytowe obejmujące Git HEAD/dirty, katalog instalacji v1.70/v1.71, grupowanie zdarzeń `dev_wake` z JSONL oraz ostatnie zdarzenia. Brak zapisu i wysyłania wiadomości. Zakres: duży pakiet diagnostyczny.
 - Wynik: `This tool call was blocked by OpenAI's safety checks`. Powód szczegółowy niepodany; zakres blokady: to konkretne wywołanie. Nie powtarzać tego pakietu innym narzędziem. Kontynuować niezależne punkty roadmapy.
+
+### OB-20261019-0806-isolated-webview2-selftest
+- Narzędzie: LC MultiHost execute_command, SATANAMD. Mały samodzielny test: uruchomienie wyłącznie STAGED 1.71.1 z parametrem --lite-webview-integration-selftest, lokalny profil jednorazowy, bez konta ChatGPT i bez ingerencji w LIVE.
+- Wynik: This tool call was blocked by OpenAI's safety checks. Nie uruchomiono testu, przyczyna szczegółowa nieudostępniona. Nie ponawiano inną drogą.
+
+### OB-20261019-0807-pbox-readonly-check
+- Narzędzie: LC MultiHost execute_command, PBOX1. Mały pakiet tylko odczytowy: PID 21560 i Responding, wolna RAM, końcowe zdarzenia dev_wake z lokalnego JSONL.
+- Wynik: This tool call was blocked by OpenAI's safety checks. Brak zmian w systemie. Nie ponawiano inną drogą.
+
+### OB-20261019-0809-late-ack-js-test
+- Narzędzie: Remote Desktop Commander edit_block, SATANAMD. Mała samodzielna zmiana jednego testu lite-resume-send-race.test.cjs: dodanie regresji opóźnionego DIL ACK bez podwójnego kliknięcia Send.
+- Wynik: This tool call was blocked by OpenAI's safety checks. Test niezmieniony, nie ponawiano innym narzędziem. Niezależne testy C# 30 checks i dotychczasowe Node 18/18 PASS.

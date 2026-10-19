@@ -149,6 +149,27 @@ internal static class LiteDevWakeState
         if (persist) Write(state);
     }
 
+    // A late DOM acknowledgment may resolve an uncertain delivery, but never
+    // authorizes another send for the same assistant answer.
+    internal static bool CanReconcileReceipt(Record s, DateTimeOffset now) =>
+        s.Enabled && MayRetryUncertain(s) &&
+        s.LastAttemptUtc != default &&
+        now >= s.LastAttemptUtc &&
+        now - s.LastAttemptUtc <= TimeSpan.FromHours(2) &&
+        s.LastAttemptHash.Length == 64 && s.LastAttemptHash.All(Uri.IsHexDigit);
+
+    internal static bool ConfirmVisibleReceipt(Record s, string receipt,
+        DateTimeOffset now, bool persist = true)
+    {
+        if (!CanReconcileReceipt(s, now) ||
+            !string.Equals(s.LastReceiptId, receipt, StringComparison.Ordinal))
+            return false;
+        s.LastConfirmedReceiptId = receipt;
+        s.LastState = "confirmed_late";
+        if (persist) Write(s);
+        return true;
+    }
+
     internal static bool ContainsCompletionMarker(string answer) =>
         answer.Contains("[OPENBROWSER-PLAN-COMPLETE]", StringComparison.OrdinalIgnoreCase) ||
         answer.Contains("[OPENBROWSER-NEEDS-USER]", StringComparison.OrdinalIgnoreCase);
@@ -321,7 +342,28 @@ internal static class LiteDevWakeState
                 true, true, false, false, false, false, true) != "same_answer_already_woken") return 23;
             amb.LastConfirmedReceiptId = amb.LastReceiptId;
             if (MayRetryUncertain(amb)) return 24;
-            LiteEventLog.Write("dev_wake_selftest", new { passed = true, checks = 24 });
+            var late = new Record {
+                Enabled = true, TargetUrl = good, IntervalMinutes = 25,
+                LastState = "uncertain_no_ack",
+                LastReceiptId = new string('d', 32),
+                LastAttemptHash = hash,
+                LastAttemptUtc = now.AddMinutes(-4),
+                NextDueUtc = now.AddMinutes(21)
+            };
+            if (!CanReconcileReceipt(late, now)) return 25;
+            if (ConfirmVisibleReceipt(late, new string('e', 32), now, persist: false)) return 26;
+            if (!ConfirmVisibleReceipt(late, late.LastReceiptId, now, persist: false) ||
+                late.LastConfirmedReceiptId != late.LastReceiptId ||
+                late.LastState != "confirmed_late") return 27;
+            if (ConfirmVisibleReceipt(late, late.LastReceiptId, now, persist: false)) return 28;
+            if (Eligibility(late, good, now.AddMinutes(30), hash,
+                true, true, false, false, false, false, true) !=
+                "same_answer_already_woken") return 29;
+            late.LastState = "uncertain_no_ack";
+            late.LastConfirmedReceiptId = "";
+            late.LastAttemptUtc = now.AddHours(-3);
+            if (CanReconcileReceipt(late, now)) return 30;
+            LiteEventLog.Write("dev_wake_selftest", new { passed = true, checks = 30 });
             return 0;
         }
         catch (Exception ex) {

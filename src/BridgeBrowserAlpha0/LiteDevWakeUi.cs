@@ -21,6 +21,7 @@ internal sealed partial class ChatGptLiteForm
     private bool _devWakePending;
     private string _devWakeLastSkipReason = "";
     private DateTimeOffset _devWakeLastSkipLoggedUtc;
+    private DateTimeOffset _devWakeLastAckProbeUtc;
 
     private void InitializeDevWake()
     {
@@ -111,6 +112,28 @@ internal sealed partial class ChatGptLiteForm
                 if (now >= _devWake.NextDueUtc)
                     ReportDevWakeSkip("other_chat");
                 return; // NEVER follow another chat
+            }
+            // Passive reconciliation only. An uncertain delivery is never resent.
+            // Check the original user bubble even after the short ACK window.
+            if (LiteDevWakeState.CanReconcileReceipt(_devWake, now) &&
+                now - _devWakeLastAckProbeUtc >= TimeSpan.FromMinutes(2)) {
+                _devWakeLastAckProbeUtc = now;
+                string pendingReceipt = _devWake.LastReceiptId;
+                string expectedPath = new Uri(_devWake.TargetUrl).AbsolutePath;
+                string ackScript = "(window.location.pathname === " +
+                    JsonSerializer.Serialize(expectedPath) +
+                    " && window.__OPENBROWSER_RESUME_SENDER__?.hasAck(" +
+                    JsonSerializer.Serialize(pendingReceipt) + ")) === true";
+                var lateAck = core.ExecuteScriptAsync(ackScript);
+                if (await Task.WhenAny(lateAck, Task.Delay(1800)) == lateAck &&
+                    await lateAck == "true" &&
+                    LiteDevWakeState.ConfirmVisibleReceipt(_devWake,
+                        pendingReceipt, DateTimeOffset.UtcNow)) {
+                    LiteEventLog.Write("dev_wake_ack", new {
+                        confirmed = true, late = true
+                    });
+                    UpdateDevWakeStatus();
+                }
             }
             if (now < _devWake.NextDueUtc) return;
             if (!string.IsNullOrEmpty(_lastResponseFailure)) {
