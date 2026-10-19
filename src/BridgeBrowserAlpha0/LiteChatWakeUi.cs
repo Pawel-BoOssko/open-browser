@@ -277,16 +277,26 @@ internal sealed partial class ChatGptLiteForm
                     string text = LiteChatWakeRegistry.Message(due,
                         _noteStore.Load(key));
                     string receipt = Guid.NewGuid().ToString("N");
+                    string payload = "[OB-" + receipt + "]\n" + text;
                     string js = "window.__OPENBROWSER_RESUME_SENDER__?.sendDirect(" +
-                        JsonSerializer.Serialize(text) + "," +
+                        JsonSerializer.Serialize(payload) + "," +
                         JsonSerializer.Serialize(receipt) + ")";
                     var result = await _chatWakeWorker.CoreWebView2.ExecuteScriptAsync(js);
                     state = JsonSerializer.Deserialize<string>(result) ?? "sender_missing";
-                    await Task.Delay(2800); // allow delayed Send and retry cycle to finish
-                    string phaseJson = await _chatWakeWorker.CoreWebView2.ExecuteScriptAsync(
-                        "window.__OPENBROWSER_RESUME_SENDER__?.phase(" +
-                        JsonSerializer.Serialize(receipt) + ")");
-                    string phase = JsonSerializer.Deserialize<string>(phaseJson) ?? "unknown";
+                    // Page timers may be throttled when the worker is occluded.
+                    // Flush submission explicitly from the host, with no dependence
+                    // on requestAnimationFrame or setTimeout in the page.
+                    string phase = "draft_button_missing";
+                    for (int attempt = 0; attempt < 7 && state == "submission_requested"; attempt++)
+                    {
+                        await Task.Delay(attempt == 0 ? 750 : 400);
+                        string flush = await _chatWakeWorker.CoreWebView2.ExecuteScriptAsync(
+                            "window.__OPENBROWSER_RESUME_SENDER__?.submitDirect(" +
+                            JsonSerializer.Serialize(receipt) + ")");
+                        phase = JsonSerializer.Deserialize<string>(flush) ?? "sender_missing";
+                        if (phase is "click_invoked" or "form_submitted" or "blocked_navigation")
+                            break;
+                    }
                     if (phase == "draft_button_missing")
                     {
                         try
@@ -314,13 +324,13 @@ internal sealed partial class ChatGptLiteForm
                         }
                         catch { /* diagnostics never prevent sending */ }
                         phase = await RetryWithNativeInputAsync(
-                            _chatWakeWorker.CoreWebView2, due.Url, text);
+                            _chatWakeWorker.CoreWebView2, due.Url, payload);
                         await Task.Delay(3500);
                     }
                     bool visible = false;
                     if (state == "submission_requested")
                     {
-                        string snippet = text[..Math.Min(65, text.Length)];
+                        string snippet = "[OB-" + receipt + "]";
                         string check = "Array.from(document.querySelectorAll('" +
                             "[data-user-message-bubble],[data-message-author-role=\\\"user\\\"]'))" +
                             ".slice(-6).some(x => String(x.innerText || x.textContent || '').includes(" +
@@ -329,9 +339,11 @@ internal sealed partial class ChatGptLiteForm
                     }
                     LiteEventLog.Write("multi_wake_send", new {
                         state, phase, visibleUserBubble = visible,
+                        receiptConfirmed = visible, // unique receipt; never match older messages
                         includesNotes = !string.IsNullOrWhiteSpace(_noteStore.Load(key)),
                         intervalMinutes = due.Minutes
                     });
+                    state = visible ? "visible_ack" : phase;
                 }
             }
             catch (Exception ex)

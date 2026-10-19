@@ -200,4 +200,20 @@ function setup(options = {}) {
   p.run();
   assert.equal(p.count(), 1, 'direct sender still attempts click');
 }
-console.log("LiteResumeSenderRace: 18 PASS");
+{
+  const p = setup({ formButton: true, missingSendButton: true });
+  assert.equal(p.sender.sendDirect(prompt, id), 'submission_requested');
+  assert.equal(p.sender.submitDirect(id), 'click_invoked',
+    'host can synchronously click Send when background page timers are throttled');
+  assert.equal(p.count(), 1);
+  p.run();
+  assert.equal(p.count(), 1, 'delayed page timer does not double-click after host flush');
+}
+{
+  const p = setup({ missingSendButton: true });
+  p.sender.sendDirect(prompt, id);
+  assert.equal(p.sender.submitDirect(id), 'draft_button_missing',
+    'missing Send button is reported instead of pretending to send');
+  assert.equal(p.count(), 0);
+}
+console.log("LiteResumeSenderRace: 20 PASS");

@@ -4,6 +4,7 @@
   if (!w.document || w.location.hostname !== "chatgpt.com") return;
   const attempted = new Set();
   const phases = new Map(); // receipt -> prepared / clicked / blocked; no message text stored
+  const directPending = new Map(); // receipt -> {editor,path}, never store message text
   const samePayload = (value, payload) => String(value || "")
     .replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim() ===
       String(payload).replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim();
@@ -144,6 +145,7 @@
     if (!el) return "missing_composer";
     const targetPath = w.location.pathname;
     const payload = String(text || "");
+    directPending.set(receiptId, { editor: el, path: targetPath });
     el.focus();
     try {
       if ("value" in el) {
@@ -162,6 +164,8 @@
     }
     phases.set(receiptId, "direct_injected");
     const trySubmit = (remaining) => {
+      if (phases.get(receiptId) === "click_invoked" ||
+          phases.get(receiptId) === "form_submitted") return;
       if (w.location.pathname !== targetPath) {
         phases.set(receiptId, "blocked_navigation"); return;
       }
@@ -185,5 +189,36 @@
     w.setTimeout(() => trySubmit(6), 500);
     return "submission_requested";
   }
-  w.__OPENBROWSER_RESUME_SENDER__ = { send, sendDirect, hasAck, diagnose, phase };
+  // Called synchronously by the host after an awaited delay. Background tabs
+  // can throttle page setTimeout, so delivery must not depend on that timer.
+  function submitDirect(receiptId) {
+    const previous = phases.get(receiptId);
+    if (previous === "click_invoked" || previous === "form_submitted")
+      return previous;
+    const pending = directPending.get(receiptId);
+    if (!pending) return "unknown_receipt";
+    if (w.location.pathname !== pending.path) {
+      phases.set(receiptId, "blocked_navigation");
+      return "blocked_navigation";
+    }
+    const el = pending.editor;
+    const form = el.closest?.("form") ||
+      w.document.querySelector("form[data-chatgpt-composer]");
+    const button = sendButton(el) ||
+      form?.querySelector?.('button[type="submit"]:not([disabled])') ||
+      w.document.querySelector('[data-testid="send-button"],button[aria-label="Wyślij"],button[aria-label="Send"],button[aria-label="Send message"]');
+    if (button && !button.disabled &&
+        button.getAttribute?.('aria-disabled') !== 'true') {
+      button.click();
+      phases.set(receiptId, "click_invoked");
+      return "click_invoked";
+    }
+    if (typeof form?.requestSubmit === "function") {
+      form.requestSubmit();
+      phases.set(receiptId, "form_submitted");
+      return "form_submitted";
+    }
+    return "draft_button_missing";
+  }
+  w.__OPENBROWSER_RESUME_SENDER__ = { send, sendDirect, submitDirect, hasAck, diagnose, phase };
 })(window);
