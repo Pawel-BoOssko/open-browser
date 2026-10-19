@@ -12,6 +12,12 @@ Nadzór należy do **Open Browser Lite**. Co ~25 minut program obserwuje JEDEN p
 
 Każdy krok ma stany `TODO | SOURCE | TEST | STAGED | LIVE_VERIFIED | BLOCKED`. Zatrzymanie wykonania w środku kroku => nowy checkpoint, nie powtarzać niepewnego wysłania. Nie wyłączaj systemowych zabezpieczeń, nie obchodź blokad przez inne narzędzia.
 
+## Najnowszy checkpoint P0 — 2026-10-19 08:57 CEST
+- **OB3-001..008/010..017: STAGED 1.72** — PBOX1 nowe wydanie `OpenBrowserChatGPTLite_v1.72.0_20261019_0847`, SHA256 EXE `DA6C2DD7B13A1B312EF2F459E7C38948F52ADE845A1A9103FC1A62C33B05159D`, manifest+gate PASS, 17/17 selftests PASS, izolowany PBOX1 WebView2 z realnym formularzem bez data-testid PASS; 15/15 zestawów JS PASS.
+- **OB3-009/018: nadal PENDING REAL ACK** — 19.10 PBOX1 LIVE 1.71.0 PID21560 ma włączoną Autopracę 25m, 58 prób: 56 `busy`/niewysłane, 2 niepewne, 0 potwierdzonych `dev_wake_ack`. Nie zaliczać faktycznego wznowienia. 1.72 poprawia wybór faktycznego przycisku submit i zapisuje `dev_wake_delivery_phase`, nadal wymaga sprawdzenia po uruchomieniu LIVE.
+- **OB3-017: promocja oczekująca bez restartu** — skróty Start i pulpit wskazują 1.72, proces pomocniczy PID19936 w interaktywnej sesji Windows 1 czeka wyłącznie na NATURALNE zamknięcie starego PID21560, potem uruchomi 1.72 na istniejącym profilu. Nie zabijać aktywnej rozmowy.
+- Analiza starej wielokrotnej wysyłki: `docs/openbrowser-old-sender-audit-2026-10-19-0845.md`; checkpoint źródła/test/staged/live: `docs/openbrowser-checkpoint-2026-10-19-0857-v172.md`. Stara metoda w MainForm wysyłała bez receipts/ACK, jej generyczne klikanie SVG nie nadaje się do Lite. Nie uruchamiać surowego SSE `PageTap` z powodu obciążenia prywatności/RAM.
+
 ## Wykonanie P0 — checkpoint 2026-10-19 01:50 CEST
 - 001–003: źródło i stan PBOX1 zinwentaryzowane. Dokładny URL tego czatu potwierdzony w prywatnej kopii historii WebView2 (NIE zapisany w repo).
 - 004–014: kod v1.68.0 w Open Browser `LiteDevWakeState.cs` + `LiteDevWakeUi.cs`, wewnętrzny timer 60s/wybudzenie 25m, DPAPI, wybór wyłącznie jednego czatu, High, no draft/error/busy, preflight odpowiedzi i no duplicate. Testy stanu 10/10 PASS; runtime E2E pending.
