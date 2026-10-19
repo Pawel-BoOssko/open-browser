@@ -189,3 +189,9 @@ SOURCE v1.71.0: liczniki ról DIL w produkcyjnie ładowanym `LiteDomOptimizer.js
 - **OB3-012/061, SOURCE+TEST+LIVE UI:** 1.72.6.0 dodała operatorowi `Przypnij ten czat`, potwierdzenie zmiany rozmowy, aktualizację szyfrowanej konfiguracji, reset ledgeru poprzedniej rozmowy, widoczny suffix przypiętej rozmowy i czas następnego wybudzenia. Testy DevWake 33 checks PASS, Node promotion 9/9 PASS, wdrożenie LIVE PID21332 14:52:56 z bezpiecznym fallbackiem, kontrola UIAutomation przycisku+statusu PASS. Rzeczywista interakcja zmieniająca czat w GUI wciąż do sprawdzenia.
 - **OB3-081, BLOCKED:** próba aktualizacji istniejącego zadania Windows `OpenBrowser ChatGPT Lite` wskazującego starą wersję telemetryczną: `Set-ScheduledTask` odmówiło dostępu HRESULT 0x80070005, nie powtarzano. Skróty pulpit/menu Start już wskazują 1.72.6; zadanie systemowe nadal stare. Log w `docs/Rejestr nieudanych komend.md`.
 - **Checkpoint:** `docs/openbrowser-checkpoint-2026-10-19-1451-handoff-ui.md`. Nie używano ChatGPT Tasks, ręcznego commit/push, reset/clean.
+
+## Aktualizacja 2026-10-19 15:04 CEST: OB3-022/023
+
+- **SOURCE + LIVE SCRIPT HOTPATCH:** naprawiono wykrywanie uruchomienia `--lite-open-safely` w `scripts/monitor-lite-resources.ps1` i lokalnym monitorze PBOX1. Poprzednio realny PID21332 był raportowany jako 0 hostów; od 15:00 hostCount=1 i 7 procesów WebView2.
+- **LIVE VERIFIED MONITOR:** zaplanowana, istniejąca próbka Windows Task 15:01:02 również wykryła hostCount=1. Dodatkowe obliczanie `cpuCorePercent` i `cpuMachinePercent` z różnicy skumulowanego czasu CPU (ten sam PID, znane okno pomiarowe) działa w próbce 15:03:55: 4 procesory logiczne, 51,9 s okna, host 0,1% jednego rdzenia, 0,02% całej maszyny. Historia sprzed poprawki nie została przepisana.
+- **PARTIAL:** dopiero początek OB3-022/023, bez długich trendów i GUI dashboardu. Szczegóły `docs/openbrowser-checkpoint-2026-10-19-1504-resources.md`. Wydanie przeglądarki nadal LIVE 1.72.6, bez restartu.

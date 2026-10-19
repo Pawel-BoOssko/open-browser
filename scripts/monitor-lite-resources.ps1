@@ -26,6 +26,35 @@ function Measure-One($cim) {
 }
 $liteRows = @($lite | ForEach-Object { Measure-One $_ } | Where-Object { $_ })
 $webRows = @($web | ForEach-Object { Measure-One $_ } | Where-Object { $_ })
+$logicalProcessors = [Environment]::ProcessorCount
+$cpuSampleIntervalSeconds = $null
+# CPU is cumulative per process; derive rate from a recent sample for same PID.
+try {
+    if (Test-Path -LiteralPath $path) {
+        $lastLine = Get-Content -LiteralPath $path -Tail 1 -Encoding UTF8
+        $previous = $lastLine | ConvertFrom-Json -ErrorAction Stop
+        $elapsed = ($stamp - [DateTimeOffset]::Parse([string]$previous.utc)).TotalSeconds
+        if ($previous.type -eq 'lite_process_resources' -and
+            $elapsed -ge 2 -and $elapsed -le 900) {
+            $cpuSampleIntervalSeconds = [math]::Round($elapsed, 1)
+            foreach ($kind in @('hosts', 'webviewProcesses')) {
+                $beforeRows = @($previous.$kind)
+                $currentRows = if ($kind -eq 'hosts') { $liteRows } else { $webRows }
+                foreach ($row in @($currentRows)) {
+                    $before = $beforeRows | Where-Object { $_.pid -eq $row.pid } | Select-Object -First 1
+                    if ($null -eq $before -or $null -eq $before.cpuSecondsCumulative) { continue }
+                    $cpuDelta = [double]$row.cpuSecondsCumulative - [double]$before.cpuSecondsCumulative
+                    if ($cpuDelta -lt 0) { continue } # Restart or PID reuse.
+                    $perCore = [math]::Round(100 * $cpuDelta / $elapsed, 1)
+                    $row | Add-Member -NotePropertyName cpuCorePercent -NotePropertyValue $perCore
+                    $row | Add-Member -NotePropertyName cpuMachinePercent -NotePropertyValue ([math]::Round($perCore / $logicalProcessors, 2))
+                }
+            }
+        }
+    }
+} catch {
+    # The first sample, an incomplete line, or a replaced process is normal.
+}
 $top = @(Get-Process | Sort-Object WorkingSet64 -Descending | Select-Object -First 6 | ForEach-Object {
     [pscustomobject]@{ name = $_.ProcessName; pid = $_.Id; workingMiB = [math]::Round($_.WorkingSet64 / 1MB, 1) }
 })
@@ -35,6 +64,8 @@ $record = [ordered]@{
     totalMemoryMiB = [math]::Round($os.TotalVisibleMemorySize / 1024, 0)
     freeMemoryMiB = [math]::Round($os.FreePhysicalMemory / 1024, 0)
     pagefileUsedMiB = [math]::Round(($pf | Measure-Object CurrentUsage -Sum).Sum, 0)
+    logicalProcessors = $logicalProcessors
+    cpuSampleIntervalSeconds = $cpuSampleIntervalSeconds
     hostCount = $liteRows.Count
     hosts = $liteRows
     webviewCount = $webRows.Count
