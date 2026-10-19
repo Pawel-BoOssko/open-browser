@@ -66,7 +66,7 @@ internal sealed partial class ChatGptLiteForm : Form
             WrapContents = false,
             AutoScroll = true
         };
-        toolbar.Controls.AddRange(new Control[] { _buildVersion, _highIndicator, _devWakeToggle, _devWakePin, _devWakeStatus, _resumeToggle, _resumeStatus, _back, _forward, _reload, _home, _domToggle, _hardPruneToggle, _archiveToggle, _openArchive, _status, _domInfo });
+        toolbar.Controls.AddRange(new Control[] { _buildVersion, _technicalInfoButton, _highIndicator, _devWakeToggle, _devWakePin, _devWakeStatus, _resumeToggle, _resumeStatus, _back, _forward, _reload, _home, _domToggle, _hardPruneToggle, _archiveToggle, _openArchive, _status, _domInfo });
         var content = new SplitContainer
         {
             Dock = DockStyle.Fill,
@@ -119,6 +119,7 @@ internal sealed partial class ChatGptLiteForm : Form
         InitializeResumeUi();
         InitializeHighUi();
         InitializeDevWake();
+        InitializeTechnicalInfoUi();
 
         LiteEventLog.PruneOldFiles();
         LiteEventLog.Write("window_constructed", new { version = Application.ProductVersion });
@@ -166,6 +167,7 @@ internal sealed partial class ChatGptLiteForm : Form
             LiteEventLog.Write("webview_initializing");
             var environment = await CoreWebView2Environment.CreateAsync(null, profile);
             await _browser.EnsureCoreWebView2Async(environment);
+            _webViewRuntimeVersion = environment.BrowserVersionString;
             LiteEventLog.Write("webview_initialized", new { browserVersion = environment.BrowserVersionString });
 
             var core = _browser.CoreWebView2;
