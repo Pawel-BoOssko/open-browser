@@ -75,3 +75,8 @@ Prioritize OB3-021: readable production technical identity (version/build time/s
 - On PBOX1 after Autosync snapshot 60fb43e, backed up and atomically updated existing LOCAL diagnostic scripts: monitor, analyzer, exporter. Did NOT update or create Windows Tasks, only script content used by the already-existing Resource Monitor Task.
 - 15:31:08 PBOX1 direct monitor test: resource sample appended and dashboard refreshed to 4060 bytes; `Wazne zdarzenia diagnostyczne` visible in generated HTML, `dev_wake_` events present; no active script tag, no external resources. All scripts live only in local diagnostics, no browser restart.
 - OB3-029 upgraded but PARTIAL: static local dashboard auto-refreshes from existing Task, no built-in Open Browser GUI integration, no sophisticated cross-day event analytics.
+
+## Independent automatic refresh confirmation 15:33 CEST
+- PBOX1 resource JSONL shows the scheduled 15:33:01 sample (hostCount=1), distinct from manual sample 15:31:05.
+- Dashboard file was autonomously regenerated at 15:33:08 by existing Resource Monitor chain (4044 bytes). Scheduler task last run 15:33:33 and LastTaskResult=0.
+- This verifies automatic HTML refresh from the existing task, with NO new task or ChatGPT automation. No app restart.

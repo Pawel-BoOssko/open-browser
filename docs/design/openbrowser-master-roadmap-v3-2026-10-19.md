@@ -221,3 +221,5 @@ SOURCE v1.71.0: liczniki ról DIL w produkcyjnie ładowanym `LiteDomOptimizer.js
 - Istniejący monitor Windows odświeża dashboard po zapisaniu próbki, ale błąd generatora nie zatrzymuje pomiarów.
 - 18 regresji PowerShell PASS, AST 0 błędów. PBOX1 po Autosync uruchomił poprawiony monitor 15:31:08 i wygenerował 4060-bajtowy HTML z wydarzeniami DevWake.
 - **OB3-029 nadal PARTIAL:** brak zintegrowanego widoku wewnątrz aplikacji i rozbudowanej korelacji wielu dni. Checkpoint `docs/openbrowser-checkpoint-2026-10-19-1512-second-wake.md`.
+
+- **OB3-029 automatic refresh LIVE_VERIFIED, 15:33 CEST:** istniejące zadanie Resource Monitor zapisało próbkę 15:33:01, a HTML z wydarzeniami i zasobami automatycznie odnowiono o 15:33:08 (4044 bajty). Bez tworzenia nowego zadania. Integracja dashboardu z GUI Lite nadal TODO.
