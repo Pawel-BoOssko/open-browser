@@ -44,6 +44,41 @@ function WebViewPrivateSum($row) {
     if ($sum.Count -eq 0 -or $null -eq $sum[0].Sum) { return 0.0 }
     return [double]$sum[0].Sum
 }
+function HostIdentity($row) {
+    $hosts = @($row.hosts)
+    if ($hosts.Count -ne 1 -or !$hosts[0].pid) { return '' }
+    return [string]$hosts[0].pid
+}
+function WebViewIdentity($row) {
+    $web = @($row.webviewProcesses)
+    if ($web.Count -eq 0 -or $web.Count -ne [int]$row.webviewCount) { return '' }
+    return [string]::Join(',', @($web | ForEach-Object { [string]$_.pid } | Sort-Object))
+}
+$stableHostFrom = $rows.Count - 1
+$stableWebFrom = $rows.Count - 1
+$finalHostId = HostIdentity $last
+$finalWebId = WebViewIdentity $last
+for ($i = $rows.Count - 2; $i -ge 0; $i--) {
+    $gapSeconds = ([datetime]$rows[$i + 1].utc -
+                   [datetime]$rows[$i].utc).TotalSeconds
+    if ($gapSeconds -le 0 -or $gapSeconds -gt 300 -or
+        !$finalHostId -or (HostIdentity $rows[$i]) -ne $finalHostId) { break }
+    $stableHostFrom = $i
+    if ($stableWebFrom -eq $i + 1 -and $finalWebId -and
+        (WebViewIdentity $rows[$i]) -eq $finalWebId) {
+        $stableWebFrom = $i
+    }
+}
+$webStableCount = $rows.Count - $stableWebFrom
+$webStableDelta = $null
+$webStableMinutes = 0.0
+if ($webStableCount -ge 2) {
+    $webStableDelta = [math]::Round(
+        ((WebViewPrivateSum $last) -
+         (WebViewPrivateSum $rows[$stableWebFrom])), 1)
+    $webStableMinutes = [math]::Round(
+        (([datetime]$last.utc - [datetime]$rows[$stableWebFrom].utc).TotalMinutes), 1)
+}
 $firstWeb = WebViewPrivateSum $first
 $lastWeb = WebViewPrivateSum $last
 $allWeb = @($rows | ForEach-Object { WebViewPrivateSum $_ })
@@ -66,7 +101,13 @@ $result = [ordered]@{
     webviewPrivateFirstMiB = [math]::Round($firstWeb, 1)
     webviewPrivateLastMiB = [math]::Round($lastWeb, 1)
     webviewPrivateDeltaMiB = [math]::Round(($lastWeb - $firstWeb), 1)
+    webviewPrivateDeltaIsRaw = $true
+    stableHostSampleCount = ($rows.Count - $stableHostFrom)
+    stableWebviewSampleCount = $webStableCount
+    stableWebviewDurationMinutes = $webStableMinutes
+    stableWebviewPrivateDeltaMiB = $webStableDelta
+    hasWebviewChurnOrRestart = ($webStableCount -lt $rows.Count)
     maxWebviewPrivateMiB = [math]::Round(($allWeb | Measure-Object -Maximum).Maximum, 1)
-    caution = 'A process-count change or restart invalidates leak attribution'
+    caution = 'Raw totals across restarts are not leak estimates; stable delta requires identical PIDs and <=300s gaps'
 }
 ConvertTo-Json -InputObject $result -Depth 5 -Compress

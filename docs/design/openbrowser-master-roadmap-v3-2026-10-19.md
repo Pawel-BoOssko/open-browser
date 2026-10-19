@@ -52,7 +52,7 @@ Przed wyborem nowych punktów **odczytaj** `docs/OPENBROWSER_DEEP_HANDOFF_2026-1
 - [ ] OB3-015. Test integracyjny w izolowanym WebView2 na lokalnej stronie, bez prawdziwego konta.
 - [ ] OB3-016. Side-by-side Release, manifest/hash/gate, 16+ selftestów na PBOX1.
 - [ ] OB3-017. Kontrolowane przejście z działającego okna na nową wersję bez ucinania generowania i bez utraty danych.
-- [ ] OB3-018. REALNY test w przypiętym czacie: jedno budzenie, odpowiedź pracującego czatu, checkpoint, wznowienie po >25min, bez duplikatu.
+- [x] OB3-018. LIVE_VERIFIED 2026-10-19: dwa rzeczywiste budzenia bieżącej rozmowy 14:45:23 i 15:10:55 (odstęp 25m32s), dwa wznowienia pracy oraz checkpointy. Bez zauważonych duplikatów w tych cyklach. Wewnętrzny ACK aplikacji nadal odrębny zakres OB3-009/025.
 - [ ] OB3-019. Przetrwanie naturalnego restartu komputera; jeśli program nie uruchomiony, nie udawać wykonania.
 - [ ] OB3-020. Autopraca nocna: po każdej odpowiedzi model sam czyta plan i checkpoint oraz realizuje zadania do wyczerpania backlogu; każde zatrzymanie jest dokumentowane.
 
@@ -201,3 +201,10 @@ SOURCE v1.71.0: liczniki ról DIL w produkcyjnie ładowanym `LiteDomOptimizer.js
 - **SOURCE + LIVE monitor:** klasyfikacja 7 procesów WebView2 działa: browser 1, crashpad-handler 1, gpu-process 1, utility 2, renderer 2. Dodano wyłącznie odczytowe wykrywanie kandydatów na procesy osierocone według niezwiązanego parentPid (bez automatycznego zamykania).
 - **PBOX1 15:07:17:** host 1, WebView2 7, orphan candidates 0, pomiar CPU 11,5 s. AST PowerShell 0 błędów.
 - **Częściowo wykonane:** OB3-024, wciąż brak testów awarii renderera. Checkpoint `docs/openbrowser-checkpoint-2026-10-19-1504-resources.md`.
+
+## Aktualizacja 2026-10-19 15:20 CEST: OB3-018, OB3-021 i OB3-023
+
+- **OB3-018: LIVE_VERIFIED.** Dwa kolejne wybudzenia 14:45:23 i 15:10:55 w prawidłowej rozmowie, odstęp 25 min 32 s, faktyczne wznowienia pracy i zapis checkpointów. Użytkownik dostarczył drugi komunikat. Wewnętrzne potwierdzanie ACK w nowej ścieżce wysyłania nadal osobnym zadaniem OB3-009/025.
+- **OB3-021: SOURCE+STAGED+LIVE UI, częściowo.** Wersja 1.72.7 w PBOX1 PID20956 od 15:15:28. Nowy przycisk `Techniczne` widoczny w rzeczywistym pasku, manifest LIVE ma source SHA `671ed94dac64183307bd73cc99bed4ed5c0aec8e`, kanał live i poprawny hash EXE. Tekst okna po kliknięciu nie został potwierdzony przez automatyczny test GUI.
+- **OB3-023: SOURCE+TEST (rozszerzenie analizy).** Analizator trendów rozróżnia surową zmianę RAM między restartami od zmiany w nieprzerwanym okresie z identycznymi PID-ami procesów. Wprowadzono 9 testów regresyjnych PASS; prawdziwe próbki PBOX1 do weryfikacji. Nie oznaczamy pełnego 5m/1h/24h dashboardu jako ukończonego.
+- Checkpoint: `docs/openbrowser-checkpoint-2026-10-19-1512-second-wake.md`. Bez przypominajek ChatGPT, ręcznych commitów i pushy.
