@@ -182,3 +182,10 @@ SOURCE v1.71.0: liczniki ról DIL w produkcyjnie ładowanym `LiteDomOptimizer.js
 - TEST: Node 15/15 suites PASS, 4 PASS dla mixed probe, .NET 17/17 selftest PASS, Debug build 0 errors, 1 historyczne MSB3277.
 - STAGED SATANAMD 1.72.1: `OpenBrowserLite_v1.72.1_20261019_0917`, manifest/hash i release gate PASS. Izolowany WebView2 blocked (rejestr); PBOX1 LIVE nadal 1.72.0 PID5852, `answer_missing` o 09:15, brak potwierdzonego ACK. Checkpoint: `docs/openbrowser-checkpoint-2026-10-19-0918-probe-metadata.md`.
 - NEXT: po Autosync staged PBOX1 1.72.1, realne odczyty diagnostyki, następnie rzeczywiste DIL ACK. Nie oznaczać OB3-009/018 jako ukończonych.
+
+## Aktualizacja 2026-10-19 14:56 CEST: OB3-012/018/061/081
+
+- **OB3-018, PARTIAL LIVE:** nowy czat projektu (ID suffix `b74f0fc1f389`) otrzymał rzeczywistą pobudkę z PBOX1 o 14:45:23, co wznowiło pracę modelu. Drugi cykl 25m dopiero przed nami, nie zamykać punktu.
+- **OB3-012/061, SOURCE+TEST+LIVE UI:** 1.72.6.0 dodała operatorowi `Przypnij ten czat`, potwierdzenie zmiany rozmowy, aktualizację szyfrowanej konfiguracji, reset ledgeru poprzedniej rozmowy, widoczny suffix przypiętej rozmowy i czas następnego wybudzenia. Testy DevWake 33 checks PASS, Node promotion 9/9 PASS, wdrożenie LIVE PID21332 14:52:56 z bezpiecznym fallbackiem, kontrola UIAutomation przycisku+statusu PASS. Rzeczywista interakcja zmieniająca czat w GUI wciąż do sprawdzenia.
+- **OB3-081, BLOCKED:** próba aktualizacji istniejącego zadania Windows `OpenBrowser ChatGPT Lite` wskazującego starą wersję telemetryczną: `Set-ScheduledTask` odmówiło dostępu HRESULT 0x80070005, nie powtarzano. Skróty pulpit/menu Start już wskazują 1.72.6; zadanie systemowe nadal stare. Log w `docs/Rejestr nieudanych komend.md`.
+- **Checkpoint:** `docs/openbrowser-checkpoint-2026-10-19-1451-handoff-ui.md`. Nie używano ChatGPT Tasks, ręcznego commit/push, reset/clean.

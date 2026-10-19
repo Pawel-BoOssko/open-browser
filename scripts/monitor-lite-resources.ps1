@@ -8,7 +8,7 @@ $path = Join-Path $folder ('resources-' + $stamp.ToString('yyyy-MM-dd') + '.json
 if ((Test-Path $path) -and (Get-Item $path).Length -gt 10MB) { exit 0 }
 $os = Get-CimInstance Win32_OperatingSystem
 $pf = Get-CimInstance Win32_PageFileUsage
-$lite = @(Get-CimInstance Win32_Process -Filter "Name='BridgeBrowserAlpha0.exe'" | Where-Object { $_.CommandLine -match '--chatgpt-lite' })
+$lite = @(Get-CimInstance Win32_Process -Filter "Name='BridgeBrowserAlpha0.exe'" | Where-Object { $_.CommandLine -match '--(chatgpt-lite|lite-open-safely)(\s|$)' })
 $web = @(Get-CimInstance Win32_Process -Filter "Name='msedgewebview2.exe'" | Where-Object { $_.CommandLine -like '*ChatGPT-Lite*' })
 function Measure-One($cim) {
     $p = Get-Process -Id $cim.ProcessId -ErrorAction SilentlyContinue

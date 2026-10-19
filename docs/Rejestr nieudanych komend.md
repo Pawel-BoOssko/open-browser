@@ -365,3 +365,13 @@ Historyczne wpisy OB-10 i OB-11 zachowują swój numer. Nowym zdarzeniom należy
 ### OB-20261019-1212-roadmap-append
 - Narzędzie: RDC `write_file append`, SATANAMD. Operacja: dopisanie krótkiej aktualizacji OB3-007/014 do `docs/design/openbrowser-master-roadmap-v3-2026-10-19.md`; pojedyncza zmiana dokumentacji.
 - Wynik: `This tool call was blocked by OpenAI's safety checks`. Brak dopisania; powód szczegółowy nieudostępniony. Nie ponawiano inną drogą. Aktualny stan zachowano w checkpointcie 12:11.
+
+## OB-20261019-145431-OB3-081 : Windows Task Scheduler access denied
+
+- Host: PBOX1, LC MultiHost, interactive user pboru, 2026-10-19 14:54:27 CEST.
+- Intended operation: update the *existing* Windows task `OpenBrowser ChatGPT Lite` to point to the LIVE v1.72.6 executable; retain one existing trigger, change only Action to `--lite-open-safely`. Not a ChatGPT scheduled reminder.
+- Denied command: `Set-ScheduledTask -TaskName 'OpenBrowser ChatGPT Lite' -Action $new`, where `$new = New-ScheduledTaskAction -Execute $exe -Argument '--lite-open-safely' -WorkingDirectory $dir`.
+- Result: `PermissionDenied`, `HRESULT 0x80070005` (Access is denied). PowerShell printed a *non-terminating error* although the remote wrapper returned exit_code=0; actual Task Scheduler update **FAILED**.
+- Independent read-only verification: Windows task action STILL points to `OpenBrowserChatGPTLite_20261018_telemetry\BridgeBrowserAlpha0.exe` with `--chatgpt-lite`; state Ready; original 1 trigger intact. No task started.
+- Attempt NOT repeated with elevated privileges or alternate tool. Do not retry automatically. OB3-081 remains BLOCKED.
+- Other parts of the command succeeded: Desktop and Start Menu shortcuts both updated to 1.72.6. LIVE executable and process unaffected.
