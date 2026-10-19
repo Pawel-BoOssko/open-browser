@@ -6,7 +6,7 @@ const vm = require("node:vm");
 const code = fs.readFileSync(path.join(__dirname, "../src/BridgeBrowserAlpha0/LiteResumeSender.js"), "utf8");
 const id = "fedcba9876543210fedcba9876543210";
 const prompt = "Write the next chapter only if work remains.";
-function setup() {
+function setup(options = {}) {
   let scheduled;
   let clicks = 0;
   let busy = false;
@@ -23,12 +23,16 @@ function setup() {
     querySelector(selector) {
       if (selector.startsWith("#prompt-textarea")) return activeEditor;
       if (selector === '[data-testid="send-button"]')
-        return { disabled: false, click() { clicks++; } };
+        return options.missingSendButton ? null :
+          { disabled: !!options.disabledSendButton, click() { clicks++; } };
       if (selector.includes("stop-button") || selector.includes("aria-busy"))
         return busy ? {} : null;
       return null;
     },
-    execCommand(_command, _ui, value) { editor.innerText = value; return true; }
+    execCommand(_command, _ui, value) {
+      editor.innerText = value + (options.editorAddsNewline ? '\n' : '');
+      return true;
+    }
   };
   const win = {
     document: doc, location: { hostname: "chatgpt.com", pathname: "/c/test" },
@@ -50,6 +54,7 @@ function setup() {
   assert.equal(p.sender.send(prompt, id), "submission_requested");
   p.run();
   assert.equal(p.count(), 1, "normal matching payload submits once");
+  assert.equal(p.sender.phase(id), 'click_invoked');
 }
 {
   const p = setup();
@@ -110,4 +115,25 @@ function setup() {
   assert.equal(p.sender.diagnose().reason, 'draft_present');
   assert.equal(p.count(), 0);
 }
-console.log("LiteResumeSenderRace: 9 PASS");
+{
+  const p = setup({ missingSendButton: true });
+  assert.equal(p.sender.send(prompt, id), 'submission_requested');
+  p.run();
+  assert.equal(p.sender.phase(id), 'draft_button_missing');
+  assert.equal(p.count(), 0, 'injected draft does not imply click');
+  assert.match(p.editor.innerText, /\[OB-/);
+}
+{
+  const p = setup({ editorAddsNewline: true });
+  p.sender.send(prompt, id);
+  p.run();
+  assert.equal(p.count(), 1, 'a trailing DOM newline should not suppress click');
+}
+{
+  const p = setup({ disabledSendButton: true });
+  p.sender.send(prompt, id);
+  p.run();
+  assert.equal(p.sender.phase(id), 'draft_button_disabled');
+  assert.equal(p.count(), 0);
+}
+console.log("LiteResumeSenderRace: 12 PASS");

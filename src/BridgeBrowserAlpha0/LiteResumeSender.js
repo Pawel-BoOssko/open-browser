@@ -3,6 +3,14 @@
   if (w.__OPENBROWSER_RESUME_SENDER__) return;
   if (!w.document || w.location.hostname !== "chatgpt.com") return;
   const attempted = new Set();
+  const phases = new Map(); // receipt -> prepared / clicked / blocked; no message text stored
+  const samePayload = (value, payload) => String(value || "")
+    .replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim() ===
+      String(payload).replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim();
+  function phase(receiptId) {
+    if (hasAck(receiptId)) return "visible_ack";
+    return phases.get(receiptId) || "not_attempted";
+  }
   function stopVisible() {
     const button = w.document.querySelector('[data-testid="stop-button"]');
     if (!button || button.disabled || button.hidden ||
@@ -59,6 +67,7 @@
     const el = composer();
     const targetPath = w.location.pathname;
     attempted.add(receiptId);
+    phases.set(receiptId, "preparing");
     const payload = "[OB-" + receiptId + "]\n" + text;
     el.focus();
     if ("value" in el) {
@@ -72,16 +81,36 @@
       if (!w.document.execCommand("insertText", false, payload))
         return "unsupported";
     }
-    // Recheck state just before clicking: React may replace the composer, the
-    // operator can type a draft, or the user may navigate during this delay.
+    // Never equate insertion into the editor with a send. Capture the click
+    // outcome for the host; any missing control leaves an explicit draft state.
+    phases.set(receiptId, "draft_prepared");
     w.setTimeout(() => {
       if (w.location.hostname !== "chatgpt.com" ||
-          w.location.pathname !== targetPath || composer() !== el || busy() ||
-          String(el.value || el.innerText || "") !== payload) return;
+          w.location.pathname !== targetPath) {
+        phases.set(receiptId, "blocked_navigation"); return;
+      }
+      if (composer() !== el) {
+        phases.set(receiptId, "blocked_editor_replaced"); return;
+      }
+      if (busy()) {
+        phases.set(receiptId, "blocked_generation"); return;
+      }
+      if (!samePayload(el.value || el.innerText || el.textContent, payload)) {
+        phases.set(receiptId, "blocked_editor_changed"); return;
+      }
       const btn = w.document.querySelector('[data-testid="send-button"]');
-      if (btn && !btn.disabled) btn.click();
+      if (!btn) {
+        phases.set(receiptId, "draft_button_missing"); return;
+      }
+      if (btn.disabled || btn.getAttribute?.('aria-disabled') === 'true') {
+        phases.set(receiptId, "draft_button_disabled"); return;
+      }
+      try {
+        btn.click();
+        phases.set(receiptId, "click_invoked");
+      } catch (_) { phases.set(receiptId, "draft_click_failed"); }
     }, 250);
     return "submission_requested";
   }
-  w.__OPENBROWSER_RESUME_SENDER__ = { send, hasAck, diagnose };
+  w.__OPENBROWSER_RESUME_SENDER__ = { send, hasAck, diagnose, phase };
 })(window);

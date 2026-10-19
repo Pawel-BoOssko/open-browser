@@ -84,9 +84,12 @@ internal sealed partial class ChatGptLiteForm
     {
         _devWakeToggle.Text = _devWake.Enabled
             ? "Autopraca: WŁ. " + _devWake.IntervalMinutes + "m" : "Autopraca: WYŁ.";
-        _devWakeStatus.Text = _devWake.Enabled
-            ? "Budzenie: " + _devWake.NextDueUtc.ToLocalTime().ToString("HH:mm")
-            : (_devWake.LastState == "complete" ? "Plan ukończony" : "Autopraca wstrzymana");
+        _devWakeStatus.Text = _devWake.Enabled &&
+            _devWake.LastState.StartsWith("uncertain_editor_", StringComparison.Ordinal)
+            ? "Szkic niewysłany — sprawdź edytor"
+            : _devWake.Enabled
+                ? "Budzenie: " + _devWake.NextDueUtc.ToLocalTime().ToString("HH:mm")
+                : (_devWake.LastState == "complete" ? "Plan ukończony" : "Autopraca wstrzymana");
     }
 
     private void ReportDevWakeSkip(string reason)
@@ -249,11 +252,30 @@ internal sealed partial class ChatGptLiteForm
                 UpdateDevWakeStatus();
             }
             else {
+                // The old sender reported 'submission_requested' merely when
+                // text entered the editor, even if it never clicked a button.
+                // Distinguish a draft from an actual unacknowledged click.
+                string sendPhase = "phase_unknown";
+                var phaseQuery = core.ExecuteScriptAsync(
+                    "window.__OPENBROWSER_RESUME_SENDER__?.phase(" +
+                    JsonSerializer.Serialize(receipt) + ")");
+                if (await Task.WhenAny(phaseQuery, Task.Delay(2500)) == phaseQuery)
+                    sendPhase = JsonSerializer.Deserialize<string>(await phaseQuery)
+                        ?? "phase_unknown";
+                bool unsentDraft = sendPhase.StartsWith("draft_", StringComparison.Ordinal) ||
+                    sendPhase.StartsWith("blocked_", StringComparison.Ordinal) ||
+                    sendPhase is "preparing";
                 LiteDevWakeState.DeferUncertain(_devWake,
-                    DateTimeOffset.UtcNow, "no_ack");
-                LiteEventLog.Write("dev_wake_submission_uncertain", new {
-                    reason = "no_visible_ack"
-                });
+                    DateTimeOffset.UtcNow,
+                    unsentDraft ? "editor_" + sendPhase : "no_ack");
+                if (unsentDraft)
+                    LiteEventLog.Write("dev_wake_draft_unsent", new {
+                        phase = sendPhase, mustNotRetrySameAnswer = true
+                    });
+                else
+                    LiteEventLog.Write("dev_wake_submission_uncertain", new {
+                        reason = "no_visible_ack", phase = sendPhase
+                    });
                 UpdateDevWakeStatus();
             }
         }
