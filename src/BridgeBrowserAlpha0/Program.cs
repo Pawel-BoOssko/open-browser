@@ -8,6 +8,25 @@ internal static class Program
     [STAThread]
     private static void Main(string[] args)
     {
+        if (args.Length >= 3 && string.Equals(args[0],
+            "--lite-chat-notes-append", StringComparison.OrdinalIgnoreCase))
+        {
+            try
+            {
+                string url = LiteDevWakeState.NormalizeUrl(args[1]);
+                var store = new LiteChatNotes();
+                string key = LiteChatNotes.NormalizeKey(url);
+                string current = store.Load(key);
+                string addition = string.Join(" ", args.Skip(2));
+                if (string.IsNullOrWhiteSpace(addition))
+                    throw new ArgumentException("Empty note");
+                store.Save(key, string.IsNullOrWhiteSpace(current)
+                    ? addition : current + Environment.NewLine + addition);
+                Environment.ExitCode = 0;
+            }
+            catch { Environment.ExitCode = 4; }
+            return;
+        }
         // Chat-specific schedules can be configured by the chat itself through
         // the local command interface, or by the operator in the app.
         if (args.Length > 0 && string.Equals(args[0],

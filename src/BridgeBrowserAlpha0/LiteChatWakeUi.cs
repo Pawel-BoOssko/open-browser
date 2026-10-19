@@ -11,7 +11,7 @@ internal sealed partial class ChatGptLiteForm
     private bool _chatWakeBusy;
     private readonly WebView2 _chatWakeWorker = new()
     {
-        Size = new Size(4, 4), Location = new Point(-80, -80),
+        Size = new Size(980, 700), Location = new Point(-1350, -900),
         Visible = true, TabStop = false
     };
     private readonly Button _chatWakeConfigure = new()
@@ -229,7 +229,7 @@ internal sealed partial class ChatGptLiteForm
                         JsonSerializer.Serialize(receipt) + ")";
                     var result = await _chatWakeWorker.CoreWebView2.ExecuteScriptAsync(js);
                     state = JsonSerializer.Deserialize<string>(result) ?? "sender_missing";
-                    await Task.Delay(1500); // allow delayed Send click to finish
+                    await Task.Delay(2800); // allow delayed Send and retry cycle to finish
                     string phaseJson = await _chatWakeWorker.CoreWebView2.ExecuteScriptAsync(
                         "window.__OPENBROWSER_RESUME_SENDER__?.phase(" +
                         JsonSerializer.Serialize(receipt) + ")");

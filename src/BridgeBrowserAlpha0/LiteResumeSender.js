@@ -161,8 +161,10 @@
       el.dispatchEvent(new w.Event("input", { bubbles: true }));
     }
     phases.set(receiptId, "direct_injected");
-    w.setTimeout(() => {
-      if (w.location.pathname !== targetPath) return;
+    const trySubmit = (remaining) => {
+      if (w.location.pathname !== targetPath) {
+        phases.set(receiptId, "blocked_navigation"); return;
+      }
       const form = el.closest?.("form") || w.document.querySelector("form[data-chatgpt-composer]");
       const btn = sendButton(el) ||
         form?.querySelector?.('button[type="submit"]:not([disabled])') ||
@@ -170,16 +172,17 @@
       if (btn && !btn.disabled) {
         btn.click();
         phases.set(receiptId, "click_invoked");
+      } else if (remaining > 0) {
+        w.setTimeout(() => trySubmit(remaining - 1), 250);
       } else if (typeof form?.requestSubmit === "function") {
         form.requestSubmit();
         phases.set(receiptId, "form_submitted");
       } else {
-        el.dispatchEvent(new w.KeyboardEvent("keydown", {
-          key: "Enter", code: "Enter", bubbles: true, cancelable: true
-        }));
-        phases.set(receiptId, "enter_dispatched");
+        // Synthetic Enter is not reliable for ChatGPT's React composer.
+        phases.set(receiptId, "draft_button_missing");
       }
-    }, 500);
+    };
+    w.setTimeout(() => trySubmit(6), 500);
     return "submission_requested";
   }
   w.__OPENBROWSER_RESUME_SENDER__ = { send, sendDirect, hasAck, diagnose, phase };
