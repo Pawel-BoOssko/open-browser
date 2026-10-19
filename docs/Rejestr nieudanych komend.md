@@ -285,3 +285,11 @@ Historyczne wpisy OB-10 i OB-11 zachowują swój numer. Nowym zdarzeniom należy
 
 ### OB-20261019-014035-devwake-selftest-dummy — wewnętrzny test tożsamości
 - Narzędzie: LC MultiHost SATANAMD / headless EXE, **mały test** `--lite-dev-wake-selftest`. Wynik: EXIT3 po usunięciu prawdziwego ID czatu z kodu; fixture nadal podmieniało dawne znaki URL i nie generowało innego czatu. Nie próbowano żadnej wysyłki. Naprawa: podmiana właściwego syntetycznego identyfikatora w teście; BUILD 0 errors, SELFTEST 0, prywatny URL pozostaje wyłącznie w DPAPI na PBOX1.
+
+### OB-20261019-0225-batch-read — odmowa narzędzia orkiestracji
+- Narzędzie: functions.exec z dwoma równoległymi wywołaniami LC MultiHost (SATANAMD i PBOX1); tylko odczyt wersji, procesów i stanu Git, bez mutacji.
+- Wynik: blokada zabezpieczeń OpenAI przed wykonaniem całego wywołania. Powód szczegółowy nieudostępniony. Niezależne późniejsze odczyty procesu i repozytorium udały się bez zmiany polityk. Zakres blokady: tamto pojedyncze wywołanie zbiorcze, nie całość LC MultiHost.
+
+### OB-20261019-0237-long-checkpoint — odmowa długiego zapisu raportu
+- Narzędzie: Remote Desktop Commander write_file SATANAMD, pojedyncza próba zapisu obszernego checkpointu .md w katalogu docs.
+- Wynik: blokada zabezpieczeń OpenAI, bez zapisu tamtej wersji dokumentu. Utworzono później krótki samodzielny checkpoint z ustaleniem i wynikami, bez zmiany polityki zabezpieczeń. Oryginalnego długiego polecenia nie ponawiano.
