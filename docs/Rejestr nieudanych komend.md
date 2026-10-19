@@ -293,3 +293,10 @@ Historyczne wpisy OB-10 i OB-11 zachowują swój numer. Nowym zdarzeniom należy
 ### OB-20261019-0237-long-checkpoint — odmowa długiego zapisu raportu
 - Narzędzie: Remote Desktop Commander write_file SATANAMD, pojedyncza próba zapisu obszernego checkpointu .md w katalogu docs.
 - Wynik: blokada zabezpieczeń OpenAI, bez zapisu tamtej wersji dokumentu. Utworzono później krótki samodzielny checkpoint z ustaleniem i wynikami, bez zmiany polityki zabezpieczeń. Oryginalnego długiego polecenia nie ponawiano.
+
+## 2026-10-19 05:18 CEST, Open Browser Lite
+
+- Narzędzie: LC MultiHost `execute_command` na SATANAMD. Operacja: pojedynczy pakiet trzech lokalnych edycji `LiteResumeSender.js`, `LiteDevWakeUi.cs`, `lite-resume-agent.test.cjs`, aby klasyfikować powody odmowy wysłania bez logowania szkiców. Wynik: błąd narzędzia bez komunikatu (`undefined`), kontrolny odczyt potwierdził brak zmian. Zakres: tylko ten pakiet, nie cała praca.
+- Narzędzie: Remote Desktop Commander `edit_block` na SATANAMD. Operacja: mała, samodzielna zmiana jednego warunku w `LiteResumeSender.js`, klasyfikacja `busy` jako brak edytora / zajęta strona / szkic. Wynik: `This tool call was blocked by OpenAI's safety checks`; plik niezmieniony. Zakres: pojedyncza edycja, bez blokady odczytów, testów i niezależnych zmian DOM.
+- Kontynuacja niezależna: OB3-031, korekta liczenia mieszanego DOM legacy+DIL, testy 17/17 PASS. Bez obejścia zablokowanej operacji.
+- Narzędzie: Remote Desktop Commander `edit_block` na SATANAMD. Operacja: dopisanie aktualizacji OB3-031 przed nagłówkiem roadmapy, mały krok. Wynik: `Search content not found` (dopasowanie 28%); brak modyfikacji przez tę próbę. Niezależne `write_file append` do roadmapy zakończone powodzeniem.

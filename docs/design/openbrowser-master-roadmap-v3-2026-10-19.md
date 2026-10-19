@@ -148,3 +148,7 @@ Każdy krok ma stany `TODO | SOURCE | TEST | STAGED | LIVE_VERIFIED | BLOCKED`. 
 - Źródłowy backlog 35 punktów: `docs/design/openbrowser-full-delivery-plan-v2-2026-10-18-1626.md`.
 - Checkpoint v1.67: `docs/openbrowser-p0-checkpoint-2026-10-18-2305.md`.
 - Aktualna decyzja operatora 19.10: włącz wyłącznie własny nadzorca Open Browser dla tej rozmowy, ~25m, bez sztucznego doboru zadań i bez przypominajek ChatGPT.
+
+## Aktualizacja 2026-10-19 05:20 CEST: OB3-031
+
+SOURCE 1.71.0: poprawiono licznik mieszanego DOM legacy+DIL, preferując rzeczywiste wiadomości DIL. Nie włączono optymalizacji ani przycinania DIL. Nowy test mixed: 90 DIL i 3 legacy; wszystkie 17 plików testów JS PASS. LIVE PBOX1 pozostaje 1.70.0, bez potwierdzonego dev_wake_ack. Szczegóły w `docs/openbrowser-checkpoint-2026-10-19-0519-diagnostics.md` i rejestrze nieudanych komend.

@@ -21,6 +21,7 @@ function createTest(turnCount, options = {}) {
   const document = {
     readyState: "complete", activeElement: options.focus ?? null,
     querySelectorAll(selector) {
+      if (selector === '[data-user-message-bubble],[data-chatgpt-selection-message-id]') return [];
       assert.equal(selector, '[data-testid^="conversation-turn-"]');
       return nodes;
     },

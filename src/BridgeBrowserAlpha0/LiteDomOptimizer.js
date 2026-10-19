@@ -37,8 +37,11 @@
       const oldTurns = Array.from(doc.querySelectorAll(legacySelector));
       // DIL changed its turn wrappers in 2026. Count it accurately, but do not
       // change modern React message layout before standalone visual QA.
-      const modern = oldTurns.length === 0;
-      const turns = modern ? Array.from(doc.querySelectorAll(dilSelector)) : oldTurns;
+      const modernTurns = Array.from(doc.querySelectorAll(dilSelector));
+      // A mixed page can retain legacy wrappers alongside DIL messages.
+      // Prefer modern counts, but never optimize a mixed React subtree.
+      const modern = modernTurns.length > 0;
+      const turns = modern ? modernTurns : oldTurns;
       state.domVariant = modern ? 'dil_observe_only' : 'legacy';
       state.turnCount = turns.length;
       state.skippedBusy = busy();

@@ -17,8 +17,8 @@ function run(variant,n){
  const doc={
   readyState:"complete",activeElement:null,head:{appendChild(){styles++;}},
   querySelectorAll(sel){
-   if(sel.includes("conversation-turn-"))return variant==="legacy"?nodes:[];
-   if(sel.includes("data-user-message-bubble"))return variant==="dil"?nodes:[];
+   if(sel.includes("conversation-turn-"))return variant==="legacy"?nodes:(variant==="mixed"?nodes.slice(0,3):[]);
+   if(sel.includes("data-user-message-bubble"))return variant==="dil"||variant==="mixed"?nodes:[];
    return [];
   },
   querySelector(){return null;},
@@ -41,6 +41,13 @@ function run(variant,n){
  assert.equal(x.writes,0,"DIL remains untouched");
 }
 {
+ const x=run("mixed",90);
+ assert.equal(x.status.domVariant,"dil_observe_only","mixed legacy+DIL is modern");
+ assert.equal(x.status.turnCount,90,"count actual DIL messages, not stray legacy wrappers");
+ assert.equal(x.status.optimized,0,"never optimize mixed React DOM");
+ assert.equal(x.writes,0,"mixed DOM remains untouched");
+}
+{
  const x=run("legacy",90);
  assert.equal(x.status.domVariant,"legacy");
  assert.equal(x.status.turnCount,90);
@@ -52,4 +59,4 @@ function run(variant,n){
  assert.equal(x.status.turnCount,0);
  assert.equal(x.writes,0);
 }
-console.log("LiteDomDilCount: 3 PASS");
+console.log("LiteDomDilCount: 4 PASS");
