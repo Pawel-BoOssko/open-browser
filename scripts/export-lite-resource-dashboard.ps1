@@ -2,7 +2,8 @@ param(
     [string]$InputPath = (Join-Path $env:LOCALAPPDATA (
         'OpenBrowser\ChatGPT-Lite\diagnostics\resources-' +
         [DateTime]::UtcNow.ToString('yyyy-MM-dd') + '.jsonl')),
-    [string]$OutputPath = (Join-Path $env:LOCALAPPDATA 'OpenBrowser\ChatGPT-Lite\diagnostics\resources-dashboard.html')
+    [string]$OutputPath = (Join-Path $env:LOCALAPPDATA 'OpenBrowser\ChatGPT-Lite\diagnostics\resources-dashboard.html'),
+    [string]$EventPath = (Join-Path $env:LOCALAPPDATA ('OpenBrowser\ChatGPT-Lite\diagnostics\lite-events-' + [DateTime]::UtcNow.ToString('yyyy-MM-dd') + '.jsonl'))
 )
 $ErrorActionPreference = 'Stop'
 $analyzer = Join-Path $PSScriptRoot 'analyze-lite-resource-trends.ps1'
@@ -26,6 +27,26 @@ $rows = foreach ($key in @('5m','1h','24h')) {
         (NumberOrEmpty $w.maxWebviewPrivateMiB ' MiB') + '</td><td>' +
         (NumberOrEmpty $w.maxWebviewCpuCorePercent '% rdzenia') + '</td><td>' +
         (Safe $status) + '</td></tr>'
+}
+$eventRows = @()
+if (Test-Path -LiteralPath $EventPath -PathType Leaf) {
+    $observed = @(Get-Content -LiteralPath $EventPath -Tail 350 -Encoding UTF8 |
+        ForEach-Object {
+            try {
+                $ev = $_ | ConvertFrom-Json -ErrorAction Stop
+                if ([string]$ev.eventName -match '^(window_constructed|window_closing|webview_process_failed|webview_initializing|webview_initialized|dev_wake_.*|high_guard_.*|.*_timeout|.*_failed)$') {
+                    $null = [DateTimeOffset]::Parse([string]$ev.utc)
+                    $ev
+                }
+            } catch { }
+        } | Sort-Object { [DateTimeOffset]::Parse([string]$_.utc) } -Descending |
+        Select-Object -First 25)
+    $eventRows = @($observed | ForEach-Object {
+        $localTime = [DateTimeOffset]::Parse([string]$_.utc)
+        '<tr><td>' + (Safe $localTime.ToLocalTime().ToString('HH:mm:ss')) +
+            '</td><td>' + (Safe $_.eventName) + '</td><td>' +
+            (Safe $_.pid) + '</td></tr>'
+    })
 }
 $since = ([DateTimeOffset]::Parse($report.firstUtc)).ToLocalTime().ToString('yyyy-MM-dd HH:mm:ss')
 $until = ([DateTimeOffset]::Parse($report.lastUtc)).ToLocalTime().ToString('yyyy-MM-dd HH:mm:ss')
@@ -62,6 +83,14 @@ $html += '<div class="panel"><h2>Stabilna seria WebView2</h2><p>' +
     (Safe $stable) + '</p><p>Ciagly zestaw PID: ' +
     (Safe $report.stableWebviewSampleCount) + ' probek. Zmiana PID/odswiezenie: ' +
     (Safe $report.hasWebviewChurnOrRestart) + '.</p><small>Surowe sumy z okresow po restartach nie sa dowodem wycieku pamieci.</small></div>'
+$html += '<div class="panel"><h2>Wazne zdarzenia diagnostyczne</h2>'
+if ($eventRows.Count) {
+    $html += '<table><thead><tr><th>Godzina</th><th>Zdarzenie</th><th>PID</th></tr></thead><tbody>' +
+        ($eventRows -join [Environment]::NewLine) + '</tbody></table>'
+} else {
+    $html += '<p>Brak zapisanych zdarzen dla wybranego dnia.</p>'
+}
+$html += '<small>Wyswietlane sa wylacznie nazwy zdarzen, czas i PID, bez szczegolow rozmowy.</small></div>'
 $html += '<small>Raport lokalny, tylko zagregowane liczniki procesow. Nie zawiera czatow, cookies, tokenow ani historii URL.</small></body></html>'
 $dir = Split-Path -Parent $OutputPath
 if (-not (Test-Path -LiteralPath $dir -PathType Container)) {

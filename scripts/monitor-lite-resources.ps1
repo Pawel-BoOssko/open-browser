@@ -84,3 +84,14 @@ try {
 } catch {
     exit 1
 }
+# Non-critical local HTML refresh. The scheduled resource sample must succeed even
+# when the dashboard exporter or its source file is missing or malformed.
+$dashboardExporter = Join-Path $folder 'export-lite-resource-dashboard.ps1'
+if (Test-Path -LiteralPath $dashboardExporter -PathType Leaf) {
+    try {
+        & $dashboardExporter -InputPath $path -OutputPath (
+            Join-Path $folder 'resources-dashboard.html') -EventPath (
+            Join-Path $folder ('lite-events-' + $stamp.ToString('yyyy-MM-dd') + '.jsonl')) |
+            Out-Null
+    } catch { }
+}

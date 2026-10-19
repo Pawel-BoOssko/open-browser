@@ -43,4 +43,16 @@ try {
     Check (-not $html.Contains('<script')) 'dashboard has no active script'
 }
 finally { if (Test-Path $htmlPath) { Remove-Item $htmlPath -Force } }
-Write-Output 'LITE_RESOURCE_TRENDS_16_PASS'
+$eventFixture = Join-Path $env:TEMP ('openbrowser-events-test-' + [Guid]::NewGuid().ToString('N') + '.jsonl')
+try {
+    [IO.File]::WriteAllLines($eventFixture, [string[]]@(
+        '{"utc":"2026-10-18T12:01:00Z","pid":10,"eventName":"dev_wake_direct_send","details":{"private":"MUST_NOT_APPEAR"}}',
+        '{"utc":"2026-10-18T12:01:30Z","pid":10,"eventName":"ui_heartbeat","details":{"private":"MUST_NOT_APPEAR"}}'
+    ), [Text.UTF8Encoding]::new($false))
+    & (Join-Path $root 'scripts\export-lite-resource-dashboard.ps1') -InputPath $fixture -EventPath $eventFixture -OutputPath $htmlPath | Out-Null
+    $reportHtml = [IO.File]::ReadAllText($htmlPath)
+    Check ($reportHtml.Contains('dev_wake_direct_send')) 'diagnostic event displayed'
+    Check (-not $reportHtml.Contains('MUST_NOT_APPEAR')) 'event details excluded'
+}
+finally { if (Test-Path $eventFixture) { Remove-Item $eventFixture -Force } }
+Write-Output 'LITE_RESOURCE_TRENDS_18_PASS'
