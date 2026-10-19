@@ -12,6 +12,10 @@ internal sealed partial class ChatGptLiteForm
     {
         Text = "Autopraca: WYŁ.", Width = 146
     };
+    private readonly Button _devWakePin = new()
+    {
+        Text = "Przypnij ten czat", Width = 124
+    };
     private readonly Label _devWakeStatus = new()
     {
         AutoSize = true, Text = "Co 25 minut (jeden czat)",
@@ -77,19 +81,69 @@ internal sealed partial class ChatGptLiteForm
                 });
             }
         };
+        _devWakePin.Click += (_, _) => PinCurrentConversation();
         _devWakeTimer.Tick += async (_, _) => await PollDevWakeAsync();
+    }
+
+    private void PinCurrentConversation()
+    {
+        try
+        {
+            string? url = _browser.CoreWebView2?.Source;
+            if (!LiteDevWakeState.IsChatUrl(url))
+            {
+                _devWakeStatus.Text = "Otwórz rozmowę ChatGPT";
+                return;
+            }
+            if (_devWakePending)
+            {
+                _devWakeStatus.Text = "Autopraca: trwa poprzednia próba";
+                return;
+            }
+            string target = LiteDevWakeState.NormalizeUrl(url!);
+            if (string.Equals(_devWake.TargetUrl, target, StringComparison.Ordinal))
+            {
+                _devWakeStatus.Text = "Ten czat jest już przypięty";
+                return;
+            }
+            string suffix = target.Substring(target.Length - 12);
+            if (MessageBox.Show(this,
+                    "Przypiąć bieżącą rozmowę (" + suffix +
+                    ") jako jedyny cel Autopracy?\n" +
+                    "Poprzedni czat przestanie otrzymywać wybudzenia.",
+                    "Zmień przypięty czat", MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Question) != DialogResult.Yes)
+                return;
+            _devWake = LiteDevWakeState.ArmForChat(
+                _devWake, target, DateTimeOffset.UtcNow);
+            LiteDevWakeState.Write(_devWake);
+            LiteEventLog.Write("dev_wake_chat_rebound", new {
+                boundToOneChat = true,
+                intervalMinutes = _devWake.IntervalMinutes
+            });
+            UpdateDevWakeStatus();
+        }
+        catch (Exception ex)
+        {
+            _devWakeStatus.Text = "Nie udało się przypiąć czatu";
+            LiteEventLog.Write("dev_wake_chat_rebind_failed",
+                new { errorType = ex.GetType().Name });
+        }
     }
 
     private void UpdateDevWakeStatus()
     {
         _devWakeToggle.Text = _devWake.Enabled
             ? "Autopraca: WŁ. " + _devWake.IntervalMinutes + "m" : "Autopraca: WYŁ.";
-        _devWakeStatus.Text = _devWake.Enabled &&
+        string pinned = LiteDevWakeState.IsChatUrl(_devWake.TargetUrl)
+            ? _devWake.TargetUrl.Substring(_devWake.TargetUrl.Length - 12) : "brak";
+        string schedule = _devWake.Enabled &&
             _devWake.LastState.StartsWith("uncertain_editor_", StringComparison.Ordinal)
-            ? "Szkic niewysłany — sprawdź edytor"
+            ? "Szkic niewysłany"
             : _devWake.Enabled
-                ? "Budzenie: " + _devWake.NextDueUtc.ToLocalTime().ToString("HH:mm")
-                : (_devWake.LastState == "complete" ? "Plan ukończony" : "Autopraca wstrzymana");
+                ? "Budzenie " + _devWake.NextDueUtc.ToLocalTime().ToString("HH:mm")
+                : (_devWake.LastState == "complete" ? "Plan ukończony" : "Wstrzymana");
+        _devWakeStatus.Text = "Czat " + pinned + " | " + schedule;
     }
 
     private void ReportDevWakeSkip(string reason)

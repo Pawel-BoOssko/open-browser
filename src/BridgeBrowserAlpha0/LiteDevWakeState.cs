@@ -41,6 +41,21 @@ internal static class LiteDevWakeState
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "OpenBrowser", "ChatGPT-Lite", "dev-wake-settings.dpapi");
 
+    // Explicit operator-controlled handoff to the currently open conversation.
+    // Switching conversations starts a clean attempt ledger for the new chat.
+    internal static Record ArmForChat(Record current, string url,
+        DateTimeOffset now)
+    {
+        string normalized = NormalizeUrl(url);
+        var next = string.Equals(current.TargetUrl, normalized, StringComparison.Ordinal)
+            ? current : new Record { TargetUrl = normalized };
+        next.Enabled = true;
+        next.IntervalMinutes = 25;
+        next.NextDueUtc = now.AddMinutes(25);
+        next.LastState = "armed";
+        return next;
+    }
+
     internal static bool IsChatUrl(string? url)
     {
         if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) ||
@@ -367,7 +382,31 @@ internal static class LiteDevWakeState
             late.LastConfirmedReceiptId = "";
             late.LastAttemptUtc = now.AddHours(-3);
             if (CanReconcileReceipt(late, now)) return 30;
-            LiteEventLog.Write("dev_wake_selftest", new { passed = true, checks = 30 });
+            var oldBound = new Record {
+                Enabled = true, TargetUrl = good,
+                IntervalMinutes = 25, AttemptsInWindow = 4,
+                LastReceiptId = receipt, LastAttemptHash = hash,
+                LastState = "direct_submission_requested"
+            };
+            string switchedUrl = good.Replace("00000000", "99999999");
+            var retargeted = ArmForChat(oldBound, switchedUrl, now);
+            if (ReferenceEquals(retargeted, oldBound) ||
+                retargeted.TargetUrl != switchedUrl ||
+                !retargeted.Enabled || retargeted.IntervalMinutes != 25 ||
+                retargeted.NextDueUtc != now.AddMinutes(25) ||
+                retargeted.AttemptsInWindow != 0 ||
+                retargeted.LastReceiptId.Length != 0 ||
+                retargeted.LastAttemptHash.Length != 0 ||
+                retargeted.LastState != "armed") return 31;
+            var rearmed = ArmForChat(retargeted, switchedUrl, now.AddMinutes(3));
+            if (!ReferenceEquals(rearmed, retargeted) ||
+                rearmed.NextDueUtc != now.AddMinutes(28) ||
+                rearmed.LastState != "armed") return 32;
+            bool invalidChatRejected = false;
+            try { ArmForChat(rearmed, "https://example.org/c/not-a-chat", now); }
+            catch (ArgumentException) { invalidChatRejected = true; }
+            if (!invalidChatRejected) return 33;
+            LiteEventLog.Write("dev_wake_selftest", new { passed = true, checks = 33 });
             return 0;
         }
         catch (Exception ex) {

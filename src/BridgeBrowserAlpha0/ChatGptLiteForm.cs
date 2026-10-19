@@ -66,7 +66,7 @@ internal sealed partial class ChatGptLiteForm : Form
             WrapContents = false,
             AutoScroll = true
         };
-        toolbar.Controls.AddRange(new Control[] { _buildVersion, _highIndicator, _devWakeToggle, _devWakeStatus, _resumeToggle, _resumeStatus, _back, _forward, _reload, _home, _domToggle, _hardPruneToggle, _archiveToggle, _openArchive, _status, _domInfo });
+        toolbar.Controls.AddRange(new Control[] { _buildVersion, _highIndicator, _devWakeToggle, _devWakePin, _devWakeStatus, _resumeToggle, _resumeStatus, _back, _forward, _reload, _home, _domToggle, _hardPruneToggle, _archiveToggle, _openArchive, _status, _domInfo });
         var content = new SplitContainer
         {
             Dock = DockStyle.Fill,

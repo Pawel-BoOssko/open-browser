@@ -17,14 +17,8 @@ internal static class Program
         {
             try
             {
-                var chat = LiteDevWakeState.NormalizeUrl(args[1]);
-                var current = LiteDevWakeState.Read();
-                if (!string.Equals(current.TargetUrl, chat, StringComparison.Ordinal))
-                    current = new LiteDevWakeState.Record { TargetUrl = chat };
-                current.Enabled = true;
-                current.IntervalMinutes = 25;
-                current.NextDueUtc = DateTimeOffset.UtcNow.AddMinutes(25);
-                current.LastState = "armed";
+                var current = LiteDevWakeState.ArmForChat(
+                    LiteDevWakeState.Read(), args[1], DateTimeOffset.UtcNow);
                 LiteDevWakeState.Write(current);
                 LiteEventLog.Write("dev_wake_armed", new { intervalMinutes = 25, boundToOneChat = true });
                 Environment.ExitCode = 0;
