@@ -49,7 +49,8 @@ internal static class LiteWebViewIntegrationSelfTest
                     phase = "install_document_scripts";
                     foreach (string name in new[] {
                         "LiteHighGuard.js", "LiteResponseSignal.js",
-                        "LiteResumeProbe.js", "LiteResumeSender.js"
+                        "LiteResumeProbe.js", "LiteResumeSender.js",
+                        "LiteDomOptimizer.js"
                     }) {
                         string script = File.ReadAllText(Path.Combine(
                             AppContext.BaseDirectory, name));
@@ -71,6 +72,13 @@ internal static class LiteWebViewIntegrationSelfTest
                     Ensure(await EvaluateAsync(core,
                         "window.__OPENBROWSER_HIGH_GUARD__?.audit()?.mode") == "high",
                         "true WebView2 recognizes High data attribute");
+                    phase = "check_dil_dom_count";
+                    Ensure(await EvaluateAsync(core,
+                        "window.__OPENBROWSER_LITE_DOM__?.check()?.turnCount") == "4",
+                        "DIL turn counter counts all four messages");
+                    Ensure(await EvaluateAsync(core,
+                        "window.__OPENBROWSER_LITE_DOM__?.getStatus()?.domVariant") == "dil_observe_only",
+                        "DIL DOM is observed without aggressive mutation");
                     phase = "check_last_role";
                     Ensure(await EvaluateAsync(core,
                         "window.__OPENBROWSER_RESUME_PROBE__?.observe()?.role") == "assistant",
@@ -129,7 +137,7 @@ internal static class LiteWebViewIntegrationSelfTest
                         "window.__OPENBROWSER_RESUME_PROBE__.observe().error") == "false",
                         "test fixture error can disappear without automatic retry");
                     LiteEventLog.Write("webview_integration_selftest", new {
-                        passed = true, checks = 11, offline = true
+                        passed = true, checks = 13, offline = true
                     });
                     code = 0;
                 }
