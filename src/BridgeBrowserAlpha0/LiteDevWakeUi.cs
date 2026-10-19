@@ -19,6 +19,8 @@ internal sealed partial class ChatGptLiteForm
     };
     private LiteDevWakeState.Record _devWake = new();
     private bool _devWakePending;
+    private string _devWakeLastSkipReason = "";
+    private DateTimeOffset _devWakeLastSkipLoggedUtc;
 
     private void InitializeDevWake()
     {
@@ -86,6 +88,16 @@ internal sealed partial class ChatGptLiteForm
             : (_devWake.LastState == "complete" ? "Plan ukończony" : "Autopraca wstrzymana");
     }
 
+    private void ReportDevWakeSkip(string reason)
+    {
+        var now = DateTimeOffset.UtcNow;
+        if (reason == _devWakeLastSkipReason &&
+            now - _devWakeLastSkipLoggedUtc < TimeSpan.FromMinutes(10)) return;
+        _devWakeLastSkipReason = reason;
+        _devWakeLastSkipLoggedUtc = now;
+        LiteEventLog.Write("dev_wake_skipped", new { reason });
+    }
+
     private async Task PollDevWakeAsync()
     {
         var core = _browser.CoreWebView2;
@@ -95,11 +107,15 @@ internal sealed partial class ChatGptLiteForm
             var now = DateTimeOffset.UtcNow;
             if (!LiteDevWakeState.IsChatUrl(core.Source) ||
                 LiteDevWakeState.NormalizeUrl(core.Source) !=
-                LiteDevWakeState.NormalizeUrl(_devWake.TargetUrl))
+                LiteDevWakeState.NormalizeUrl(_devWake.TargetUrl)) {
+                if (now >= _devWake.NextDueUtc)
+                    ReportDevWakeSkip("other_chat");
                 return; // NEVER follow another chat
+            }
             if (now < _devWake.NextDueUtc) return;
             if (!string.IsNullOrEmpty(_lastResponseFailure)) {
                 _devWakeStatus.Text = "Autopraca: błąd odpowiedzi — pauza";
+                ReportDevWakeSkip("response_failure");
                 return;
             }
             // read-only snapshot of the active tab, do not inspect other chats
@@ -112,7 +128,10 @@ internal sealed partial class ChatGptLiteForm
                 return; // fail closed; no timer retry of uncertain message
             }
             var encoded = JsonSerializer.Deserialize<string>(await probe);
-            if (string.IsNullOrEmpty(encoded)) return;
+            if (string.IsNullOrEmpty(encoded)) {
+                ReportDevWakeSkip("probe_empty");
+                return;
+            }
             using var parsed = JsonDocument.Parse(encoded);
             var observation = parsed.RootElement;
             string answer = observation.GetProperty("text").GetString() ?? "";
@@ -142,6 +161,7 @@ internal sealed partial class ChatGptLiteForm
                 observation.GetProperty("composerReady").GetBoolean());
             if (eligible != "ready") {
                 _devWakeStatus.Text = "Autopraca: " + eligible;
+                ReportDevWakeSkip(eligible);
                 return;
             }
             string normalizedChat = LiteChatNotes.NormalizeKey(core.Source);
@@ -149,31 +169,9 @@ internal sealed partial class ChatGptLiteForm
                 LiteEventLog.Write("dev_wake_preflight_rejected");
                 return;
             }
-            // Before sending a retry, look for the previous receipt in the
-            // real conversation. If visible, no extra message is needed.
-            if (_devWake.LastAttemptHash == hash &&
-                LiteDevWakeState.MayRetryUncertain(_devWake))
-            {
-                string oldReceipt = _devWake.LastReceiptId;
-                var oldAck = core.ExecuteScriptAsync(
-                    "window.__OPENBROWSER_RESUME_SENDER__?.hasAck(" +
-                    JsonSerializer.Serialize(oldReceipt) + ")");
-                if (await Task.WhenAny(oldAck, Task.Delay(4500)) == oldAck &&
-                    await oldAck == "true")
-                {
-                    _devWake.LastConfirmedReceiptId = oldReceipt;
-                    _devWake.LastState = "confirmed";
-                    LiteDevWakeState.Write(_devWake);
-                    LiteEventLog.Write("dev_wake_late_ack_recovered");
-                    UpdateDevWakeStatus();
-                    return;
-                }
-                LiteEventLog.Write("dev_wake_retry_unconfirmed", new {
-                    waitedMinutes = _devWake.IntervalMinutes
-                });
-            }
-            // Every attempt gets its own durable receipt. Unconfirmed attempts
-            // may repeat after the interval, not immediately or concurrently.
+            // The eligibility gate rejects any previously attempted answer,
+            // including a send with unknown delivery. Never retry that hash.
+            // A new answer may be woken after the normal interval.
             string receipt = Guid.NewGuid().ToString("N");
             LiteDevWakeState.CommitAttempt(_devWake, now, hash, receipt);
             LiteEventLog.Write("dev_wake_send_attempt", new {

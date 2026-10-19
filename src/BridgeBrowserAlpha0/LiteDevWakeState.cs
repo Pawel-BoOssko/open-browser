@@ -101,11 +101,10 @@ internal static class LiteDevWakeState
         if (!high) return "high_not_verified";
         if (!assistant) return "assistant_not_last";
         if (generating || tools || draft || error || !composerReady) return "not_idle";
-        // Owner's 2026-10-19 policy: a missing acknowledgement is NOT a
-        // permanent blocker. Another wake may be attempted after the 25-minute
-        // interval if the same assistant answer is still last.
-        if (state.LastAttemptHash == answerHash &&
-            !MayRetryUncertain(state)) return "same_answer_already_woken";
+        // A delivery with unknown outcome must not be automatically repeated.
+        // Resume work only after a NEW completed assistant answer is observed.
+        if (state.LastAttemptHash == answerHash)
+            return "same_answer_already_woken";
         if (state.LastObservedHash != answerHash ||
             now - state.FirstObservedUtc < TimeSpan.FromSeconds(45))
             return "wait_stable";
@@ -304,7 +303,7 @@ internal static class LiteDevWakeState
                 FirstObservedUtc = now.AddMinutes(-2)
             };
             if (Eligibility(amb, good, now, hash, true, true,
-                false, false, false, false, true) != "ready") return 18;
+                false, false, false, false, true) != "same_answer_already_woken") return 18;
             if (!MayRetryUncertain(amb)) return 19;
             DeferUncertain(amb, now, "renderer_timeout", persist: false);
             if (!amb.Enabled || amb.LastState != "uncertain_renderer_timeout" ||
@@ -313,9 +312,16 @@ internal static class LiteDevWakeState
             amb.LastAttemptUtc = now.AddMinutes(-3);
             if (!RecoverUncertainAfterRestart(amb, now, persist: false) ||
                 !amb.Enabled || amb.NextDueUtc != now.AddMinutes(25)) return 21;
+            var nextAnswerHash = new string('c', 64);
+            amb.LastObservedHash = nextAnswerHash;
+            amb.FirstObservedUtc = now.AddMinutes(20);
+            if (Eligibility(amb, good, now.AddMinutes(26), nextAnswerHash,
+                true, true, false, false, false, false, true) != "ready") return 22;
+            if (Eligibility(amb, good, now.AddMinutes(26), hash,
+                true, true, false, false, false, false, true) != "same_answer_already_woken") return 23;
             amb.LastConfirmedReceiptId = amb.LastReceiptId;
-            if (MayRetryUncertain(amb)) return 22;
-            LiteEventLog.Write("dev_wake_selftest", new { passed = true, checks = 22 });
+            if (MayRetryUncertain(amb)) return 24;
+            LiteEventLog.Write("dev_wake_selftest", new { passed = true, checks = 24 });
             return 0;
         }
         catch (Exception ex) {

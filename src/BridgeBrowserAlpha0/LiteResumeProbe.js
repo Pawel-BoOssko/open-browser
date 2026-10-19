@@ -9,13 +9,23 @@
     // uses data-chatgpt-selection-message-id for assistant replies and
     // data-user-message-bubble for user prompts instead of the old role.
     const legacy = Array.from(d.querySelectorAll('[data-message-author-role]'));
-    const modern = legacy.length ? [] : Array.from(d.querySelectorAll(
+    const modern = Array.from(d.querySelectorAll(
       '[data-user-message-bubble],[data-chatgpt-selection-message-id]'));
-    const parts = legacy.length ? legacy : modern;
+    // A DIL page may contain BOTH selector families. Never let a stray
+    // legacy node hide the actual newest DIL assistant response.
+    const parts = Array.from(new Set([...legacy, ...modern]));
+    parts.sort((a, b) => {
+      if (a === b) return 0;
+      const order = typeof a.compareDocumentPosition === 'function' ?
+        a.compareDocumentPosition(b) : 0;
+      return order & 4 ? -1 : order & 2 ? 1 : 0;
+    });
     const last = parts[parts.length - 1] || null;
-    const role = last ? (legacy.length ? last.getAttribute('data-message-author-role') :
-      last.hasAttribute('data-chatgpt-selection-message-id') ? 'assistant' :
-      last.hasAttribute('data-user-message-bubble') ? 'user' : 'unknown') : 'unknown';
+    const role = last ? (
+      last.getAttribute?.('data-message-author-role') ||
+      (last.hasAttribute?.('data-chatgpt-selection-message-id') ? 'assistant' :
+        last.hasAttribute?.('data-user-message-bubble') ? 'user' : 'unknown')) :
+      'unknown';
     const text = last && role === "assistant" ?
       String(last.innerText || "").slice(-8000) : "";
     const stop = !!d.querySelector(

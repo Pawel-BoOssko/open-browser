@@ -12,6 +12,8 @@ function page(overrides = {}) {
   const doc = {
     querySelectorAll(selector) {
       if (selector === 'button') return [{ innerText: overrides.effort || 'High' }];
+      if (selector === '[data-user-message-bubble],[data-chatgpt-selection-message-id]')
+        return [];
       if (selector === '[data-message-author-role]') {
         return overrides.lastUser ? [{
           getAttribute() { return "user"; }, innerText: "User's message"

@@ -20,6 +20,7 @@ Każdy krok ma stany `TODO | SOURCE | TEST | STAGED | LIVE_VERIFIED | BLOCKED`. 
 - Konfiguracja na PBOX1 uzbrojona przez headless `--lite-dev-wake-arm`: DPAPI file istnieje, log `dev_wake_armed` confirmed, firstDue około 02:08 CEST. Aktywne okno o 01:46 było jeszcze v1.67.0; nie twierdzić, że autopraca już wysyła wiadomości. Sprawdź LIVE EXE, log `dev_wake_loaded`, `dev_wake_send_attempt`, `dev_wake_ack` po 25m przed oznaczeniem LIVE_VERIFIED.
 - 018–020: do wykonania po uruchomieniu LIVE 1.68.0 i rzeczywistej pierwszej odpowiedzi. Pracuj nad pozostałymi punktami niezależnie w aktualnym czacie.
 - Równolegle SOURCE 1.69.0: tylko odczytowy fallback do metadanych DIL w `LiteDomOptimizer.js`, test `lite-dom-dil-count.test.cjs` 3 PASS. Optymalizacja DIL pozostaje OFF do realnego QA, aby nie rozbić React.
+- SOURCE 1.71.0, 03:23 CEST: OB3-009/011/031 w toku. Zakaz automatycznej ponownej wysyłki dla identycznej odpowiedzi po niepewnym dostarczeniu; logowanie przyczyn pominięcia `dev_wake_skipped` z limitem 10 minut; poprawka mieszanego DOM legacy+DIL w `LiteResumeProbe.js`. Testy JS 14 plików/17 runner PASS, DevWake 24 warunki PASS na Debug przed zmianą numeru wersji. PBOX1 LIVE nadal 1.70.0, UI: High, Autopraca WŁ. 25m, `answer_missing`, brak `dev_wake_ack`. SOURCE nie oznacza STAGED ani LIVE. Szczegóły i blokady: `docs/openbrowser-checkpoint-2026-10-19-0323-v171.md`.
 
 ## Faza 0 — P0: autowznowienie tego czatu
 
