@@ -6,7 +6,7 @@ const path = require("node:path");
 const js = fs.readFileSync(path.join(__dirname,
   "../src/BridgeBrowserAlpha0/LiteHighGuard.js"), "utf8");
 
-function site(mode, { draft = false, busy = false } = {}) {
+function site(mode, { draft = false, busy = false, sidebarBusy = false } = {}) {
   let open = false, arrows = 0, focused = false;
   const picker = {
     hidden: false, disabled: false, innerText: "Wysiłek myślowy",
@@ -36,7 +36,9 @@ function site(mode, { draft = false, busy = false } = {}) {
     querySelector(s) {
       if (s.includes('button[aria-label="Wybierz model ChatGPT"]')) return picker;
       if (s.includes('contenteditable')) return editor;
-      if (s.includes('stop-button') || s.includes('aria-busy')) return busy ? {} : null;
+      if (s.includes('stop-button'))
+        return busy ? { hidden: false, getAttribute() { return null; }, getClientRects() { return [1]; } } : null;
+      if (s.includes('aria-busy')) return sidebarBusy ? {} : null;
       if (s.includes('data-reasoning-slider')) return open ? slider : null;
       return null;
     },
@@ -84,4 +86,12 @@ function site(mode, { draft = false, busy = false } = {}) {
   assert.equal(p.api.switchHigh().state, "user_draft_present");
   assert.equal(p.arrows, 0);
 }
-console.log("LiteHighSlider: 4 PASS");
+{
+  const p = site("medium", { sidebarBusy: true });
+  assert.equal(p.api.switchHigh().state, "high_selection_requested",
+    "busy sidebar does not block real effort picker");
+  p.runMenu();
+  assert.equal(p.arrows, 1, "slider can advance despite sidebar busy indicator");
+  assert.equal(p.api.audit().mode, "high");
+}
+console.log("LiteHighSlider: 5 PASS");

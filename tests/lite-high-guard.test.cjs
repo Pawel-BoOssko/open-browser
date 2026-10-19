@@ -7,6 +7,7 @@ const source = fs.readFileSync(path.join(__dirname,
   "../src/BridgeBrowserAlpha0/LiteHighGuard.js"), "utf8");
 function create(mode = "instant", option = true, host = "chatgpt.com") {
   let opened = false, chosen = 0, stopped = 0, busy = false, draft = '', delayed = null;
+  let sidebarBusy = false, currentTurnBusy = false, toolBusy = false;
   const button = {
     hidden: false, disabled: false,
     getAttribute() { return null; }, innerText: mode,
@@ -18,14 +19,22 @@ function create(mode = "instant", option = true, host = "chatgpt.com") {
     getClientRects() { return [1]; },
     click() { chosen++; button.innerText = "High"; }
   };
-  const stop = { disabled: false, click() { stopped++; } };
+  const stop = { disabled: false, hidden: false,
+    getAttribute() { return null; }, getClientRects() { return [1]; },
+    click() { stopped++; } };
   const doc = {
     querySelector(selector) {
       if (selector.includes('contenteditable')) return { innerText: draft };
-      return selector.includes("stop-button") && busy ? stop : null;
+      if (selector.includes('stop-button')) return busy ? stop : null;
+      if (selector.includes('tool-running')) return toolBusy ? {} : null;
+      if (selector.includes('aria-busy')) return sidebarBusy ? {} : null;
+      return null;
     },
     querySelectorAll(selector) {
       if (selector.includes('role="menuitem"')) return opened && option ? [high] : [];
+      if (selector.includes('conversation-turn-')) return [{
+        querySelector(s) { return currentTurnBusy && s.includes('aria-busy') ? {} : null; }
+      }];
       return [button];
     }
   };
@@ -38,6 +47,9 @@ function create(mode = "instant", option = true, host = "chatgpt.com") {
     api: win.__OPENBROWSER_HIGH_GUARD__, win,
     flush() { if (delayed) { const fn = delayed; delayed = null; fn(); } },
     setBusy(v) { busy = v; }, setDraft(v) { draft = v; },
+    setSidebarBusy(v) { sidebarBusy = v; },
+    setCurrentTurnBusy(v) { currentTurnBusy = v; },
+    setToolBusy(v) { toolBusy = v; },
     get chosen() { return chosen; },
     get stopped() { return stopped; }
   };
@@ -89,4 +101,27 @@ function create(mode = "instant", option = true, host = "chatgpt.com") {
   const p = create("instant"); p.api.switchHigh(); p.setDraft("Unsent user note");
   p.flush(); assert.equal(p.chosen, 0, "draft blocks delayed High click");
 }
-console.log("LiteHighGuard: 14 PASS");
+{
+  const p = create("instant"); p.setSidebarBusy(true);
+  assert.equal(p.api.switchHigh().state, "high_selection_requested",
+    "unrelated busy sidebar must not block High selection");
+  p.flush(); assert.equal(p.chosen, 1);
+}
+{
+  const p = create("instant"); p.setCurrentTurnBusy(true);
+  assert.equal(p.api.switchHigh().state, "generation_busy",
+    "busy current conversation turn must block High selection");
+  assert.equal(p.chosen, 0);
+}
+{
+  const p = create("instant"); p.setToolBusy(true);
+  assert.equal(p.api.switchHigh().state, "generation_busy",
+    "running tool must block High selection");
+  assert.equal(p.chosen, 0);
+}
+{
+  const p = create("instant"); p.api.switchHigh(); p.setCurrentTurnBusy(true);
+  p.flush(); assert.equal(p.chosen, 0,
+    "new busy state must block delayed High selection");
+}
+console.log("LiteHighGuard: 18 PASS");

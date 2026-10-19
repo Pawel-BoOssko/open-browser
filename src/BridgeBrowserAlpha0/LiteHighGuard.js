@@ -32,6 +32,17 @@
     const editor = w.document.querySelector('textarea,[contenteditable="true"]');
     return !!editor && !!String(editor.value || editor.innerText || '').trim();
   }
+  function generationBusy() {
+    const stop = w.document.querySelector(
+      '[data-testid="stop-button"],button[aria-label*="Stop generating"],button[aria-label*="Przerwij generowanie"]');
+    if (stop && visible(stop)) return true;
+    // Keep global tool-running evidence, but not unrelated sidebar aria-busy.
+    if (w.document.querySelector('[data-testid*="tool-running"],[data-state="running"]'))
+      return true;
+    const turns = Array.from(w.document.querySelectorAll('[data-testid^="conversation-turn-"]'));
+    const currentTurn = turns.length ? turns[turns.length - 1] : null;
+    return !!currentTurn?.querySelector?.('[aria-busy="true"]');
+  }
   function switchHigh() {
     const current = currentMode();
     if (current === "high" || current === "extra high")
@@ -46,7 +57,7 @@
     if (!trigger) return { state: "no_picker", mode: current };
     // Never interrupt a generation or tool just to change its effort.
     // In particular this code must not click Stop in an unrelated chat.
-    if (w.document.querySelector('[data-testid="stop-button"],[aria-busy="true"]'))
+    if (generationBusy())
       return { state: "generation_busy", mode: current };
     if (hasUserDraft()) return { state: "user_draft_present", mode: current };
     const selectedPath = w.location.pathname;
@@ -58,7 +69,7 @@
   function chooseHigh(selectedPath) {
     if (w.location.hostname !== "chatgpt.com" || w.location.pathname !== selectedPath ||
         hasUserDraft() ||
-        w.document.querySelector('[data-testid="stop-button"],[aria-busy="true"]'))
+        generationBusy())
       return { state: "page_changed_or_busy" };
     // 2026-10-18 real GPT-6 UI: 'Moc' is a slider from 0..2, not
     // three separate High/Medium/Instant menu buttons.
