@@ -34,4 +34,13 @@ try {
     Check ($churn.hasWebviewChurnOrRestart -eq $true) 'churn is flagged'
 }
 finally { if (Test-Path -LiteralPath $temp) { Remove-Item -LiteralPath $temp -Force } }
-Write-Output 'LITE_RESOURCE_TRENDS_13_PASS'
+$htmlPath = Join-Path $env:TEMP ('openbrowser-dashboard-test-' + [Guid]::NewGuid().ToString('N') + '.html')
+try {
+    & (Join-Path $root 'scripts\export-lite-resource-dashboard.ps1') -InputPath $fixture -OutputPath $htmlPath | Out-Null
+    Check ([IO.File]::Exists($htmlPath)) 'offline dashboard created'
+    $html = [IO.File]::ReadAllText($htmlPath)
+    Check ($html.Contains('5m') -and $html.Contains('1h') -and $html.Contains('24h')) 'all dashboard time windows'
+    Check (-not $html.Contains('<script')) 'dashboard has no active script'
+}
+finally { if (Test-Path $htmlPath) { Remove-Item $htmlPath -Force } }
+Write-Output 'LITE_RESOURCE_TRENDS_16_PASS'
