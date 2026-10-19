@@ -11,7 +11,13 @@ function run(variant,n){
   id:i, attrs:{}, contains(){return false;},
   getAttribute(key){return this.attrs[key]??null;},
   setAttribute(key,v){this.attrs[key]=v;writes++;},
-  hasAttribute(key){return Object.prototype.hasOwnProperty.call(this.attrs,key);},
+  hasAttribute(key){
+   if(variant==="dil"||variant==="mixed"){
+    if(key==="data-user-message-bubble")return i%2===0;
+    if(key==="data-chatgpt-selection-message-id")return i%2===1;
+   }
+   return Object.prototype.hasOwnProperty.call(this.attrs,key);
+  },
   removeAttribute(key){delete this.attrs[key];writes++;}
  }));
  const doc={
@@ -36,6 +42,8 @@ function run(variant,n){
 {
  const x=run("dil",90);
  assert.equal(x.status.turnCount,90,"count modern DIL assistant/user messages");
+ assert.equal(x.status.dilAssistantCount,45);
+ assert.equal(x.status.dilUserCount,45);
  assert.equal(x.status.domVariant,"dil_observe_only");
  assert.equal(x.status.optimized,0,"no dangerous React subtree changes");
  assert.equal(x.writes,0,"DIL remains untouched");
@@ -44,6 +52,8 @@ function run(variant,n){
  const x=run("mixed",90);
  assert.equal(x.status.domVariant,"dil_observe_only","mixed legacy+DIL is modern");
  assert.equal(x.status.turnCount,90,"count actual DIL messages, not stray legacy wrappers");
+ assert.equal(x.status.dilAssistantCount,45);
+ assert.equal(x.status.dilUserCount,45);
  assert.equal(x.status.optimized,0,"never optimize mixed React DOM");
  assert.equal(x.writes,0,"mixed DOM remains untouched");
 }

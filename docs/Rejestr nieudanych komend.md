@@ -300,3 +300,7 @@ Historyczne wpisy OB-10 i OB-11 zachowują swój numer. Nowym zdarzeniom należy
 - Narzędzie: Remote Desktop Commander `edit_block` na SATANAMD. Operacja: mała, samodzielna zmiana jednego warunku w `LiteResumeSender.js`, klasyfikacja `busy` jako brak edytora / zajęta strona / szkic. Wynik: `This tool call was blocked by OpenAI's safety checks`; plik niezmieniony. Zakres: pojedyncza edycja, bez blokady odczytów, testów i niezależnych zmian DOM.
 - Kontynuacja niezależna: OB3-031, korekta liczenia mieszanego DOM legacy+DIL, testy 17/17 PASS. Bez obejścia zablokowanej operacji.
 - Narzędzie: Remote Desktop Commander `edit_block` na SATANAMD. Operacja: dopisanie aktualizacji OB3-031 przed nagłówkiem roadmapy, mały krok. Wynik: `Search content not found` (dopasowanie 28%); brak modyfikacji przez tę próbę. Niezależne `write_file append` do roadmapy zakończone powodzeniem.
+
+### OB-20261019-0614-pbox-batch-diagnostics
+- Narzędzie: LC MultiHost `execute_command` na PBOX1. Operacja: pojedyncze złożone polecenie odczytowe obejmujące Git HEAD/dirty, katalog instalacji v1.70/v1.71, grupowanie zdarzeń `dev_wake` z JSONL oraz ostatnie zdarzenia. Brak zapisu i wysyłania wiadomości. Zakres: duży pakiet diagnostyczny.
+- Wynik: `This tool call was blocked by OpenAI's safety checks`. Powód szczegółowy niepodany; zakres blokady: to konkretne wywołanie. Nie powtarzać tego pakietu innym narzędziem. Kontynuować niezależne punkty roadmapy.

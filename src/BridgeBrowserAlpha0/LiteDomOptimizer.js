@@ -12,6 +12,7 @@
     enabled: true, supported: !!(global.CSS && global.CSS.supports &&
       global.CSS.supports("content-visibility", "auto")),
     keepRecent: 40, minTurns: 60, turnCount: 0, optimized: 0,
+    dilAssistantCount: 0, dilUserCount: 0,
     domVariant: 'unknown',
     skippedBusy: false, lastDurationMs: 0, lastCheckedAt: null, errorCount: 0
   };
@@ -44,6 +45,13 @@
       const turns = modern ? modernTurns : oldTurns;
       state.domVariant = modern ? 'dil_observe_only' : 'legacy';
       state.turnCount = turns.length;
+      // DIL role metadata only. A node matching both markers is a user bubble,
+      // so the two role counters cannot exceed the total message count.
+      state.dilUserCount = modernTurns.filter(n =>
+        n.hasAttribute?.('data-user-message-bubble')).length;
+      state.dilAssistantCount = modernTurns.filter(n =>
+        n.hasAttribute?.('data-chatgpt-selection-message-id') &&
+        !n.hasAttribute?.('data-user-message-bubble')).length;
       state.skippedBusy = busy();
       const mayOptimize = state.enabled && state.supported &&
         !modern && !state.skippedBusy && turns.length >= state.minTurns;
@@ -80,6 +88,7 @@
     return {
       enabled: state.enabled, supported: state.supported,
       keepRecent: state.keepRecent, turnCount: state.turnCount,
+      dilAssistantCount: state.dilAssistantCount, dilUserCount: state.dilUserCount,
       optimized: state.optimized, domVariant: state.domVariant,
       skippedBusy: state.skippedBusy,
       lastDurationMs: state.lastDurationMs, lastCheckedAt: state.lastCheckedAt,

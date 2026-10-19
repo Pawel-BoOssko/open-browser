@@ -152,3 +152,7 @@ Każdy krok ma stany `TODO | SOURCE | TEST | STAGED | LIVE_VERIFIED | BLOCKED`. 
 ## Aktualizacja 2026-10-19 05:20 CEST: OB3-031
 
 SOURCE 1.71.0: poprawiono licznik mieszanego DOM legacy+DIL, preferując rzeczywiste wiadomości DIL. Nie włączono optymalizacji ani przycinania DIL. Nowy test mixed: 90 DIL i 3 legacy; wszystkie 17 plików testów JS PASS. LIVE PBOX1 pozostaje 1.70.0, bez potwierdzonego dev_wake_ack. Szczegóły w `docs/openbrowser-checkpoint-2026-10-19-0519-diagnostics.md` i rejestrze nieudanych komend.
+
+## Aktualizacja 2026-10-19 06:17 CEST: OB3-031/032
+
+SOURCE v1.71.0: liczniki ról DIL w produkcyjnie ładowanym `LiteDomOptimizer.js` (`dilAssistantCount`, `dilUserCount`), wyłącznie odczyt DOM. Osobny testowy `LiteDomSelectorAudit.js` obsługuje DIL/mixed i deduplikację. Testy Node: 18/18 PASS, 0 FAIL. LIVE PBOX1 nadal v1.70.0, PID 8704; nadzorca do 06:11:51 CEST odmawia `busy`, `dev_wake_ack` niepotwierdzony. Wydanie i realny QA nadal TODO. Szczegóły: `docs/openbrowser-checkpoint-2026-10-19-0617-dom-roles.md`.

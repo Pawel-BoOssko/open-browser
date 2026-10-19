@@ -1,0 +1,9 @@
+# Open Browser Lite: checkpoint 2026-10-19 06:17 CEST
+
+- Stan początkowy: SATANAMD `D:\projects\open-browser`, HEAD `374ed29`, branch master, 168 wpisów dirty (w tym równoległe zmiany i przeniesienia plików); źródła v1.71.0. PBOX1: LIVE v1.70.0, PID 8704, uruchomiony 02:43:50. Brak restartu i wysyłania wiadomości.
+- Nadzorca PBOX1: nadal `dev_wake_send_attempt` + `dev_wake_deferred_busy` do 06:11:51 CEST, brak dowodu `dev_wake_ack`. Sender `busy` oznacza odmowę przed dotknięciem edytora; dokładna przyczyna wymaga diagnostyki. Nie ponawiano wiadomości.
+- Pakiet OB3-031/032 SOURCE: w `LiteDomOptimizer.js` dodano read-only liczniki ról DIL (`dilAssistantCount`, `dilUserCount`) bez zmian optymalizacji React; w `LiteDomSelectorAudit.js` uwzględniono DIL, mixed i deduplikację wspólnych węzłów. Audit jest pomocnikiem testowym, nie jest obecnie instalowany przez produkcyjny loader. Testy: `lite-dom-dil-count.test.cjs` rozszerzony o role, nowy `lite-dom-selector-dil.test.cjs` 5 przypadków.
+- `node --check` PASS dla obu zmienionych skryptów; `node --test tests\*.test.cjs`: 18 plików PASS, 0 FAIL. Nie wykonywano build/publish z powodu wcześniejszej blokady wydania. SOURCE != LIVE.
+- Blokada 06:14: LC MultiHost PBOX1, duże złożone polecenie diagnostyczne (Git/instalacje/agregacja wake JSONL), `blocked by OpenAI's safety checks`. Szczegóły zapisane w `docs/Rejestr nieudanych komend.md`. Nie ponawiano operacji innym narzędziem.
+- Autosync: 06:11 `SKIP open-browser | unchanged tree` przed nowymi zmianami; nowe zmiany pozostawiono do automatycznej synchronizacji. Bez ręcznych commitów/pushy.
+- NEXT: kontrola wyniku Autosync i test licznika ról na rzeczywistym DIL po wydaniu; przywrócenie gate v1.71.0 i ustalenie przyczyny `busy` bez naruszania aktywnej rozmowy; pierwszy `dev_wake_ack` wciąż niepotwierdzony.
