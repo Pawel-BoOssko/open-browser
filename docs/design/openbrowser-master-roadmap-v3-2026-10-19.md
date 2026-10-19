@@ -223,3 +223,13 @@ SOURCE v1.71.0: liczniki ról DIL w produkcyjnie ładowanym `LiteDomOptimizer.js
 - **OB3-029 nadal PARTIAL:** brak zintegrowanego widoku wewnątrz aplikacji i rozbudowanej korelacji wielu dni. Checkpoint `docs/openbrowser-checkpoint-2026-10-19-1512-second-wake.md`.
 
 - **OB3-029 automatic refresh LIVE_VERIFIED, 15:33 CEST:** istniejące zadanie Resource Monitor zapisało próbkę 15:33:01, a HTML z wydarzeniami i zasobami automatycznie odnowiono o 15:33:08 (4044 bajty). Bez tworzenia nowego zadania. Integracja dashboardu z GUI Lite nadal TODO.
+
+## Aktualizacja 2026-10-19 17:51 CEST: wybudzenia wielu rozmów i notatki
+
+- **Przyczyna 15:35 potwierdzona:** PBOX1, 15:36:27 oraz 15:46:27 `dev_wake_skipped reason=other_chat`. Wersja 1.72.7 nie wysyłała, gdy widoczny czat był inny niż przypięty.
+- **OB3-055 i OB3-061 SOURCE+LIVE v1.72.12:** szyfrowany rejestr DPAPI do 48 jawnie włączonych czatów, osobne interwały 20–1440 minut, teksty poleceń, terminy, stan i zatrzymanie. Osobny WebView2 worker pracuje na czacie docelowym bez potrzeby przełączenia foreground. UI `Wybudzenia` i `Ustaw ten czat`, komendy `--lite-chat-wake-set/off/now`; klasyczny pojedynczy timer ma zablokowaną wysyłkę w trybie multi.
+- **OB3-049/051 SOURCE+LIVE:** notatki konkretnej rozmowy pobierane z dotychczasowego szyfrowanego store i dołączane do wiadomości przy pobudce. Test książki `includesNotes=true`.
+- **OB3-063 realny test LIVE v1.72.12:** w rozmowie „Napisz książkę przygodową” 17:47:53 log `phase=click_invoked`, `visibleUserBubble=true`, `receiptConfirmed=true`; każda wiadomość ma nowy `[OB-<receipt>]`, dlatego nie może zostać uznana za stary powtarzany komunikat. Obsługa klikania została przeniesiona do hosta C# (`submitDirect`), aby opóźnianie `setTimeout` w tle nie blokowało wysyłki. Testy nadawcy 20 PASS, HighGuard 18, HighSlider 5, Release build i selftest PBOX1 PASS.
+- **Aktywne na PBOX1:** czat Open Browser projekt 25m, następne 18:02:33; czat książki 25m, następne 18:15:01, już ze stałym poleceniem kontynuowania jednej spójnej sceny (bez starych znaczników testowych).
+- **Ograniczenia:** nie potwierdzono jeszcze dwóch kolejnych NATURALNYCH cykli dwóch różnych czatów, ani odpowiedzi modelu na wysłaną w tle wiadomość książki. Client-side DIL receipt to dowód widocznej nowej wiadomości użytkownika, nie odpowiedzi asystenta. Obserwować zdarzenia `RenderProcessUnresponsive`.
+- Checkpoint: `docs/openbrowser-checkpoint-2026-10-19-1717-multichat-wake.md`. Instrukcja dla czatów: `docs/openbrowser-multichat-wake-commands-2026-10-19.md`. Nie oznaczaj całego 86-punktowego planu jako kompletnego. Bez ręcznego commit/push i bez ChatGPT Tasks.
