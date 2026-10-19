@@ -196,10 +196,14 @@ Wysiłek myślowy</button>
 <div data-chatgpt-selection-message-id="chapter7">Rozdział 7. Czarny kompas.
 Zostały wątki do rozwinięcia.</div>
 </main>
+<form data-chatgpt-composer>
 <div id="prompt-textarea" contenteditable="true" aria-label="Napisz wiadomość"></div>
-<button data-testid="send-button">Wyślij</button>
+<button type="submit" aria-label="Wyślij">Wyślij</button>
+<button type="button" aria-label="Tryb głosowy">Mów</button>
+</form>
 <script>
-document.querySelector('[data-testid="send-button"]').addEventListener('click',()=>{
+document.querySelector('form[data-chatgpt-composer]').addEventListener('submit',(e)=>{
+ e.preventDefault();
  const editor=document.querySelector('#prompt-textarea');
  const item=document.createElement('div');
  item.setAttribute('data-user-message-bubble','');
