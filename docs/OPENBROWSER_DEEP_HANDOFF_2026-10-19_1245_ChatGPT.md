@@ -1,7 +1,7 @@
 # OPEN BROWSER LITE — KOMPLETNY HANDOFF I AUDYT PRACY RÓWNOLEGŁEGO CZATU
 **Wersja handoffu:** 1.0, 19 października 2026, około 12:45 CEST  
 **Autor:** bieżący, interaktywny czat ChatGPT; zakres: weryfikacja i dokumentacja, bez wdrażania nowych binarek.  
-**Główny dziennik bieżącej pracy:** `docs/OPENBROWSER_AUDIT_RUNLOG_2026-10-19_1220_ChatGPT.md` — checkpointy 00–05 zapisane po etapach.  
+**Główny dziennik bieżącej pracy:** `docs/OPENBROWSER_AUDIT_RUNLOG_2026-10-19_1220_ChatGPT.md` — checkpointy 00–07 zapisane po etapach.  
 **Poprzedni główny plan:** `docs/design/openbrowser-master-roadmap-v3-2026-10-19.md` — OB3-001…086.  
 **Zasady obowiązkowe:** `docs/agent/READ_BEFORE_WORK_new.md`; `docs/agent/current-state_new.md`; `docs/agent/architecture-decisions_new.md`; `docs/Rejestr nieudanych komend.md`.
 
