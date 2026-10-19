@@ -11,7 +11,7 @@ internal sealed partial class ChatGptLiteForm
     private bool _chatWakeBusy;
     private readonly WebView2 _chatWakeWorker = new()
     {
-        Size = new Size(980, 700), Location = new Point(-1350, -900),
+        Size = new Size(980, 700), Location = new Point(0, 42),
         Visible = true, TabStop = false
     };
     private readonly Button _chatWakeConfigure = new()
@@ -289,9 +289,33 @@ internal sealed partial class ChatGptLiteForm
                     string phase = JsonSerializer.Deserialize<string>(phaseJson) ?? "unknown";
                     if (phase == "draft_button_missing")
                     {
+                        try
+                        {
+                            const string domState = @"JSON.stringify({
+                                visibility:document.visibilityState,
+                                width:innerWidth, height:innerHeight,
+                                composerCount:document.querySelectorAll('#prompt-textarea,[contenteditable=""true""]').length,
+                                submitCount:document.querySelectorAll('button[type=submit]').length,
+                                sendCount:document.querySelectorAll('[data-testid=""send-button""],button[aria-label=""Send""],button[aria-label=""Wyślij""]').length
+                            })";
+                            string encoded = await _chatWakeWorker.CoreWebView2.ExecuteScriptAsync(domState);
+                            string metadata = JsonSerializer.Deserialize<string>(encoded) ?? "{}";
+                            using var parsed = JsonDocument.Parse(metadata);
+                            var root = parsed.RootElement;
+                            LiteEventLog.Write("multi_wake_dom_diagnostic", new
+                            {
+                                visibility = root.GetProperty("visibility").GetString(),
+                                width = root.GetProperty("width").GetInt32(),
+                                height = root.GetProperty("height").GetInt32(),
+                                composers = root.GetProperty("composerCount").GetInt32(),
+                                submitButtons = root.GetProperty("submitCount").GetInt32(),
+                                sendButtons = root.GetProperty("sendCount").GetInt32()
+                            });
+                        }
+                        catch { /* diagnostics never prevent sending */ }
                         phase = await RetryWithNativeInputAsync(
                             _chatWakeWorker.CoreWebView2, due.Url, text);
-                        await Task.Delay(1800);
+                        await Task.Delay(3500);
                     }
                     bool visible = false;
                     if (state == "submission_requested")
