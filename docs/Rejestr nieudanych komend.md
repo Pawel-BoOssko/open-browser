@@ -334,3 +334,18 @@ Historyczne wpisy OB-10 i OB-11 zachowują swój numer. Nowym zdarzeniom należy
 
 ### OB-20261019-1028-autosync-wait
 - Narzędzie: LC MultiHost `execute_command`, SATANAMD. Operacja: pojedynczy `Start-Sleep -Seconds 215` i odczyt ostatnich czterech linii logu Autosync po następnym cyklu, bez ingerencji w synchronizację. Wynik: `This tool call was blocked by OpenAI's safety checks`; polecenie nie zostało uruchomione. Zakres: wyłącznie oczekiwanie i odczyt, szczegółowej przyczyny nie udostępniono. Pozostawiono istniejący Autosync bez zmian.
+
+### OB-20261019-1103-dil-snapshot
+- Narzędzie: RDC `edit_block`, SATANAMD. Mały, samodzielny krok: zastąpienie wyłącznie selektora i pętli w `LiteConversationSnapshot.js` obsługą DIL, deduplikacją po identyfikatorze tury i odczytem widocznego tekstu. Bez zmian w LIVE i bez wysyłania wiadomości.
+- Wynik: `This tool call was blocked by OpenAI's safety checks`. Operacja nie została wykonana; szczegółowej przyczyny odmowy nie udostępniono. Nie ponawiano przez inne narzędzie.
+
+### OB-20261019-1104-pbox-fetch
+- Narzędzie: LC MultiHost `execute_command`, PBOX1. Mały krok: `git -C C:\Users\pboru\AppData\Local\OpenBrowser\buildsrc\OpenBrowserLite_1.72.1_20261019_1024 fetch --no-tags origin autosync/SATANAMD`, pobranie już zsynchronizowanej rewizji do izolowanego repo budowania. Bez commit/push, bez resetu i bez zmiany LIVE.
+- Wynik: `This tool call was blocked by OpenAI's safety checks`. Pobrania nie potwierdzono, przyczyna szczegółowa nieznana. Nie ponawiano tej operacji innym narzędziem.
+
+### OB-20261019-1105-full-js-suite
+- Narzędzie: LC MultiHost `execute_command`, SATANAMD. Pakiet odczytowo-testowy: wykonanie wszystkich `tests/lite-*.test.cjs` przez Node i zliczenie kodów zakończenia, bez zmian plików ani LIVE.
+- Wynik: `This tool call was blocked by OpenAI's safety checks`. Pełny zestaw nie został uruchomiony; przyczyna szczegółowa nieznana. Osobne, wcześniejsze testy nowego przypadku i dwóch istniejących zestawów: 3+4+4 PASS.
+
+### OB-20261019-1106-roadmap-append
+- Narzędzie: RDC `write_file append`, SATANAMD. Mały zapis sekcji postępu OB3-007/011/QA do `docs/design/openbrowser-master-roadmap-v3-2026-10-19.md`. Wynik: `This tool call was blocked by OpenAI's safety checks`. Brak potwierdzenia dopisania; szczegółowej przyczyny nie podano. Odrębny checkpoint 11:06 zapisano pomyślnie.

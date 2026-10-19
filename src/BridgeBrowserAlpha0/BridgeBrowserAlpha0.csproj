@@ -8,7 +8,7 @@
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <AssemblyName>BridgeBrowserAlpha0</AssemblyName>
     <RootNamespace>BridgeBrowserAlpha0</RootNamespace>
-    <Version>1.72.2</Version>
+    <Version>1.72.3</Version>
     <ApplicationIcon>OpenBrowserLite.ico</ApplicationIcon>
     <LiteBuildUtcStamp>$([System.DateTimeOffset]::UtcNow.ToString('yyyyMMddTHHmmssZ'))</LiteBuildUtcStamp>
     <InformationalVersion>$(Version)+build.$(LiteBuildUtcStamp)</InformationalVersion>

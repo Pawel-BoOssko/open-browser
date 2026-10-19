@@ -40,8 +40,11 @@
     const lastAssistantChars = String(lastAssistant?.innerText || '').length;
     const stop = !!d.querySelector(
       '[data-testid="stop-button"],button[aria-label*="Stop generating"],button[aria-label*="Przerwij generowanie"]');
+    // An unrelated busy sidebar must not suppress the current chat.
+    const activeTurn = last?.closest?.('[data-testid^="conversation-turn-"]');
     const toolBusy = !!d.querySelector(
-      '[data-testid*="tool-running"],[data-state="running"],[aria-busy="true"]');
+      '[data-testid*="tool-running"],[data-state="running"]') ||
+      !!activeTurn?.querySelector?.('[aria-busy="true"]');
     // Use the same composer priority as LiteResumeSender: a hidden textarea
     // must not mask a user's draft in the active ChatGPT editor.
     const editor = d.querySelector('#prompt-textarea') ||
