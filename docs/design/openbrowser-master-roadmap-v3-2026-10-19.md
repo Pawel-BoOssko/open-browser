@@ -172,3 +172,9 @@ SOURCE v1.71.0: liczniki ról DIL w produkcyjnie ładowanym `LiteDomOptimizer.js
 - [BLOCKED] Izolowany test WebView2 oraz późniejszy odczyt kontrolny PBOX1 odrzucone przez safety checks LC MultiHost. Szczegóły w rejestrze i checkpointcie.
 - [NEXT] Po Autosync PBOX1 STAGED 1.71.1, izolowany WebView2 QA, kontrolowany upgrade, potwierdzenie realnego ACK i no-duplicate. Nie zamykać OB3-009/018/073 jako LIVE_VERIFIED przed dowodami.
 - Checkpoint: docs/openbrowser-checkpoint-2026-10-19-0808-late-ack.md.
+
+## Aktualizacja 2026-10-19 09:18 CEST: OB3-009/011/025
+- SOURCE 1.72.1: obserwator DOM zwraca liczbę węzłów asystenta/użytkownika i długość ostatniej odpowiedzi, bez nowych treści; nadzorca zapisuje throttled `dev_wake_probe_diagnostic` dla `answer_missing`/`high_not_verified`/`not_idle`. Wysyłka i idempotencja bez zmian.
+- TEST: Node 15/15 suites PASS, 4 PASS dla mixed probe, .NET 17/17 selftest PASS, Debug build 0 errors, 1 historyczne MSB3277.
+- STAGED SATANAMD 1.72.1: `OpenBrowserLite_v1.72.1_20261019_0917`, manifest/hash i release gate PASS. Izolowany WebView2 blocked (rejestr); PBOX1 LIVE nadal 1.72.0 PID5852, `answer_missing` o 09:15, brak potwierdzonego ACK. Checkpoint: `docs/openbrowser-checkpoint-2026-10-19-0918-probe-metadata.md`.
+- NEXT: po Autosync staged PBOX1 1.72.1, realne odczyty diagnostyki, następnie rzeczywiste DIL ACK. Nie oznaczać OB3-009/018 jako ukończonych.

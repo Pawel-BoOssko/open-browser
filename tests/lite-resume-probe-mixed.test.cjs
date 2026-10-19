@@ -35,15 +35,30 @@ function observe(legacy, modern) {
   assert.equal(s.role, "assistant");
   assert.equal(s.text, "Completed assistant response");
   assert.equal(s.turnCount, 2);
+  assert.equal(s.assistantNodeCount, 1);
+  assert.equal(s.userNodeCount, 1);
+  assert.equal(s.lastAssistantChars, "Completed assistant response".length);
 }
 {
   const s = observe([node(1, "assistant", false)], [node(2, "user", true)]);
   assert.equal(s.role, "user");
   assert.equal(s.text, "");
+  assert.equal(s.assistantNodeCount, 1);
+  assert.equal(s.userNodeCount, 1);
+  assert.equal(s.lastAssistantChars, "Completed assistant response".length);
 }
 {
   const shared = node(1, "assistant", false);
   const s = observe([shared], [shared]);
   assert.equal(s.turnCount, 1);
+  assert.equal(s.assistantNodeCount, 1);
+  assert.equal(s.userNodeCount, 0);
 }
-console.log("LiteResumeProbeMixed: 3 PASS");
+{
+  const s = observe([], []);
+  assert.equal(s.turnCount, 0);
+  assert.equal(s.assistantNodeCount, 0);
+  assert.equal(s.userNodeCount, 0);
+  assert.equal(s.lastAssistantChars, 0);
+}
+console.log("LiteResumeProbeMixed: 4 PASS");

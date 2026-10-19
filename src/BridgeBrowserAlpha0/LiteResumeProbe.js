@@ -28,6 +28,16 @@
       'unknown';
     const text = last && role === "assistant" ?
       String(last.innerText || "").slice(-8000) : "";
+    // Metadata only: distinguish an empty assistant reply from a stale user
+    // bubble without copying any extra conversation text into diagnostics.
+    const isAssistant = n => n.getAttribute?.('data-message-author-role') === 'assistant' ||
+      n.hasAttribute?.('data-chatgpt-selection-message-id');
+    const isUser = n => n.getAttribute?.('data-message-author-role') === 'user' ||
+      n.hasAttribute?.('data-user-message-bubble');
+    const assistantNodeCount = parts.filter(isAssistant).length;
+    const userNodeCount = parts.filter(isUser).length;
+    const lastAssistant = parts.slice().reverse().find(isAssistant);
+    const lastAssistantChars = String(lastAssistant?.innerText || '').length;
     const stop = !!d.querySelector(
       '[data-testid="stop-button"],button[aria-label*="Stop generating"],button[aria-label*="Przerwij generowanie"]');
     const toolBusy = !!d.querySelector(
@@ -64,6 +74,9 @@
       error: !!error,
       composerReady: !!editor,
       turnCount: parts.length,
+      assistantNodeCount,
+      userNodeCount,
+      lastAssistantChars,
       observedAt: Date.now()
     };
   }

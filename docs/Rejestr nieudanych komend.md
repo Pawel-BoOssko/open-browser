@@ -316,3 +316,11 @@ Historyczne wpisy OB-10 i OB-11 zachowują swój numer. Nowym zdarzeniom należy
 ### OB-20261019-0809-late-ack-js-test
 - Narzędzie: Remote Desktop Commander edit_block, SATANAMD. Mała samodzielna zmiana jednego testu lite-resume-send-race.test.cjs: dodanie regresji opóźnionego DIL ACK bez podwójnego kliknięcia Send.
 - Wynik: This tool call was blocked by OpenAI's safety checks. Test niezmieniony, nie ponawiano innym narzędziem. Niezależne testy C# 30 checks i dotychczasowe Node 18/18 PASS.
+
+### OB-20261019-0917-webview2-v1721
+- Narzędzie: LC MultiHost `execute_command`, SATANAMD. Operacja: mały, samodzielny test `Start-Process ...OpenBrowserLite_v1.72.1_20261019_0917\BridgeBrowserAlpha0.exe --lite-webview-integration-selftest -Wait`, izolowany WebView2 bez logowania do ChatGPT i bez ingerencji w LIVE.
+- Wynik: `This tool call was blocked by OpenAI's safety checks`. Polecenie nie zostało uruchomione, brak dowodu wyniku testu. Szczegółowej przyczyny odmowy nie udostępniono. Nie ponawiano innym narzędziem. Niezależne testy Node 15/15, .NET 17/17 i manifest/gates PASS.
+
+### OB-20261019-0914-existing-diff-whitespace
+- Narzędzie: LC MultiHost `execute_command`, SATANAMD. Operacja: odczytowa kontrola `git diff --check` całego istniejącego dirty repo.
+- Wynik: exit 2, istniejące trailing whitespace w `NetworkLogger.cs`, `ResponseExtractor.cs`, `PageTap.js`, `OpenBridgeEnvelopeObserver.cs` i innych historycznych plikach. To nie jest odmowa bezpieczeństwa; żadnych plików nie zmieniono tym poleceniem. Nowy pakiet dotyczy `LiteResumeProbe.js`, `LiteDevWakeUi.cs` i testu; nie poprawiano cudzych zmian.

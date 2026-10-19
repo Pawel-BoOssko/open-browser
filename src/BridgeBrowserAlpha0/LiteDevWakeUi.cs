@@ -187,7 +187,27 @@ internal sealed partial class ChatGptLiteForm
                 observation.GetProperty("composerReady").GetBoolean());
             if (eligible != "ready") {
                 _devWakeStatus.Text = "Autopraca: " + eligible;
+                // Rate-limited, content-free evidence for diagnosing
+                // answer_missing, high_not_verified and false busy states.
+                bool diagnosticDue = eligible != _devWakeLastSkipReason ||
+                    now - _devWakeLastSkipLoggedUtc >= TimeSpan.FromMinutes(10);
                 ReportDevWakeSkip(eligible);
+                if (diagnosticDue)
+                    LiteEventLog.Write("dev_wake_probe_diagnostic", new {
+                        reason = eligible,
+                        role = observation.GetProperty("role").GetString(),
+                        reasoningMode = observation.GetProperty("reasoningMode").GetString(),
+                        turnCount = observation.GetProperty("turnCount").GetInt32(),
+                        assistantNodeCount = observation.GetProperty("assistantNodeCount").GetInt32(),
+                        userNodeCount = observation.GetProperty("userNodeCount").GetInt32(),
+                        lastAssistantChars = observation.GetProperty("lastAssistantChars").GetInt32(),
+                        answerChars = answer.Length,
+                        generating = observation.GetProperty("generating").GetBoolean(),
+                        toolBusy = observation.GetProperty("toolBusy").GetBoolean(),
+                        hasDraft = observation.GetProperty("hasDraft").GetBoolean(),
+                        composerReady = observation.GetProperty("composerReady").GetBoolean(),
+                        error = observation.GetProperty("error").GetBoolean()
+                    });
                 return;
             }
             string normalizedChat = LiteChatNotes.NormalizeKey(core.Source);
