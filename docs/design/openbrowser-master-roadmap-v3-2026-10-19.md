@@ -195,3 +195,9 @@ SOURCE v1.71.0: liczniki ról DIL w produkcyjnie ładowanym `LiteDomOptimizer.js
 - **SOURCE + LIVE SCRIPT HOTPATCH:** naprawiono wykrywanie uruchomienia `--lite-open-safely` w `scripts/monitor-lite-resources.ps1` i lokalnym monitorze PBOX1. Poprzednio realny PID21332 był raportowany jako 0 hostów; od 15:00 hostCount=1 i 7 procesów WebView2.
 - **LIVE VERIFIED MONITOR:** zaplanowana, istniejąca próbka Windows Task 15:01:02 również wykryła hostCount=1. Dodatkowe obliczanie `cpuCorePercent` i `cpuMachinePercent` z różnicy skumulowanego czasu CPU (ten sam PID, znane okno pomiarowe) działa w próbce 15:03:55: 4 procesory logiczne, 51,9 s okna, host 0,1% jednego rdzenia, 0,02% całej maszyny. Historia sprzed poprawki nie została przepisana.
 - **PARTIAL:** dopiero początek OB3-022/023, bez długich trendów i GUI dashboardu. Szczegóły `docs/openbrowser-checkpoint-2026-10-19-1504-resources.md`. Wydanie przeglądarki nadal LIVE 1.72.6, bez restartu.
+
+## Aktualizacja 2026-10-19 15:07 CEST: OB3-024
+
+- **SOURCE + LIVE monitor:** klasyfikacja 7 procesów WebView2 działa: browser 1, crashpad-handler 1, gpu-process 1, utility 2, renderer 2. Dodano wyłącznie odczytowe wykrywanie kandydatów na procesy osierocone według niezwiązanego parentPid (bez automatycznego zamykania).
+- **PBOX1 15:07:17:** host 1, WebView2 7, orphan candidates 0, pomiar CPU 11,5 s. AST PowerShell 0 błędów.
+- **Częściowo wykonane:** OB3-024, wciąż brak testów awarii renderera. Checkpoint `docs/openbrowser-checkpoint-2026-10-19-1504-resources.md`.

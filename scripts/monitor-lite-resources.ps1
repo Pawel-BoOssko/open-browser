@@ -55,6 +55,9 @@ try {
 } catch {
     # The first sample, an incomplete line, or a replaced process is normal.
 }
+$knownPids = @($liteRows | ForEach-Object { $_.pid }) +
+    @($webRows | ForEach-Object { $_.pid })
+$orphanCandidates = @($webRows | Where-Object { $_.parentPid -notin $knownPids })
 $top = @(Get-Process | Sort-Object WorkingSet64 -Descending | Select-Object -First 6 | ForEach-Object {
     [pscustomobject]@{ name = $_.ProcessName; pid = $_.Id; workingMiB = [math]::Round($_.WorkingSet64 / 1MB, 1) }
 })
@@ -70,6 +73,8 @@ $record = [ordered]@{
     hosts = $liteRows
     webviewCount = $webRows.Count
     webviewProcesses = $webRows
+    orphanWebviewCandidateCount = $orphanCandidates.Count
+    orphanWebviewCandidatePids = @($orphanCandidates | ForEach-Object { $_.pid })
     topMemoryConsumers = $top
 }
 try {

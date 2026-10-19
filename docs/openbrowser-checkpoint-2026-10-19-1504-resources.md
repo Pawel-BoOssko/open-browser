@@ -45,3 +45,10 @@ Latest:
 - OB3-024 process-role classification and orphan detection requires more work.
 - PBOX1 release 1.72.6 still scheduled to wake the correct chat around 15:10:23. Real second wake not yet confirmed in this checkpoint.
 - No manual git commit/push, no new ChatGPT Tasks, no modification to blocked OB3-081 old Windows launch task.
+
+## Append 2026-10-19 15:07 CEST: OB3-024 process roles and orphans
+
+- In actual 15:05 sampled data, 7 WebView2 processes were classified: 1 browser, 1 crashpad-handler, 1 gpu-process, 2 utility, 2 renderer. One renderer used 542 MiB private memory and 8.7% of one CPU core during its sampled interval; this alone does not establish a leak.
+- Added read-only orphanWebviewCandidateCount and orphanWebviewCandidatePids to source and the PBOX1 installed sampler. Candidates are scoped WebView2 processes whose parent PID is absent from the detected host and WebView2 process set. These are diagnostic candidates only, not auto-kill decisions.
+- 15:07:17 live sample: hostCount=1, webviewCount=7, orphanWebviewCandidateCount=0, elapsed=11.5s. PowerShell AST parse found 0 errors. No browser restart.
+- OB3-024 PARTIAL LIVE. More role-specific trends and orphan validation across abnormal renderer exits are still needed.
