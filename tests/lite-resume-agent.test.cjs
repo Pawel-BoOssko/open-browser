@@ -91,7 +91,7 @@ function page(overrides = {}) {
   const p = page({ draft: "Unsent private message" });
   assert.equal(p.w.__OPENBROWSER_RESUME_SENDER__.send(
     "Kontynuuj drugi rozdział książki.",
-    "0123456789abcdef0123456789abcdef"), "busy");
+    "0123456789abcdef0123456789abcdef"), "busy_draft_present");
 }
 {
   const p = page({ path: "/settings" });
@@ -106,7 +106,7 @@ function page(overrides = {}) {
   assert.equal(observation.hasDraft, true);
   assert.equal(p.w.__OPENBROWSER_RESUME_SENDER__.send(
     "Kontynuuj drugi rozdział książki.",
-    "0123456789abcdef0123456789abcdef"), "busy");
+    "0123456789abcdef0123456789abcdef"), "busy_draft_present");
   assert.equal(p.sent.length, 0);
 }
 {
@@ -123,7 +123,7 @@ function page(overrides = {}) {
   assert.equal(p.w.__OPENBROWSER_RESUME_PROBE__.observe().composerReady, false);
   assert.equal(p.w.__OPENBROWSER_RESUME_SENDER__.send(
     "Kontynuuj drugi rozdział książki.",
-    "0123456789abcdef0123456789abcdef"), "busy");
+    "0123456789abcdef0123456789abcdef"), "busy_missing_composer");
   assert.equal(p.sent.length, 0);
 }
 console.log("LiteResumeAgent: 10 PASS");

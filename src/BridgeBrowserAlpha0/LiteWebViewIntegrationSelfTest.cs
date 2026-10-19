@@ -188,6 +188,7 @@ internal static class LiteWebViewIntegrationSelfTest
 <body>
 <button aria-label="Wybierz model ChatGPT" data-selected-reasoning-effort="high">
 Wysiłek myślowy</button>
+<aside aria-busy="true" style="display:none">Background spinner, not a response</aside>
 <main id="conversation">
 <div data-user-message-bubble>Napisz książkę przygodową.</div>
 <div data-chatgpt-selection-message-id="chapter1">Rozdział pierwszy.</div>
