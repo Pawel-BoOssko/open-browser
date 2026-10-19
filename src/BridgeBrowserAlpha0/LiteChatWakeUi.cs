@@ -191,6 +191,59 @@ internal sealed partial class ChatGptLiteForm
         finally { core.NavigationCompleted -= OnCompleted; }
     }
 
+    private async Task<string> RetryWithNativeInputAsync(CoreWebView2 core,
+        string url, string text)
+    {
+        if (!LiteDevWakeState.IsChatUrl(core.Source) ||
+            LiteDevWakeState.NormalizeUrl(core.Source) != url)
+            return "cdp_wrong_chat";
+        // Select only the worker composer contents, never the visible user tab.
+        const string selectComposer = @"(() => {
+            const el = document.querySelector('#prompt-textarea,[data-testid=""composer-text-input""],textarea,[contenteditable=""true""]');
+            if (!el) return false;
+            el.focus();
+            if (typeof el.select === 'function') el.select();
+            else {
+                const range = document.createRange();
+                range.selectNodeContents(el);
+                const s = window.getSelection();
+                s.removeAllRanges(); s.addRange(range);
+            }
+            return true;
+        })()";
+        if (await core.ExecuteScriptAsync(selectComposer) != "true")
+            return "cdp_no_composer";
+        try
+        {
+            await core.CallDevToolsProtocolMethodAsync("Input.insertText",
+                JsonSerializer.Serialize(new { text }));
+            await Task.Delay(650);
+            const string clickSend = @"(() => {
+                const el = document.querySelector('#prompt-textarea,[data-testid=""composer-text-input""],textarea,[contenteditable=""true""]');
+                const form = el?.closest('form');
+                const btn = form?.querySelector('button[type=submit]:not([disabled])') ||
+                    document.querySelector('[data-testid=""send-button""],button[aria-label=""Wyślij""],button[aria-label=""Send""],button[aria-label=""Send message""]');
+                if (!btn || btn.disabled || btn.getAttribute('aria-disabled') === 'true')
+                    return false;
+                btn.click(); return true;
+            })()";
+            if (await core.ExecuteScriptAsync(clickSend) == "true")
+                return "cdp_native_input_click";
+            // Deliver a real browser-level Enter, not an untrusted JS KeyboardEvent.
+            const string enterDown = "{\"type\":\"keyDown\",\"key\":\"Enter\",\"code\":\"Enter\",\"windowsVirtualKeyCode\":13}";
+            const string enterUp = "{\"type\":\"keyUp\",\"key\":\"Enter\",\"code\":\"Enter\",\"windowsVirtualKeyCode\":13}";
+            await core.CallDevToolsProtocolMethodAsync("Input.dispatchKeyEvent", enterDown);
+            await core.CallDevToolsProtocolMethodAsync("Input.dispatchKeyEvent", enterUp);
+            return "cdp_native_enter";
+        }
+        catch (Exception ex)
+        {
+            LiteEventLog.Write("multi_wake_cdp_failed",
+                new { errorType = ex.GetType().Name });
+            return "cdp_failed";
+        }
+    }
+
     private async Task PollAllChatWakesAsync()
     {
         if (!_multiWakeEnabled || _chatWakeBusy || IsDisposed) return;
@@ -234,6 +287,12 @@ internal sealed partial class ChatGptLiteForm
                         "window.__OPENBROWSER_RESUME_SENDER__?.phase(" +
                         JsonSerializer.Serialize(receipt) + ")");
                     string phase = JsonSerializer.Deserialize<string>(phaseJson) ?? "unknown";
+                    if (phase == "draft_button_missing")
+                    {
+                        phase = await RetryWithNativeInputAsync(
+                            _chatWakeWorker.CoreWebView2, due.Url, text);
+                        await Task.Delay(1800);
+                    }
                     bool visible = false;
                     if (state == "submission_requested")
                     {

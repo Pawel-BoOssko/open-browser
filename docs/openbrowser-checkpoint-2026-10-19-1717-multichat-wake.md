@@ -43,3 +43,11 @@ Next:
 - Publish and verify 1.72.8, use safe restart/fallback script on PBOX1.
 - Configure book test via CLI, manually make its next due immediate, verify that its message appears in the book chat while foreground remains on a different chat. Confirm notes via unit and, if available, real note content.
 - If background worker is unable to navigate or click (hidden WebView2), keep checkpoint OPEN and correct the root cause, without marking success.
+
+## Verification 17:30 CEST: REAL book wake #2
+
+- Production v1.72.9 PID7512 built/published on PBOX1, deployment recovery script exit0, fallback v1.72.8 available.
+- Book chat separately enabled with 20min interval. Temporary test note added via local CLI; old note state was empty. Test command made book due once without altering project scheduling.
+- Actual background worker started at 17:30:23 CEST; log at 17:30:31 CEST: `state=submission_requested`, `phase=draft_button_missing`, `visibleUserBubble=false`, `includesNotes=true`.
+- Therefore note composition was verified but actual book message WAS NOT delivered. Do not mark delivery as PASS. Synthetic JS Enter was explicitly removed because it was previously logged without visible success.
+- Next fix SOURCE 1.72.10: when the background WebView2 lacks a Send button after 2s, select its own composer and use WebView2 CDP `Input.insertText` to generate a native input event; try Send click, then browser-level Enter; log phase and check user bubble. Visible foreground chat remains untouched. Does not create OpenAI scheduled tasks.
