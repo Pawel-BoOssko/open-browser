@@ -42,6 +42,8 @@ Latest:
 
 ## Open Questions
 
+- **2026-10-19 audit — bounded retry vs same-answer dedup requires owner decision, do not silently resolve.** Accepted 02:24 decision permits a bounded retry of an ambiguous wake after the configured ~25-minute interval, but the later SOURCE `LiteDevWakeState.Eligibility` returns `same_answer_already_woken` for an unchanged `LastAttemptHash`, even if the prior send is `uncertain_no_ack`. Choose and document the actual desired behavior before further implementation. Do not equate `delivery_timeout` with definitely-not-sent or click 'Ponów'. See `docs/OPENBROWSER_DEEP_HANDOFF_2026-10-19_1245_ChatGPT.md` §4/§6. Two Open Browser native ChatGPT hourly automations remain OFF by explicit user request; app-local DevWake is separate.
+
 ## Accepted Decisions
 
 ## 2026-10-19 02:24 — Permit bounded repeats of unconfirmed wake messages

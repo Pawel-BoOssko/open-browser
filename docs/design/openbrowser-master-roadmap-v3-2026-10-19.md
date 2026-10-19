@@ -12,6 +12,10 @@ Nadzór należy do **Open Browser Lite**. Co ~25 minut program obserwuje JEDEN p
 
 Każdy krok ma stany `TODO | SOURCE | TEST | STAGED | LIVE_VERIFIED | BLOCKED`. Zatrzymanie wykonania w środku kroku => nowy checkpoint, nie powtarzać niepewnego wysłania. Nie wyłączaj systemowych zabezpieczeń, nie obchodź blokad przez inne narzędzia.
 
+## Nadrzędny audyt i handoff — 2026-10-19 około 12:45 CEST
+
+Przed wyborem nowych punktów **odczytaj** `docs/OPENBROWSER_DEEP_HANDOFF_2026-10-19_1245_ChatGPT.md` i `docs/OPENBROWSER_AUDIT_RUNLOG_2026-10-19_1220_ChatGPT.md`. Native ChatGPT hourly automations Open Browser OFF; nie tworzyć ani nie włączać. PBOX1 LIVE v1.72.0 PID5852, a SOURCE 1.72.4 wyłącznie SATANAMD; STAGED 1.72.4 ma EXE bez manifestu/gate. Nie ma potwierdzonego live `dev_wake_ack` — OB3-018 pozostaje otwarte. W 1.72.4 selected JS 16+10+3 PASS tylko według starszych checkpointów, testy manifestu/headless zablokowane, nie promować bez kwalifikacji. Sprzeczność polityki retry OWNER/implementacja patrz handoff; nie poprawiać jednostronnie. Przestarzałych dawnych oznaczeń LIVE/STAGED poniżej nie interpretować jako stanu bieżącego. Dalej realizować OB3 według dowodów SOURCE/TEST/STAGED/LIVE_VERIFIED, bez ręcznego commit/push i bez restartu rozmowy.
+
 ## Najnowszy checkpoint P0 — 2026-10-19 08:57 CEST
 - **OB3-001..008/010..017: STAGED 1.72** — PBOX1 nowe wydanie `OpenBrowserChatGPTLite_v1.72.0_20261019_0847`, SHA256 EXE `DA6C2DD7B13A1B312EF2F459E7C38948F52ADE845A1A9103FC1A62C33B05159D`, manifest+gate PASS, 17/17 selftests PASS, izolowany PBOX1 WebView2 z realnym formularzem bez data-testid PASS; 15/15 zestawów JS PASS.
 - **OB3-009/018: nadal PENDING REAL ACK** — 19.10 PBOX1 LIVE 1.71.0 PID21560 ma włączoną Autopracę 25m, 58 prób: 56 `busy`/niewysłane, 2 niepewne, 0 potwierdzonych `dev_wake_ack`. Nie zaliczać faktycznego wznowienia. 1.72 poprawia wybór faktycznego przycisku submit i zapisuje `dev_wake_delivery_phase`, nadal wymaga sprawdzenia po uruchomieniu LIVE.
