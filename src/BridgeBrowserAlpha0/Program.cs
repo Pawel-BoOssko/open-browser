@@ -173,6 +173,19 @@ internal static class Program
             Environment.ExitCode = LiteWebViewIntegrationSelfTest.Run();
             return;
         }
+        if (args.Any(arg => string.Equals(arg, "--lite-dev-wake-send-now", StringComparison.OrdinalIgnoreCase)))
+        {
+            try
+            {
+                var state = LiteDevWakeState.Read();
+                if (state.Enabled && LiteDevWakeState.IsChatUrl(state.TargetUrl))
+                {
+                    state.NextDueUtc = DateTimeOffset.UtcNow.AddSeconds(-1);
+                    LiteDevWakeState.Write(state);
+                }
+            }
+            catch { /* Startup must proceed even without local wake configuration. */ }
+        }
         bool safeOpen = args.Any(arg => string.Equals(arg, "--lite-open-safely", StringComparison.OrdinalIgnoreCase));
         if (safeOpen && System.Diagnostics.Process.GetProcessesByName("BridgeBrowserAlpha0")
             .Any(process => process.Id != Environment.ProcessId && !process.HasExited))
