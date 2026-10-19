@@ -8,6 +8,65 @@ internal static class Program
     [STAThread]
     private static void Main(string[] args)
     {
+        // Chat-specific schedules can be configured by the chat itself through
+        // the local command interface, or by the operator in the app.
+        if (args.Length > 0 && string.Equals(args[0],
+            "--lite-chat-wake-selftest", StringComparison.OrdinalIgnoreCase))
+        {
+            Environment.ExitCode = LiteChatWakeRegistry.SelfTest();
+            return;
+        }
+        if (args.Length >= 2 && string.Equals(args[0],
+            "--lite-chat-wake-now", StringComparison.OrdinalIgnoreCase))
+        {
+            try
+            {
+                var url = LiteDevWakeState.NormalizeUrl(args[1]);
+                var chats = LiteChatWakeRegistry.Read();
+                var entry = chats.FirstOrDefault(x => x.Url == url && x.Enabled);
+                if (entry is null) { Environment.ExitCode = 3; return; }
+                entry.DueUtc = DateTimeOffset.UtcNow.AddSeconds(-1);
+                entry.LastState = "manual_test_due";
+                LiteChatWakeRegistry.Write(chats);
+                Environment.ExitCode = 0;
+            }
+            catch { Environment.ExitCode = 4; }
+            return;
+        }
+        if (args.Length >= 2 && string.Equals(args[0],
+            "--lite-chat-wake-off", StringComparison.OrdinalIgnoreCase))
+        {
+            try
+            {
+                string url = LiteDevWakeState.NormalizeUrl(args[1]);
+                var chats = LiteChatWakeRegistry.Read();
+                var entry = chats.FirstOrDefault(x => x.Url == url);
+                if (entry is null) { Environment.ExitCode = 3; return; }
+                entry.Enabled = false;
+                entry.LastState = "paused";
+                LiteChatWakeRegistry.Write(chats);
+                Environment.ExitCode = 0;
+            }
+            catch { Environment.ExitCode = 4; }
+            return;
+        }
+        if (args.Length >= 4 && string.Equals(args[0],
+            "--lite-chat-wake-set", StringComparison.OrdinalIgnoreCase))
+        {
+            try
+            {
+                if (!int.TryParse(args[2], out int minutes))
+                    throw new ArgumentException("Invalid interval");
+                var chats = LiteChatWakeRegistry.Read();
+                LiteChatWakeRegistry.Configure(chats, args[1], minutes,
+                    string.Join(" ", args.Skip(3)), DateTimeOffset.UtcNow);
+                LiteChatWakeRegistry.Write(chats);
+                LiteEventLog.Write("multi_wake_cli_armed", new { intervalMinutes = minutes });
+                Environment.ExitCode = 0;
+            }
+            catch { Environment.ExitCode = 5; }
+            return;
+        }
         if (args.Length > 0 && string.Equals(args[0], "--lite-await-upgrade", StringComparison.OrdinalIgnoreCase))
         {
             Environment.ExitCode = LiteUpgradeHelper.Run(args);

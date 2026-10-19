@@ -66,7 +66,7 @@ internal sealed partial class ChatGptLiteForm : Form
             WrapContents = false,
             AutoScroll = true
         };
-        toolbar.Controls.AddRange(new Control[] { _buildVersion, _technicalInfoButton, _highIndicator, _devWakeToggle, _devWakePin, _devWakeStatus, _resumeToggle, _resumeStatus, _back, _forward, _reload, _home, _domToggle, _hardPruneToggle, _archiveToggle, _openArchive, _status, _domInfo });
+        toolbar.Controls.AddRange(new Control[] { _buildVersion, _technicalInfoButton, _highIndicator, _devWakeToggle, _devWakePin, _chatWakeConfigure, _devWakeStatus, _resumeToggle, _resumeStatus, _back, _forward, _reload, _home, _domToggle, _hardPruneToggle, _archiveToggle, _openArchive, _status, _domInfo });
         var content = new SplitContainer
         {
             Dock = DockStyle.Fill,
@@ -119,6 +119,7 @@ internal sealed partial class ChatGptLiteForm : Form
         InitializeResumeUi();
         InitializeHighUi();
         InitializeDevWake();
+        InitializeMultiWake();
         InitializeTechnicalInfoUi();
 
         LiteEventLog.PruneOldFiles();
@@ -144,6 +145,7 @@ internal sealed partial class ChatGptLiteForm : Form
             _responseTimer.Stop();
             _resumeTimer.Stop();
             _devWakeTimer.Stop();
+            _chatWakeTimer.Stop();
             _highTimer.Stop();
             _pruneReportTimer.Stop();
             _noteSaveTimer.Stop();
@@ -207,7 +209,7 @@ internal sealed partial class ChatGptLiteForm : Form
                 if (e.IsSuccess) _ = ApplyHardPruneModeAsync();
             };
             core.HistoryChanged += (_, _) => UpdateNavigation();
-            core.SourceChanged += (_, _) => SwitchNotesForUrl(core.Source);
+            core.SourceChanged += (_, _) => { SwitchNotesForUrl(core.Source); UpdateMultiWakeStatus(); };
             core.ProcessFailed += (_, e) =>
             {
                 LiteEventLog.Write("webview_process_failed", new
@@ -230,6 +232,7 @@ internal sealed partial class ChatGptLiteForm : Form
             _pruneReportTimer.Start();
             _resumeTimer.Start();
             _devWakeTimer.Start();
+            _chatWakeTimer.Start();
             _highTimer.Start();
             _ = VerifyHighAsync();
         }

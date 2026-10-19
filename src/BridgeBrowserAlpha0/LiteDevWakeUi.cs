@@ -56,6 +56,7 @@ internal sealed partial class ChatGptLiteForm
             });
         }
         _devWakeToggle.Click += (_, _) => {
+            if (_multiWakeEnabled) { ToggleCurrentChatWake(); return; }
             try {
                 if (!LiteDevWakeState.IsChatUrl(_devWake.TargetUrl)) {
                     _devWakeStatus.Text = "Brak przypiętego czatu";
@@ -81,7 +82,10 @@ internal sealed partial class ChatGptLiteForm
                 });
             }
         };
-        _devWakePin.Click += (_, _) => PinCurrentConversation();
+        _devWakePin.Click += (_, _) => {
+            if (_multiWakeEnabled) ConfigureCurrentChatWake();
+            else PinCurrentConversation();
+        };
         _devWakeTimer.Tick += async (_, _) => await PollDevWakeAsync();
     }
 
@@ -159,7 +163,7 @@ internal sealed partial class ChatGptLiteForm
     private async Task PollDevWakeAsync()
     {
         var core = _browser.CoreWebView2;
-        if (_devWakePending || !_devWake.Enabled || core is null) return;
+        if (_multiWakeEnabled || _devWakePending || !_devWake.Enabled || core is null) return;
         _devWakePending = true;
         try {
             var now = DateTimeOffset.UtcNow;
