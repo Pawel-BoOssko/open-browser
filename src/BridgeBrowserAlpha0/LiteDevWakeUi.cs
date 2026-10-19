@@ -116,6 +116,13 @@ internal sealed partial class ChatGptLiteForm
                     ReportDevWakeSkip("other_chat");
                 return; // NEVER follow another chat
             }
+            // Direct recovery path enabled by default. Older detailed delivery
+            // validation remains available only for later diagnostics.
+            if (Environment.GetEnvironmentVariable("OPENBROWSER_LEGACY_DIRECT_SEND") != "0") {
+                if (now >= _devWake.NextDueUtc)
+                    await SendDevWakeDirectAsync(core, now);
+                return;
+            }
             // Passive reconciliation only. An uncertain delivery is never resent.
             // Check the original user bubble even after the short ACK window.
             if (LiteDevWakeState.CanReconcileReceipt(_devWake, now) &&

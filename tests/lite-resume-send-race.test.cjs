@@ -185,4 +185,19 @@ function setup(options = {}) {
     'aria-label-only Stop blocks initial send');
   assert.equal(p.count(), 0);
 }
-console.log("LiteResumeSenderRace: 16 PASS");
+{
+  const p = setup({ formButton: true, missingSendButton: true });
+  assert.equal(p.sender.sendDirect(prompt, id), 'submission_requested');
+  p.run();
+  assert.equal(p.count(), 1, 'direct legacy-style insertion clicks DIL form submit');
+  assert.equal(p.sender.phase(id), 'click_invoked');
+}
+{
+  const p = setup();
+  p.setBusy(true);
+  assert.equal(p.sender.sendDirect(prompt, id), 'submission_requested',
+    'direct sender bypasses the former generation/ACK preflight');
+  p.run();
+  assert.equal(p.count(), 1, 'direct sender still attempts click');
+}
+console.log("LiteResumeSenderRace: 18 PASS");

@@ -137,5 +137,50 @@
     }, 250);
     return "submission_requested";
   }
-  w.__OPENBROWSER_RESUME_SENDER__ = { send, hasAck, diagnose, phase };
+  // Bring back the pre-Lite direct editor injection path. Delivery auditing is
+  // intentionally not a prerequisite for trying the Send action.
+  function sendDirect(text, receiptId) {
+    const el = composer();
+    if (!el) return "missing_composer";
+    const targetPath = w.location.pathname;
+    const payload = String(text || "");
+    el.focus();
+    try {
+      if ("value" in el) {
+        const native = Object.getOwnPropertyDescriptor(
+          w.HTMLTextAreaElement.prototype, "value");
+        if (native?.set) native.set.call(el, payload);
+        else el.value = payload;
+        el.dispatchEvent(new w.Event("input", { bubbles: true }));
+      } else if (!w.document.execCommand?.("insertText", false, payload)) {
+        el.textContent = payload;
+        el.dispatchEvent(new w.Event("input", { bubbles: true }));
+      }
+    } catch (_) {
+      el.textContent = payload;
+      el.dispatchEvent(new w.Event("input", { bubbles: true }));
+    }
+    phases.set(receiptId, "direct_injected");
+    w.setTimeout(() => {
+      if (w.location.pathname !== targetPath) return;
+      const form = el.closest?.("form") || w.document.querySelector("form[data-chatgpt-composer]");
+      const btn = sendButton(el) ||
+        form?.querySelector?.('button[type="submit"]:not([disabled])') ||
+        w.document.querySelector('[data-testid="send-button"],button[aria-label="Wyślij"],button[aria-label="Send"],button[aria-label="Send message"]');
+      if (btn && !btn.disabled) {
+        btn.click();
+        phases.set(receiptId, "click_invoked");
+      } else if (typeof form?.requestSubmit === "function") {
+        form.requestSubmit();
+        phases.set(receiptId, "form_submitted");
+      } else {
+        el.dispatchEvent(new w.KeyboardEvent("keydown", {
+          key: "Enter", code: "Enter", bubbles: true, cancelable: true
+        }));
+        phases.set(receiptId, "enter_dispatched");
+      }
+    }, 500);
+    return "submission_requested";
+  }
+  w.__OPENBROWSER_RESUME_SENDER__ = { send, sendDirect, hasAck, diagnose, phase };
 })(window);
