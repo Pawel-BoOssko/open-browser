@@ -229,9 +229,24 @@ internal sealed partial class ChatGptLiteForm
                         JsonSerializer.Serialize(receipt) + ")";
                     var result = await _chatWakeWorker.CoreWebView2.ExecuteScriptAsync(js);
                     state = JsonSerializer.Deserialize<string>(result) ?? "sender_missing";
-                    await Task.Delay(1100); // allow delayed Send click to finish
+                    await Task.Delay(1500); // allow delayed Send click to finish
+                    string phaseJson = await _chatWakeWorker.CoreWebView2.ExecuteScriptAsync(
+                        "window.__OPENBROWSER_RESUME_SENDER__?.phase(" +
+                        JsonSerializer.Serialize(receipt) + ")");
+                    string phase = JsonSerializer.Deserialize<string>(phaseJson) ?? "unknown";
+                    bool visible = false;
+                    if (state == "submission_requested")
+                    {
+                        string snippet = text[..Math.Min(65, text.Length)];
+                        string check = "Array.from(document.querySelectorAll('" +
+                            "[data-user-message-bubble],[data-message-author-role=\\\"user\\\"]'))" +
+                            ".slice(-6).some(x => String(x.innerText || x.textContent || '').includes(" +
+                            JsonSerializer.Serialize(snippet) + "))";
+                        visible = await _chatWakeWorker.CoreWebView2.ExecuteScriptAsync(check) == "true";
+                    }
                     LiteEventLog.Write("multi_wake_send", new {
-                        state, includesNotes = !string.IsNullOrWhiteSpace(_noteStore.Load(key)),
+                        state, phase, visibleUserBubble = visible,
+                        includesNotes = !string.IsNullOrWhiteSpace(_noteStore.Load(key)),
                         intervalMinutes = due.Minutes
                     });
                 }
