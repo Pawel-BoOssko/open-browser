@@ -66,3 +66,12 @@ Prioritize OB3-021: readable production technical identity (version/build time/s
 - At 15:25:48, local static report created and validated at `%LOCALAPPDATA%\OpenBrowser\ChatGPT-Lite\diagnostics\resources-dashboard.html`, 1993 bytes, all three windows present, no active scripts.
 - OB3-029 PARTIAL: local machine-readable/offline dashboard exists, but no inside-app navigation or event timelines yet. OB3-023 PARTIAL: 5m/1h/24h summaries exist, but sustained monitoring/peak commit accuracy still under development.
 - No manual commit/push, no ChatGPT Tasks. Existing blocked Windows startup task OB3-081 was not touched.
+
+## 15:31 CEST: OB3-029 event timeline and automatic local refresh
+
+- Enhanced `scripts/export-lite-resource-dashboard.ps1` to read a bounded tail of today's `lite-events-YYYY-MM-DD.jsonl`, extract only timestamp, controlled event name and PID for up to 25 relevant events; explicitly excludes event details/contents. Event names include wake, renderer failures, selected High-mode issues and timeouts. Malformed JSON and invalid timestamps skipped.
+- `scripts/monitor-lite-resources.ps1` now calls the exporter after writing a successful sample, if exporter exists; the refresh is deliberately noncritical, and its failure cannot stop the resource-monitor task.
+- Test fixture checks event inclusion and deliberate exclusion of a fake private details field, plus resource windows and PID churn. `tests/test-lite-resource-trends.ps1`: 18 PASS. Four PowerShell files AST parse errors: 0.
+- On PBOX1 after Autosync snapshot 60fb43e, backed up and atomically updated existing LOCAL diagnostic scripts: monitor, analyzer, exporter. Did NOT update or create Windows Tasks, only script content used by the already-existing Resource Monitor Task.
+- 15:31:08 PBOX1 direct monitor test: resource sample appended and dashboard refreshed to 4060 bytes; `Wazne zdarzenia diagnostyczne` visible in generated HTML, `dev_wake_` events present; no active script tag, no external resources. All scripts live only in local diagnostics, no browser restart.
+- OB3-029 upgraded but PARTIAL: static local dashboard auto-refreshes from existing Task, no built-in Open Browser GUI integration, no sophisticated cross-day event analytics.

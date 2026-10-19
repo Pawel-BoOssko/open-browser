@@ -214,3 +214,10 @@ SOURCE v1.71.0: liczniki ról DIL w produkcyjnie ładowanym `LiteDomOptimizer.js
 - **OB3-023 (PARTIAL):** analizator wspiera teraz osobne okna `5m`, `1h`, `24h`, każde z faktycznym czasem pokrycia, próbkami, minimum dostępnego RAM, maksimum pamięci prywatnej hosta/WebView2 i szczytem CPU. Zachowuje osobny wskaźnik nieprzerwanej serii PID. 16 testów PASS.
 - **OB3-029 (PARTIAL):** lokalna, statyczna strona HTML z trzema oknami i stanem stabilności procesów wygenerowana oraz zweryfikowana na PBOX1: `%LOCALAPPDATA%\OpenBrowser\ChatGPT-Lite\diagnostics\resources-dashboard.html`. Brak zewnętrznego JavaScript lub eksportu treści rozmów. Nadal brak UI w samej aplikacji i osi zdarzeń diagnostycznych.
 - **Rzeczywiste dane PBOX1:** okno 5m: 3 próbki/4m, 1h: 33/58m, 24h: 404/800m, wyraźnie oznaczone niepełne 24h; 24h peak private WebView2 1103,7 MiB. Weryfikacja `docs/openbrowser-checkpoint-2026-10-19-1512-second-wake.md`.
+
+## Aktualizacja 2026-10-19 15:31 CEST: OB3-029
+
+- **SOURCE + LIVE SCRIPT:** dashboard zasobów wzbogacono o ostatnie 25 istotnych zdarzeń z `lite-events-YYYY-MM-DD.jsonl`, wyłącznie godzina, nazwa zdarzenia i PID. Bez `details`, rozmów, URL, cookies ani zdalnego JavaScript.
+- Istniejący monitor Windows odświeża dashboard po zapisaniu próbki, ale błąd generatora nie zatrzymuje pomiarów.
+- 18 regresji PowerShell PASS, AST 0 błędów. PBOX1 po Autosync uruchomił poprawiony monitor 15:31:08 i wygenerował 4060-bajtowy HTML z wydarzeniami DevWake.
+- **OB3-029 nadal PARTIAL:** brak zintegrowanego widoku wewnątrz aplikacji i rozbudowanej korelacji wielu dni. Checkpoint `docs/openbrowser-checkpoint-2026-10-19-1512-second-wake.md`.
