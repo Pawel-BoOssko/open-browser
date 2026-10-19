@@ -98,7 +98,16 @@
       if (!samePayload(el.value || el.innerText || el.textContent, payload)) {
         phases.set(receiptId, "blocked_editor_changed"); return;
       }
-      const btn = w.document.querySelector('[data-testid="send-button"]');
+      // Observed ChatGPT DIL composer on 2026-10-19: the Send button has
+      // no data-testid. Scope the exact submit action to the composer form;
+      // never mistake the purple voice button for Send.
+      const btn = w.document.querySelector('[data-testid="send-button"]') ||
+        w.document.querySelector(
+          'form[data-chatgpt-composer] button[type="submit"][aria-label="Wyślij"]') ||
+        w.document.querySelector(
+          'form[data-chatgpt-composer] button[type="submit"][aria-label="Send"]') ||
+        w.document.querySelector(
+          'form[data-chatgpt-composer] button[type="submit"][aria-label="Send message"]');
       if (!btn) {
         phases.set(receiptId, "draft_button_missing"); return;
       }
