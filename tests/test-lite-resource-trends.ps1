@@ -14,6 +14,10 @@ Check ($normal.stableHostSampleCount -eq 2) 'same host pid'
 Check ($normal.stableWebviewSampleCount -eq 2) 'same webview pid'
 Check ($normal.stableWebviewPrivateDeltaMiB -eq 50) 'real 50MiB webview increase'
 Check ($normal.hasWebviewChurnOrRestart -eq $false) 'no churn'
+Check ($normal.windows.'5m'.samples -eq 2) '5m window sample count'
+Check ($normal.windows.'1h'.samples -eq 2) '1h window sample count'
+Check ($normal.windows.'24h'.samples -eq 2) '24h window sample count'
+Check ($normal.windows.'5m'.maxWebviewPrivateMiB -eq 850) '5m peak WebView2 private MiB'
 
 $temp = Join-Path $env:TEMP ('openbrowser-resource-test-' + [Guid]::NewGuid().ToString('N') + '.jsonl')
 try {
@@ -30,4 +34,4 @@ try {
     Check ($churn.hasWebviewChurnOrRestart -eq $true) 'churn is flagged'
 }
 finally { if (Test-Path -LiteralPath $temp) { Remove-Item -LiteralPath $temp -Force } }
-Write-Output 'LITE_RESOURCE_TRENDS_9_PASS'
+Write-Output 'LITE_RESOURCE_TRENDS_13_PASS'

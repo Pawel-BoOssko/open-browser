@@ -85,6 +85,35 @@ $allWeb = @($rows | ForEach-Object { WebViewPrivateSum $_ })
 $pressure = if ($critical -gt 0) { 'critical_observed' } elseif ($warning -gt 0) {
     'warning_observed'
 } else { 'normal_observed' }
+$trendWindows = [ordered]@{}
+$lastInstant = [DateTimeOffset]::Parse([string]$last.utc)
+foreach ($window in @(@{ label = '5m'; minutes = 5 },
+                      @{ label = '1h'; minutes = 60 },
+                      @{ label = '24h'; minutes = 1440 })) {
+    $threshold = $lastInstant.AddMinutes(-$window.minutes)
+    $bucket = @($rows | Where-Object {
+        [DateTimeOffset]::Parse([string]$_.utc) -ge $threshold
+    })
+    $firstInstant = [DateTimeOffset]::Parse([string]$bucket[0].utc)
+    $hostPrivate = @($bucket | ForEach-Object {
+        @($_.hosts | Measure-Object -Property privateMiB -Sum)[0].Sum
+    })
+    $webPrivate = @($bucket | ForEach-Object { WebViewPrivateSum $_ })
+    $cpu = @($bucket | ForEach-Object {
+        @($_.webviewProcesses | ForEach-Object {
+            if ($null -ne $_.cpuCorePercent) { [double]$_.cpuCorePercent }
+        })
+    })
+    $trendWindows[$window.label] = [ordered]@{
+        samples = $bucket.Count
+        observedMinutes = [math]::Round(($lastInstant - $firstInstant).TotalMinutes, 1)
+        requestedMinutes = $window.minutes
+        minFreeMemoryMiB = [math]::Round(($bucket | Measure-Object -Property freeMemoryMiB -Minimum).Minimum, 0)
+        maxHostPrivateMiB = [math]::Round(($hostPrivate | Measure-Object -Maximum).Maximum, 1)
+        maxWebviewPrivateMiB = [math]::Round(($webPrivate | Measure-Object -Maximum).Maximum, 1)
+        maxWebviewCpuCorePercent = if ($cpu.Count) { [math]::Round(($cpu | Measure-Object -Maximum).Maximum, 1) } else { $null }
+    }
+}
 $result = [ordered]@{
     schema = 1
     firstUtc = ([datetime]$first.utc).ToUniversalTime().ToString('o')
@@ -107,6 +136,7 @@ $result = [ordered]@{
     stableWebviewDurationMinutes = $webStableMinutes
     stableWebviewPrivateDeltaMiB = $webStableDelta
     hasWebviewChurnOrRestart = ($webStableCount -lt $rows.Count)
+    windows = $trendWindows
     maxWebviewPrivateMiB = [math]::Round(($allWeb | Measure-Object -Maximum).Maximum, 1)
     caution = 'Raw totals across restarts are not leak estimates; stable delta requires identical PIDs and <=300s gaps'
 }
