@@ -24,6 +24,16 @@ internal sealed partial class ChatGptLiteForm
     {
         try {
             _devWake = LiteDevWakeState.Read();
+            if (LiteDevWakeState.RecoverLegacyDefinitelyNotSent(
+                _devWake, DateTimeOffset.UtcNow))
+                LiteEventLog.Write("dev_wake_legacy_busy_recovered", new {
+                    reason = "v168_busy_pre_send", deferredMinutes = 2
+                });
+            if (LiteDevWakeState.RecoverUncertainAfterRestart(
+                _devWake, DateTimeOffset.UtcNow))
+                LiteEventLog.Write("dev_wake_ambiguous_send_rearmed", new {
+                    retryMinutes = _devWake.IntervalMinutes
+                });
             UpdateDevWakeStatus();
             LiteEventLog.Write("dev_wake_loaded", new {
                 enabled = _devWake.Enabled,
@@ -139,8 +149,31 @@ internal sealed partial class ChatGptLiteForm
                 LiteEventLog.Write("dev_wake_preflight_rejected");
                 return;
             }
-            // Persistent receipt first. If UI/client crashes, NEVER repeat for
-            // this assistant answer on the next run.
+            // Before sending a retry, look for the previous receipt in the
+            // real conversation. If visible, no extra message is needed.
+            if (_devWake.LastAttemptHash == hash &&
+                LiteDevWakeState.MayRetryUncertain(_devWake))
+            {
+                string oldReceipt = _devWake.LastReceiptId;
+                var oldAck = core.ExecuteScriptAsync(
+                    "window.__OPENBROWSER_RESUME_SENDER__?.hasAck(" +
+                    JsonSerializer.Serialize(oldReceipt) + ")");
+                if (await Task.WhenAny(oldAck, Task.Delay(4500)) == oldAck &&
+                    await oldAck == "true")
+                {
+                    _devWake.LastConfirmedReceiptId = oldReceipt;
+                    _devWake.LastState = "confirmed";
+                    LiteDevWakeState.Write(_devWake);
+                    LiteEventLog.Write("dev_wake_late_ack_recovered");
+                    UpdateDevWakeStatus();
+                    return;
+                }
+                LiteEventLog.Write("dev_wake_retry_unconfirmed", new {
+                    waitedMinutes = _devWake.IntervalMinutes
+                });
+            }
+            // Every attempt gets its own durable receipt. Unconfirmed attempts
+            // may repeat after the interval, not immediately or concurrently.
             string receipt = Guid.NewGuid().ToString("N");
             LiteDevWakeState.CommitAttempt(_devWake, now, hash, receipt);
             LiteEventLog.Write("dev_wake_send_attempt", new {
@@ -152,9 +185,8 @@ internal sealed partial class ChatGptLiteForm
                 JsonSerializer.Serialize(receipt) + ")";
             var send = core.ExecuteScriptAsync(javascript);
             if (await Task.WhenAny(send, Task.Delay(6000)) != send) {
-                _devWake.LastState = "uncertain_renderer_timeout";
-                _devWake.Enabled = false;
-                LiteDevWakeState.Write(_devWake);
+                LiteDevWakeState.DeferUncertain(_devWake,
+                    DateTimeOffset.UtcNow, "renderer_timeout");
                 LiteEventLog.Write("dev_wake_submission_uncertain", new {
                     reason = "renderer_timeout"
                 });
@@ -162,10 +194,20 @@ internal sealed partial class ChatGptLiteForm
                 return;
             }
             string returned = JsonSerializer.Deserialize<string>(await send) ?? "";
+            if (returned == "busy") {
+                // Sender returned before touching the editor or scheduling a click:
+                // this is a confirmed NOT-SENT, unlike a renderer timeout.
+                LiteDevWakeState.DeferDefinitelyUnsentBusy(
+                    _devWake, receipt, DateTimeOffset.UtcNow);
+                LiteEventLog.Write("dev_wake_deferred_busy", new {
+                    confirmedNotSent = true, retryMinutes = 2
+                });
+                UpdateDevWakeStatus();
+                return;
+            }
             if (returned is not ("submission_requested" or "already_visible")) {
-                _devWake.LastState = "uncertain_send_" + returned;
-                _devWake.Enabled = false;
-                LiteDevWakeState.Write(_devWake);
+                LiteDevWakeState.DeferUncertain(_devWake,
+                    DateTimeOffset.UtcNow, "send_" + returned);
                 LiteEventLog.Write("dev_wake_submission_uncertain", new {
                     reason = returned
                 });
@@ -185,9 +227,8 @@ internal sealed partial class ChatGptLiteForm
                 UpdateDevWakeStatus();
             }
             else {
-                _devWake.Enabled = false;
-                _devWake.LastState = "uncertain_no_ack";
-                LiteDevWakeState.Write(_devWake);
+                LiteDevWakeState.DeferUncertain(_devWake,
+                    DateTimeOffset.UtcNow, "no_ack");
                 LiteEventLog.Write("dev_wake_submission_uncertain", new {
                     reason = "no_visible_ack"
                 });
@@ -195,13 +236,18 @@ internal sealed partial class ChatGptLiteForm
             }
         }
         catch (Exception ex) {
-            // Current attempt is stored before sending. Never blindly retry.
-            _devWakeStatus.Text = "Autopraca: wstrzymana po wyjątku";
-            _devWake.Enabled = false;
+            _devWakeStatus.Text = "Autopraca: błąd — późniejsza próba";
             try {
-                _devWake.LastState = "exception";
-                LiteDevWakeState.Write(_devWake);
-            } catch { /* fail closed */ }
+                if (LiteDevWakeState.MayRetryUncertain(_devWake))
+                    LiteDevWakeState.DeferUncertain(_devWake,
+                        DateTimeOffset.UtcNow, "exception");
+                else {
+                    _devWake.NextDueUtc = DateTimeOffset.UtcNow
+                        .AddMinutes(_devWake.IntervalMinutes);
+                    _devWake.LastState = "probe_exception_retry_later";
+                    LiteDevWakeState.Write(_devWake);
+                }
+            } catch { /* local state inaccessible: do not corrupt it */ }
             LiteEventLog.Write("dev_wake_failed", new {
                 errorType = ex.GetType().Name
             });

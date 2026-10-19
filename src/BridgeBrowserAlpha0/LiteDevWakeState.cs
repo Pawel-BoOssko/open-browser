@@ -101,7 +101,11 @@ internal static class LiteDevWakeState
         if (!high) return "high_not_verified";
         if (!assistant) return "assistant_not_last";
         if (generating || tools || draft || error || !composerReady) return "not_idle";
-        if (state.LastAttemptHash == answerHash) return "same_answer_already_woken";
+        // Owner's 2026-10-19 policy: a missing acknowledgement is NOT a
+        // permanent blocker. Another wake may be attempted after the 25-minute
+        // interval if the same assistant answer is still last.
+        if (state.LastAttemptHash == answerHash &&
+            !MayRetryUncertain(state)) return "same_answer_already_woken";
         if (state.LastObservedHash != answerHash ||
             now - state.FirstObservedUtc < TimeSpan.FromSeconds(45))
             return "wait_stable";
@@ -109,6 +113,41 @@ internal static class LiteDevWakeState
             now - state.RateWindowUtc < TimeSpan.FromDays(1) &&
             state.AttemptsInWindow >= 40) return "daily_limit";
         return "ready";
+    }
+
+    internal static bool MayRetryUncertain(Record state) =>
+        state.LastReceiptId.Length == 32 &&
+        state.LastReceiptId != state.LastConfirmedReceiptId &&
+        (state.LastState == "sending_uncertain" ||
+         state.LastState.StartsWith("uncertain_", StringComparison.Ordinal) ||
+         state.LastState == "exception");
+
+    internal static bool RecoverUncertainAfterRestart(Record state,
+        DateTimeOffset now, bool persist = true)
+    {
+        if (state.Enabled || !IsChatUrl(state.TargetUrl) ||
+            !MayRetryUncertain(state) ||
+            state.LastAttemptUtc == default ||
+            state.LastAttemptUtc > now.AddMinutes(2)) return false;
+        state.Enabled = true;
+        state.NextDueUtc = now.AddMinutes(state.IntervalMinutes);
+        state.LastObservedHash = "";
+        state.FirstObservedUtc = default;
+        state.LastState = "uncertain_renderer_timeout"; // retains retry eligibility
+        if (persist) Write(state);
+        return true;
+    }
+
+    internal static void DeferUncertain(Record state, DateTimeOffset now,
+        string cause, bool persist = true)
+    {
+        if (!state.Enabled || !MayRetryUncertain(state))
+            throw new InvalidOperationException("Expected pending uncertain wake");
+        state.LastState = "uncertain_" + cause;
+        state.NextDueUtc = now.AddMinutes(state.IntervalMinutes);
+        state.LastObservedHash = "";
+        state.FirstObservedUtc = default;
+        if (persist) Write(state);
     }
 
     internal static bool ContainsCompletionMarker(string answer) =>
@@ -134,6 +173,59 @@ internal static class LiteDevWakeState
         s.FirstObservedUtc = default;
         s.LastState = "sending_uncertain";
         Write(s); // disk BEFORE WebView ExecuteScriptAsync: no crash retry
+    }
+
+    /// <summary>
+    /// Sender's "busy" is definitive pre-send rejection: its JavaScript
+    /// returns before marking a receipt attempted or touching the editor.
+    /// No network submission occurred. Allow a later fresh stable observation,
+    /// rather than permanently disabling the development wake.
+    /// Do not use this method for "unsupported", timeout, or uncertain results.
+    /// </summary>
+    internal static void DeferDefinitelyUnsentBusy(Record s, string receipt,
+        DateTimeOffset now, bool persist = true)
+    {
+        if (s.LastState != "sending_uncertain" ||
+            s.LastReceiptId != receipt ||
+            receipt.Length != 32 || !receipt.All(Uri.IsHexDigit))
+            throw new InvalidOperationException("Wake attempt receipt/state mismatch");
+        s.LastAttemptHash = "";
+        s.LastReceiptId = "";
+        s.LastAttemptUtc = default;
+        s.LastObservedHash = "";
+        s.FirstObservedUtc = default;
+        s.AttemptsInWindow = Math.Max(0, s.AttemptsInWindow - 1);
+        s.NextDueUtc = now.AddMinutes(2);
+        s.LastState = "deferred_busy_before_send";
+        if (persist) Write(s);
+    }
+
+    /// <summary>
+    /// v1.68 persisted "uncertain_send_busy" even though ResumeSender.send
+    /// returned before any DOM modification. Recover ONLY that exact proven
+    /// legacy pre-send condition, within one day of the failed attempt.
+    /// Never recover renderer timeouts, unsupported, or no-ACK states.
+    /// </summary>
+    internal static bool RecoverLegacyDefinitelyNotSent(Record s,
+        DateTimeOffset now, bool persist = true)
+    {
+        if (s.Enabled || s.LastState != "uncertain_send_busy" ||
+            s.LastReceiptId.Length != 32 ||
+            !s.LastReceiptId.All(Uri.IsHexDigit) ||
+            s.LastAttemptHash.Length != 64 ||
+            !s.LastAttemptHash.All(Uri.IsHexDigit) ||
+            s.LastAttemptUtc > now.AddMinutes(2) ||
+            s.LastAttemptUtc < now.AddDays(-1) ||
+            s.LastConfirmedReceiptId == s.LastReceiptId ||
+            !IsChatUrl(s.TargetUrl))
+            return false;
+        string receipt = s.LastReceiptId;
+        s.LastState = "sending_uncertain";
+        DeferDefinitelyUnsentBusy(s, receipt, now, persist: false);
+        s.Enabled = true;
+        s.LastState = "legacy_busy_recovered";
+        if (persist) Write(s);
+        return true;
     }
 
     internal static int SelfTest()
@@ -163,7 +255,67 @@ internal static class LiteDevWakeState
             if (Eligibility(s, good, now, hash, true, true, false, false, false, false, true) != "wait_stable") return 9;
             if (!ContainsCompletionMarker("Wszystko zakończone [OPENBROWSER-PLAN-COMPLETE]")) return 10;
             if (ContainsCompletionMarker("Wykonano jeszcze 4 kroki, są następne.")) return 11;
-            LiteEventLog.Write("dev_wake_selftest", new { passed = true, checks = 10 });
+            var receipt = new string('a', 32);
+            s.LastState = "sending_uncertain";
+            s.LastReceiptId = receipt;
+            s.LastAttemptHash = hash;
+            s.AttemptsInWindow = 1;
+            DeferDefinitelyUnsentBusy(s, receipt, now, persist: false);
+            if (!s.Enabled || s.LastState != "deferred_busy_before_send" ||
+                s.LastAttemptHash.Length > 0 || s.AttemptsInWindow != 0 ||
+                s.NextDueUtc != now.AddMinutes(2)) return 12;
+            if (Eligibility(s, good, now.AddMinutes(2), hash, true, true,
+                    false, false, false, false, true) != "wait_stable") return 13;
+            bool mismatchRejected = false;
+            try { DeferDefinitelyUnsentBusy(s, receipt, now, persist: false); }
+            catch (InvalidOperationException) { mismatchRejected = true; }
+            if (!mismatchRejected) return 14;
+            var legacy = new Record {
+                Enabled = false,
+                TargetUrl = good,
+                LastState = "uncertain_send_busy",
+                LastReceiptId = receipt,
+                LastAttemptHash = hash,
+                LastAttemptUtc = now,
+                AttemptsInWindow = 1
+            };
+            if (!RecoverLegacyDefinitelyNotSent(legacy, now, persist: false) ||
+                !legacy.Enabled || legacy.LastAttemptHash.Length != 0 ||
+                legacy.LastReceiptId.Length != 0 ||
+                legacy.LastState != "legacy_busy_recovered" ||
+                legacy.AttemptsInWindow != 0) return 15;
+            if (RecoverLegacyDefinitelyNotSent(legacy, now, persist: false))
+                return 16;
+            legacy.Enabled = false;
+            legacy.LastState = "uncertain_renderer_timeout";
+            legacy.LastReceiptId = receipt;
+            legacy.LastAttemptHash = hash;
+            legacy.LastAttemptUtc = now;
+            if (RecoverLegacyDefinitelyNotSent(legacy, now, persist: false))
+                return 17;
+            var amb = new Record {
+                Enabled = true, TargetUrl = good, IntervalMinutes = 25,
+                LastState = "uncertain_no_ack",
+                LastReceiptId = new string('b', 32),
+                LastAttemptHash = hash,
+                LastAttemptUtc = now.AddMinutes(-26),
+                NextDueUtc = now.AddSeconds(-1),
+                LastObservedHash = hash,
+                FirstObservedUtc = now.AddMinutes(-2)
+            };
+            if (Eligibility(amb, good, now, hash, true, true,
+                false, false, false, false, true) != "ready") return 18;
+            if (!MayRetryUncertain(amb)) return 19;
+            DeferUncertain(amb, now, "renderer_timeout", persist: false);
+            if (!amb.Enabled || amb.LastState != "uncertain_renderer_timeout" ||
+                amb.NextDueUtc != now.AddMinutes(25)) return 20;
+            amb.Enabled = false;
+            amb.LastAttemptUtc = now.AddMinutes(-3);
+            if (!RecoverUncertainAfterRestart(amb, now, persist: false) ||
+                !amb.Enabled || amb.NextDueUtc != now.AddMinutes(25)) return 21;
+            amb.LastConfirmedReceiptId = amb.LastReceiptId;
+            if (MayRetryUncertain(amb)) return 22;
+            LiteEventLog.Write("dev_wake_selftest", new { passed = true, checks = 22 });
             return 0;
         }
         catch (Exception ex) {
