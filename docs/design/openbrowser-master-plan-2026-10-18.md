@@ -141,3 +141,9 @@ Status: decyzje architektury zatwierdzone jako kierunek, dopiero poszczególne e
 - [PENDING] SOURCE 1.71.0, PBOX1 LIVE 1.70.0. Nadzorca nadal zgłasza `dev_wake_deferred_busy`; brak `dev_wake_ack`. Nie wykonywano restartu ani retry.
 - [BLOCKED] Zbiorczy odczyt i test LC MultiHost, próba dopisania do rejestru oraz utworzenia nowego checkpointu przez RDC zostały odrzucone przez zabezpieczenia narzędzi. Szczegółowa przyczyna nieznana. Ten wpis zachowuje zakres blokad; nie ponawiać tych operacji innymi narzędziami.
 - [FAILED] LC MultiHost SATANAMD: pojedynczy odczyt `rg -n RevalidateResumeBeforeSendAsync` nie wykonał się, ponieważ `rg` nie jest zainstalowany (`The term 'rg' is not recognized`). Nie była to blokada bezpieczeństwa. Rejestr główny nadal nieprzyjmujący dopisania.
+
+## Checkpoint 2026-10-19 10:28, nadzorca OB3-009/011/025
+- [DONE] PBOX1 STAGED 1.72.1 z istniejącego Autosync: izolowany worktree, Node 15/15 PASS, Release build/publish exit 0; LIVE 1.72.0 bez przerwania.
+- [DONE] SOURCE 1.72.2: rozdzielono `assistant_not_last` od `answer_missing` bez zmiany zasad wysyłania, dwie asercje w SelfTest, Release build i Node 15/15 PASS, STAGED SATANAMD.
+- [BLOCKED] 10 headless selftestów PBOX1: safety checks; nie ma potwierdzenia ich wykonania. Szczegóły w rejestrze błędów.
+- [TODO] Po Autosync przygotować PBOX1 STAGED 1.72.2; przy bezpiecznym wdrożeniu odczytać nowe metadane sondy i potwierdzić prawdziwy `dev_wake_ack` bez dubli.

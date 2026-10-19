@@ -96,10 +96,12 @@ internal static class LiteDevWakeState
         if (!IsChatUrl(url) ||
             NormalizeUrl(url!) != NormalizeUrl(state.TargetUrl)) return "other_chat";
         if (now < state.NextDueUtc) return "not_due";
+        // A last user turn with no assistant text is not an empty assistant reply.
+        // Classify it first for actionable, content-free wake diagnostics.
+        if (!assistant) return "assistant_not_last";
         if (answerHash.Length != 64 || !answerHash.All(Uri.IsHexDigit))
             return "answer_missing";
         if (!high) return "high_not_verified";
-        if (!assistant) return "assistant_not_last";
         if (generating || tools || draft || error || !composerReady) return "not_idle";
         // A delivery with unknown outcome must not be automatically repeated.
         // Resume work only after a NEW completed assistant answer is observed.
@@ -265,6 +267,8 @@ internal static class LiteDevWakeState
             if (Eligibility(s, good, now, hash, true, true, false, false, false, false, true) != "ready") return 2;
             if (Eligibility(s, good.Replace("00000000", "99999999"), now, hash, true, true, false, false, false, false, true) != "other_chat") return 3;
             if (Eligibility(s, good, now, hash, false, true, false, false, false, false, true) != "high_not_verified") return 4;
+            if (Eligibility(s, good, now, "", true, false, false, false, false, false, true) != "assistant_not_last") return 31;
+            if (Eligibility(s, good, now, "", true, true, false, false, false, false, true) != "answer_missing") return 32;
             if (Eligibility(s, good, now, hash, true, true, true, false, false, false, true) != "not_idle") return 5;
             if (Eligibility(s, good, now, hash, true, true, false, false, true, false, true) != "not_idle") return 6;
             if (Eligibility(s, good, now, hash, true, true, false, false, false, true, true) != "not_idle") return 7;

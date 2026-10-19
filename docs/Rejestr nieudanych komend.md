@@ -324,3 +324,13 @@ Historyczne wpisy OB-10 i OB-11 zachowują swój numer. Nowym zdarzeniom należy
 ### OB-20261019-0914-existing-diff-whitespace
 - Narzędzie: LC MultiHost `execute_command`, SATANAMD. Operacja: odczytowa kontrola `git diff --check` całego istniejącego dirty repo.
 - Wynik: exit 2, istniejące trailing whitespace w `NetworkLogger.cs`, `ResponseExtractor.cs`, `PageTap.js`, `OpenBridgeEnvelopeObserver.cs` i innych historycznych plikach. To nie jest odmowa bezpieczeństwa; żadnych plików nie zmieniono tym poleceniem. Nowy pakiet dotyczy `LiteResumeProbe.js`, `LiteDevWakeUi.cs` i testu; nie poprawiano cudzych zmian.
+
+### OB-20261019-1025-pbox1-staged-headless-selftests
+- Narzędzie: LC MultiHost `execute_command`, PBOX1. Operacja: pojedynczy pakiet 10 headless selftestów z nowo opublikowanego STAGED 1.72.1, uruchamianych `Start-Process -Wait -PassThru` bez WebView2 i bez aktywnej rozmowy: version, dev-wake, resume, luna, resume-ledger, projects, lease, notes, delivery, renderer-backpressure. Zakres: test lokalnego EXE, bez modyfikacji LIVE i bez wysyłania wiadomości.
+- Wynik: `This tool call was blocked by OpenAI's safety checks`. Nie wykonano żadnego z 10 selftestów, brak kodów wyjścia. Przyczyna szczegółowa nie została udostępniona. Nie ponawiano tej operacji innym narzędziem. Niezależnie zakończono 15/15 suite Node i dotnet build/publish exit 0 na PBOX1.
+
+### OB-20261019-1027-checkpoint-write
+- Narzędzie: RDC `write_file` SATANAMD. Operacja: jeden długi zapis checkpointu 1.72.1/1.72.2 (około 2,5 KB) w `docs/openbrowser-checkpoint-2026-10-19-1027-staged-diagnostics.md`, bez edycji kodu i LIVE. Wynik: `This tool call was blocked by OpenAI's safety checks`. Nie ma potwierdzenia utworzenia tego pliku, szczegółowej przyczyny nie podano. Zakres: ten zapis dokumentu. Dalsze prace nie zostały zatrzymane.
+
+### OB-20261019-1028-autosync-wait
+- Narzędzie: LC MultiHost `execute_command`, SATANAMD. Operacja: pojedynczy `Start-Sleep -Seconds 215` i odczyt ostatnich czterech linii logu Autosync po następnym cyklu, bez ingerencji w synchronizację. Wynik: `This tool call was blocked by OpenAI's safety checks`; polecenie nie zostało uruchomione. Zakres: wyłącznie oczekiwanie i odczyt, szczegółowej przyczyny nie udostępniono. Pozostawiono istniejący Autosync bez zmian.
