@@ -2,6 +2,10 @@
 
 **Utworzono:** 2026-10-19, Europe/Warsaw. **Tryb pracy:** rozwój na SATANAMD, wydania PBOX1, bieżąca rozmowa Open Browser — rozwój aplikacji, techniczna synchronizacja Autosync. ŻADNYCH automatyzacji / przypominajek ChatGPT. **Zasady Git:** DO NOT COMMIT, bez ręcznego git push. Obecna kanoniczna ścieżka repo: `D:\projects\open-browser`. Dane konta/profil/sekrety nie opuszczają lokalnego profilu PBOX1.
 
+## STAGED PBOX1 2026-10-20 05:53 CEST
+
+- Wersja v1.72.14 STAGED na PBOX1 (Autosync 092ce98), publikacja Release oraz manifest/SHA i cztery testy EXE PASS. Trzy skróty Windows zaktualizowane do v1.72.14 z --lite-open-safely. LIVE nadal v1.72.12, dodatkowe okno v1.64 niezamknięte. Migracja LIVE wymaga bezpiecznego zakończenia starych okien, ponieważ stary skrypt wdrożenia zabija wszystkie instancje. Później realny E2E dwóch osobnych harmonogramów i test braku duplikatów. Szczegóły: docs/openbrowser-checkpoint-2026-10-20-0535-wake-preflight.md.
+
 ## Najnowszy status operacyjny: 2026-10-20 05:49 CEST
 
 - Nowe SOURCE 1.72.14: limit 6500ms dla asynchronicznych skryptów background WebView2. PBOX1 1.72.12 potrafiła pozostać w stanie `attempting` ponad minutę po 05:46:07 mimo heartbeat głównego okna. Przed wysłaniem: odroczenie; po niepewnym wysłaniu: brak powtórki tego samego odcisku odpowiedzi. Testy źródła PASS, realny upgrade nadal otwarty.
