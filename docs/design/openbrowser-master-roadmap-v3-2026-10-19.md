@@ -2,6 +2,12 @@
 
 **Utworzono:** 2026-10-19, Europe/Warsaw. **Tryb pracy:** rozwój na SATANAMD, wydania PBOX1, bieżąca rozmowa Open Browser — rozwój aplikacji, techniczna synchronizacja Autosync. ŻADNYCH automatyzacji / przypominajek ChatGPT. **Zasady Git:** DO NOT COMMIT, bez ręcznego git push. Obecna kanoniczna ścieżka repo: `D:\projects\open-browser`. Dane konta/profil/sekrety nie opuszczają lokalnego profilu PBOX1.
 
+## Stan LIVE 2026-10-20 06:19 CEST
+
+- PBOX1 v1.72.14 PID18424 uruchomiona 06:14 po potwierdzonym graceful close wcześniejszej 1.72.12; lokalny skrypt wycofania, kopia szyfrowanej konfiguracji. Starsze okno 1.64 niezmienione. Dwa harmonogramy osobne i aktywne.
+- Test book chat 06:16:08 bez wysyłki: `assistant_not_complete`; `waiting_assistant_not_complete`, odroczenie 2m. To nie jest potwierdzenie skutecznego nowego wybudzenia. SOURCE v1.72.15 dodaje diagnostykę samych liczników/roli DOM (bez treści), kompilacja i 16 JS suite PASS. Następny krok: PBOX1 diagnostyczne wydanie, zdiagnozować źródło i dopiero realny E2E dwóch czatów.
+- Checkpoint: `docs/openbrowser-checkpoint-2026-10-20-0619-live-v17214-preflight.md`.
+
 ## STAGED PBOX1 2026-10-20 05:53 CEST
 
 - Wersja v1.72.14 STAGED na PBOX1 (Autosync 092ce98), publikacja Release oraz manifest/SHA i cztery testy EXE PASS. Trzy skróty Windows zaktualizowane do v1.72.14 z --lite-open-safely. LIVE nadal v1.72.12, dodatkowe okno v1.64 niezamknięte. Migracja LIVE wymaga bezpiecznego zakończenia starych okien, ponieważ stary skrypt wdrożenia zabija wszystkie instancje. Później realny E2E dwóch osobnych harmonogramów i test braku duplikatów. Szczegóły: docs/openbrowser-checkpoint-2026-10-20-0535-wake-preflight.md.

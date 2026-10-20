@@ -254,6 +254,25 @@ internal sealed partial class ChatGptLiteForm
         string expectedPath = new Uri(url).AbsolutePath;
         string reason = LiteChatWakePreflight.Eligibility(
             first, second, expectedPath, previousHash);
+        if (reason != "ready")
+        {
+            // Metadata only. Do not log response text, prompts or chat URLs.
+            LiteEventLog.Write("multi_wake_preflight_observed", new {
+                reason, firstRole = first?.Role, secondRole = second?.Role,
+                firstChars = first?.Text?.Length ?? 0,
+                secondChars = second?.Text?.Length ?? 0,
+                assistantNodes = second?.AssistantNodeCount ?? 0,
+                userNodes = second?.UserNodeCount ?? 0,
+                lastAssistantChars = second?.LastAssistantChars ?? 0,
+                turns = second?.TurnCount ?? 0,
+                generating = second?.Generating,
+                toolBusy = second?.ToolBusy,
+                draft = second?.HasDraft,
+                error = second?.Error,
+                composer = second?.ComposerReady,
+                targetMatches = second?.Location == expectedPath
+            });
+        }
         string answer = second?.Text ?? "";
         string hash = reason == "ready" ?
             LiteChatWakePreflight.Fingerprint(answer) : "";

@@ -18,6 +18,8 @@ internal static class LiteChatWakePreflight
         public bool ComposerReady { get; set; }
         public int TurnCount { get; set; }
         public int AssistantNodeCount { get; set; }
+        public int LastAssistantChars { get; set; }
+        public int UserNodeCount { get; set; }
     }
 
     internal static string Fingerprint(string answer) =>
