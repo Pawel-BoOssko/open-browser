@@ -2,7 +2,11 @@
 
 **Utworzono:** 2026-10-19, Europe/Warsaw. **Tryb pracy:** rozwój na SATANAMD, wydania PBOX1, bieżąca rozmowa Open Browser — rozwój aplikacji, techniczna synchronizacja Autosync. ŻADNYCH automatyzacji / przypominajek ChatGPT. **Zasady Git:** DO NOT COMMIT, bez ręcznego git push. Obecna kanoniczna ścieżka repo: `D:\projects\open-browser`. Dane konta/profil/sekrety nie opuszczają lokalnego profilu PBOX1.
 
-## Najnowszy status operacyjny: 2026-10-20 05:35 CEST
+## Najnowszy status operacyjny: 2026-10-20 05:49 CEST
+
+- Nowe SOURCE 1.72.14: limit 6500ms dla asynchronicznych skryptów background WebView2. PBOX1 1.72.12 potrafiła pozostać w stanie `attempting` ponad minutę po 05:46:07 mimo heartbeat głównego okna. Przed wysłaniem: odroczenie; po niepewnym wysłaniu: brak powtórki tego samego odcisku odpowiedzi. Testy źródła PASS, realny upgrade nadal otwarty.
+
+## Poprzedni status: 2026-10-20 05:35 CEST
 
 - Obowiązuje rozszerzona architektura: osobne szyfrowane wybudzenie per jawnie włączony czat, nie jeden wyłączny czat. Każdy czat ustawia swój odstęp (20–1440 min), tekst i pauzę przez UI albo lokalne CLI; istniejący plan jednego czatu poniżej jest historycznym zakresem Fazy 0.
 - PBOX1 LIVE: v1.72.12 PID20736; dodatkowy stary proces v1.64 PID18064 wymaga diagnozy. Na 20.10 z 17 prób budzenia tylko 4 mają unikalny `receiptConfirmed=true`. Nie mylić kliknięcia `form_submitted` z dostarczeniem.

@@ -177,6 +177,15 @@ internal sealed partial class ChatGptLiteForm
         catch { _devWakeStatus.Text = "Harmonogram: błąd odczytu"; }
     }
 
+    private static async Task<string> ExecuteWorkerScriptAsync(
+        CoreWebView2 core, string script, int timeoutMs = 6500)
+    {
+        var execution = core.ExecuteScriptAsync(script);
+        if (await Task.WhenAny(execution, Task.Delay(timeoutMs)) != execution)
+            throw new TimeoutException("Background WebView2 script did not return");
+        return await execution;
+    }
+
     private async Task EnsureWakeWorkerAsync()
     {
         if (_chatWakeWorker.CoreWebView2 is not null) return;
@@ -214,7 +223,7 @@ internal sealed partial class ChatGptLiteForm
                 if (core.Source is null ||
                     !LiteDevWakeState.IsChatUrl(core.Source) ||
                     LiteDevWakeState.NormalizeUrl(core.Source) != url) return false;
-                string found = await core.ExecuteScriptAsync(
+                string found = await ExecuteWorkerScriptAsync(core,
                     "!!document.querySelector('#prompt-textarea,[data-testid=\"composer-text-input\"],textarea,[contenteditable=\"true\"]')");
                 if (found == "true") return true;
                 await Task.Delay(700);
@@ -229,7 +238,7 @@ internal sealed partial class ChatGptLiteForm
     {
         const string script = "window.__OPENBROWSER_RESUME_PROBE__ ? " +
             "JSON.stringify(window.__OPENBROWSER_RESUME_PROBE__.observe()) : null";
-        string result = await core.ExecuteScriptAsync(script);
+        string result = await ExecuteWorkerScriptAsync(core, script);
         string? json = JsonSerializer.Deserialize<string>(result);
         return string.IsNullOrEmpty(json) ? null :
             JsonSerializer.Deserialize<LiteChatWakePreflight.Observation>(json,
@@ -341,7 +350,8 @@ internal sealed partial class ChatGptLiteForm
                     string js = "window.__OPENBROWSER_RESUME_SENDER__?.sendDirect(" +
                         JsonSerializer.Serialize(payload) + "," +
                         JsonSerializer.Serialize(receipt) + ",true)";
-                    var result = await _chatWakeWorker.CoreWebView2.ExecuteScriptAsync(js);
+                    var result = await ExecuteWorkerScriptAsync(
+                        _chatWakeWorker.CoreWebView2, js);
                     state = JsonSerializer.Deserialize<string>(result) ?? "sender_missing";
                     if (state.StartsWith("busy_", StringComparison.Ordinal) ||
                         state is "missing_composer" or "invalid" or "already_attempted")
@@ -368,7 +378,8 @@ internal sealed partial class ChatGptLiteForm
                     for (int attempt = 0; attempt < 7 && state == "submission_requested"; attempt++)
                     {
                         await Task.Delay(attempt == 0 ? 750 : 400);
-                        string flush = await _chatWakeWorker.CoreWebView2.ExecuteScriptAsync(
+                        string flush = await ExecuteWorkerScriptAsync(
+                            _chatWakeWorker.CoreWebView2,
                             "window.__OPENBROWSER_RESUME_SENDER__?.submitDirect(" +
                             JsonSerializer.Serialize(receipt) + ")");
                         phase = JsonSerializer.Deserialize<string>(flush) ?? "sender_missing";
@@ -387,7 +398,8 @@ internal sealed partial class ChatGptLiteForm
                                 submitCount:document.querySelectorAll('button[type=submit]').length,
                                 sendCount:document.querySelectorAll('[data-testid=""send-button""],button[aria-label=""Send""],button[aria-label=""Wyślij""]').length
                             })";
-                            string encoded = await _chatWakeWorker.CoreWebView2.ExecuteScriptAsync(domState);
+                            string encoded = await ExecuteWorkerScriptAsync(
+                                _chatWakeWorker.CoreWebView2, domState);
                             string metadata = JsonSerializer.Deserialize<string>(encoded) ?? "{}";
                             using var parsed = JsonDocument.Parse(metadata);
                             var root = parsed.RootElement;
@@ -413,7 +425,8 @@ internal sealed partial class ChatGptLiteForm
                             "[data-user-message-bubble],[data-message-author-role=\\\"user\\\"]'))" +
                             ".slice(-6).some(x => String(x.innerText || x.textContent || '').includes(" +
                             JsonSerializer.Serialize(snippet) + "))";
-                        visible = await _chatWakeWorker.CoreWebView2.ExecuteScriptAsync(check) == "true";
+                        visible = await ExecuteWorkerScriptAsync(
+                            _chatWakeWorker.CoreWebView2, check) == "true";
                     }
                     LiteEventLog.Write("multi_wake_send", new {
                         state, phase, visibleUserBubble = visible,
