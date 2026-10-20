@@ -9,6 +9,8 @@ internal sealed partial class ChatGptLiteForm
     private readonly System.Windows.Forms.Timer _chatWakeTimer = new() { Interval = 20000 };
     private bool _multiWakeEnabled;
     private bool _chatWakeBusy;
+    private System.Threading.Mutex? _multiWakeMutex;
+    private bool _ownsMultiWakeMutex;
     private readonly WebView2 _chatWakeWorker = new()
     {
         Size = new Size(980, 700), Location = new Point(0, 42),
@@ -24,22 +26,45 @@ internal sealed partial class ChatGptLiteForm
         try
         {
             var registered = LiteChatWakeRegistry.Read(); // migrates old pinned chat once
-            _multiWakeEnabled = true;
+            // Only one upgraded Lite window may supervise the shared user profile.
+            _multiWakeMutex = new System.Threading.Mutex(
+                false, @"Local\OpenBrowserLiteChatWake_v1");
+            try { _ownsMultiWakeMutex = _multiWakeMutex.WaitOne(0); }
+            catch (AbandonedMutexException) { _ownsMultiWakeMutex = true; }
+            _multiWakeEnabled = true; // suppress legacy sender in every instance
             Controls.Add(_chatWakeWorker);
             _chatWakeWorker.SendToBack();
             _chatWakeConfigure.Click += (_, _) => ConfigureCurrentChatWake();
             _chatWakeTimer.Tick += async (_, _) => await PollAllChatWakesAsync();
             UpdateMultiWakeStatus();
+            if (!_ownsMultiWakeMutex)
+                LiteEventLog.Write("multi_wake_secondary_window", new {
+                    supervisorActiveElsewhere = true
+                });
             LiteEventLog.Write("multi_wake_loaded", new {
                 chatCount = registered.Count, enabledCount = registered.Count(x => x.Enabled)
             });
         }
         catch (Exception ex)
         {
+            _multiWakeEnabled = true; // do not fall back to legacy single-chat sends
+            DisposeMultiWakeMutex();
             LiteEventLog.Write("multi_wake_load_failed",
                 new { errorType = ex.GetType().Name });
             _chatWakeConfigure.Text = "Błąd wybudzeń";
         }
+    }
+
+    private void DisposeMultiWakeMutex()
+    {
+        if (_ownsMultiWakeMutex && _multiWakeMutex is not null)
+        {
+            try { _multiWakeMutex.ReleaseMutex(); }
+            catch (ApplicationException) { /* process recovery owns cleanup */ }
+        }
+        _ownsMultiWakeMutex = false;
+        _multiWakeMutex?.Dispose();
+        _multiWakeMutex = null;
     }
 
     private void ToggleCurrentChatWake()
@@ -129,6 +154,11 @@ internal sealed partial class ChatGptLiteForm
     private void UpdateMultiWakeStatus()
     {
         if (!_multiWakeEnabled) return;
+        if (!_ownsMultiWakeMutex)
+        {
+            _devWakeStatus.Text = "Nadzór w innym oknie";
+            return;
+        }
         try
         {
             var entries = LiteChatWakeRegistry.Read();
@@ -237,62 +267,10 @@ internal sealed partial class ChatGptLiteForm
         UpdateMultiWakeStatus();
     }
 
-    private async Task<string> RetryWithNativeInputAsync(CoreWebView2 core,
-        string url, string text)
-    {
-        if (!LiteDevWakeState.IsChatUrl(core.Source) ||
-            LiteDevWakeState.NormalizeUrl(core.Source) != url)
-            return "cdp_wrong_chat";
-        // Select only the worker composer contents, never the visible user tab.
-        const string selectComposer = @"(() => {
-            const el = document.querySelector('#prompt-textarea,[data-testid=""composer-text-input""],textarea,[contenteditable=""true""]');
-            if (!el) return false;
-            el.focus();
-            if (typeof el.select === 'function') el.select();
-            else {
-                const range = document.createRange();
-                range.selectNodeContents(el);
-                const s = window.getSelection();
-                s.removeAllRanges(); s.addRange(range);
-            }
-            return true;
-        })()";
-        if (await core.ExecuteScriptAsync(selectComposer) != "true")
-            return "cdp_no_composer";
-        try
-        {
-            await core.CallDevToolsProtocolMethodAsync("Input.insertText",
-                JsonSerializer.Serialize(new { text }));
-            await Task.Delay(650);
-            const string clickSend = @"(() => {
-                const el = document.querySelector('#prompt-textarea,[data-testid=""composer-text-input""],textarea,[contenteditable=""true""]');
-                const form = el?.closest('form');
-                const btn = form?.querySelector('button[type=submit]:not([disabled])') ||
-                    document.querySelector('[data-testid=""send-button""],button[aria-label=""Wyślij""],button[aria-label=""Send""],button[aria-label=""Send message""]');
-                if (!btn || btn.disabled || btn.getAttribute('aria-disabled') === 'true')
-                    return false;
-                btn.click(); return true;
-            })()";
-            if (await core.ExecuteScriptAsync(clickSend) == "true")
-                return "cdp_native_input_click";
-            // Deliver a real browser-level Enter, not an untrusted JS KeyboardEvent.
-            const string enterDown = "{\"type\":\"keyDown\",\"key\":\"Enter\",\"code\":\"Enter\",\"windowsVirtualKeyCode\":13}";
-            const string enterUp = "{\"type\":\"keyUp\",\"key\":\"Enter\",\"code\":\"Enter\",\"windowsVirtualKeyCode\":13}";
-            await core.CallDevToolsProtocolMethodAsync("Input.dispatchKeyEvent", enterDown);
-            await core.CallDevToolsProtocolMethodAsync("Input.dispatchKeyEvent", enterUp);
-            return "cdp_native_enter";
-        }
-        catch (Exception ex)
-        {
-            LiteEventLog.Write("multi_wake_cdp_failed",
-                new { errorType = ex.GetType().Name });
-            return "cdp_failed";
-        }
-    }
-
     private async Task PollAllChatWakesAsync()
     {
-        if (!_multiWakeEnabled || _chatWakeBusy || IsDisposed) return;
+        if (!_multiWakeEnabled || !_ownsMultiWakeMutex ||
+            _chatWakeBusy || IsDisposed) return;
         _chatWakeBusy = true;
         try
         {
@@ -309,6 +287,7 @@ internal sealed partial class ChatGptLiteForm
             // Navigation and read-only checks do not count as send attempts.
             // Commit only after the target conversation is stable and eligible.
             string state = "unknown";
+            bool attemptCommitted = false;
             try
             {
                 await EnsureWakeWorkerAsync();
@@ -353,6 +332,7 @@ internal sealed partial class ChatGptLiteForm
                     due.DueUtc = now.AddMinutes(due.Minutes);
                     due.LastState = "attempting";
                     LiteChatWakeRegistry.Write(entries);
+                    attemptCommitted = true;
                     var key = LiteChatNotes.NormalizeKey(due.Url);
                     string text = LiteChatWakeRegistry.Message(due,
                         _noteStore.Load(key));
@@ -363,6 +343,24 @@ internal sealed partial class ChatGptLiteForm
                         JsonSerializer.Serialize(receipt) + ",true)";
                     var result = await _chatWakeWorker.CoreWebView2.ExecuteScriptAsync(js);
                     state = JsonSerializer.Deserialize<string>(result) ?? "sender_missing";
+                    if (state.StartsWith("busy_", StringComparison.Ordinal) ||
+                        state is "missing_composer" or "invalid" or "already_attempted")
+                    {
+                        // Confirmed no editor submission: release the answer fence,
+                        // unlike an unacknowledged click where outcome is uncertain.
+                        entries = LiteChatWakeRegistry.Read();
+                        var unsent = entries.FirstOrDefault(x => x.Url == due.Url);
+                        if (unsent is not null && unsent.LastAttemptUtc == now)
+                        {
+                            unsent.LastAnswerFingerprint = "";
+                            unsent.DueUtc = now.AddMinutes(2);
+                            unsent.LastState = "waiting_" + state;
+                            LiteChatWakeRegistry.Write(entries);
+                        }
+                        LiteEventLog.Write("multi_wake_definitely_unsent",
+                            new { reason = state });
+                        return;
+                    }
                     // Page timers may be throttled when the worker is occluded.
                     // Flush submission explicitly from the host, with no dependence
                     // on requestAnimationFrame or setTimeout in the page.
@@ -374,7 +372,8 @@ internal sealed partial class ChatGptLiteForm
                             "window.__OPENBROWSER_RESUME_SENDER__?.submitDirect(" +
                             JsonSerializer.Serialize(receipt) + ")");
                         phase = JsonSerializer.Deserialize<string>(flush) ?? "sender_missing";
-                        if (phase is "click_invoked" or "form_submitted" or "blocked_navigation")
+                        if (phase is "click_invoked" or "form_submitted" ||
+                            phase.StartsWith("blocked_", StringComparison.Ordinal))
                             break;
                     }
                     if (phase == "draft_button_missing")
@@ -403,9 +402,8 @@ internal sealed partial class ChatGptLiteForm
                             });
                         }
                         catch { /* diagnostics never prevent sending */ }
-                        phase = await RetryWithNativeInputAsync(
-                            _chatWakeWorker.CoreWebView2, due.Url, payload);
-                        await Task.Delay(3500);
+                        // Do not synthesize Enter or submit an unhydrated form.
+                        // The unique receipt was NOT confirmed as submitted.
                     }
                     bool visible = false;
                     if (state == "submission_requested")
@@ -430,8 +428,15 @@ internal sealed partial class ChatGptLiteForm
             {
                 state = "failed_" + ex.GetType().Name;
                 LiteEventLog.Write("multi_wake_failed", new {
-                    errorType = ex.GetType().Name
+                    errorType = ex.GetType().Name,
+                    submissionMayBeUncertain = attemptCommitted
                 });
+                if (!attemptCommitted)
+                {
+                    DeferWakeWithoutSend(due.Url, DateTimeOffset.UtcNow,
+                        "worker_exception");
+                    return;
+                }
             }
             // Merge against current DPAPI content: CLI/UI may have changed other chats meanwhile.
             entries = LiteChatWakeRegistry.Read();

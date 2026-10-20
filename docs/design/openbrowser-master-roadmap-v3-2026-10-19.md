@@ -2,6 +2,13 @@
 
 **Utworzono:** 2026-10-19, Europe/Warsaw. **Tryb pracy:** rozwój na SATANAMD, wydania PBOX1, bieżąca rozmowa Open Browser — rozwój aplikacji, techniczna synchronizacja Autosync. ŻADNYCH automatyzacji / przypominajek ChatGPT. **Zasady Git:** DO NOT COMMIT, bez ręcznego git push. Obecna kanoniczna ścieżka repo: `D:\projects\open-browser`. Dane konta/profil/sekrety nie opuszczają lokalnego profilu PBOX1.
 
+## Najnowszy status operacyjny: 2026-10-20 05:35 CEST
+
+- Obowiązuje rozszerzona architektura: osobne szyfrowane wybudzenie per jawnie włączony czat, nie jeden wyłączny czat. Każdy czat ustawia swój odstęp (20–1440 min), tekst i pauzę przez UI albo lokalne CLI; istniejący plan jednego czatu poniżej jest historycznym zakresem Fazy 0.
+- PBOX1 LIVE: v1.72.12 PID20736; dodatkowy stary proces v1.64 PID18064 wymaga diagnozy. Na 20.10 z 17 prób budzenia tylko 4 mają unikalny `receiptConfirmed=true`. Nie mylić kliknięcia `form_submitted` z dostarczeniem.
+- SOURCE v1.72.13: nowe testowalne preflight per czat, stabilna zakończona odpowiedź, brak szkicu/generowania, trwały fingerprint poprzedniej odpowiedzi, zatrzymanie tylko ukończonego czatu i odroczenie bez wysłania. Nadawca przestaje używać niesprawdzonego requestSubmit/CDP Enter. STAGED/LIVE QA jeszcze otwarte.
+- Zakres następny OB3-009/025/055/059/060/063. Checkpoint `docs/openbrowser-checkpoint-2026-10-20-0535-wake-preflight.md`. Stare checkpointy traktować jako historię, nie aktualny stan. Brak ręcznego commit/push i brak ChatGPT Tasks.
+
 ## Cel i mechanizm nocny
 
 Nadzór należy do **Open Browser Lite**. Co ~25 minut program obserwuje JEDEN przypięty czat (konkretne `https://chatgpt.com/c/{id}`) i tylko gdy ostatnia odpowiedź jest ukończona, model ma High, UI nie generuje, nie ma błędu ani niewysłanego tekstu, może wysłać JEDEN prosty komunikat:

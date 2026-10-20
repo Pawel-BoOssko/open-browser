@@ -146,6 +146,7 @@ internal sealed partial class ChatGptLiteForm : Form
             _resumeTimer.Stop();
             _devWakeTimer.Stop();
             _chatWakeTimer.Stop();
+            DisposeMultiWakeMutex();
             _highTimer.Stop();
             _pruneReportTimer.Stop();
             _noteSaveTimer.Stop();

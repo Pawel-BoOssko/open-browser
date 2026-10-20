@@ -243,4 +243,17 @@ function setup(options = {}) {
   assert.equal(p.sender.submitDirect(id), "click_invoked");
   assert.equal(p.count(), 1, "same receipt may click at most once");
 }
-console.log("LiteResumeSenderRace: 24 PASS");
+{
+  const p = setup();
+  assert.equal(p.sender.sendDirect(prompt, id, true), "submission_requested");
+  assert.equal(p.sender.submitDirect(id), "click_invoked",
+    "host-managed wake can submit without a page timer");
+  assert.equal(p.count(), 1);
+}
+{
+  const p = setup();
+  p.editor.innerText = "unsent owner text";
+  assert.equal(p.sender.sendDirect(prompt, id, true), "busy_draft_present");
+  assert.equal(p.count(), 0, "host-managed wake does not overwrite owner draft");
+}
+console.log("LiteResumeSenderRace: 26 PASS");

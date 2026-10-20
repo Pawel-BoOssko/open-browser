@@ -204,7 +204,8 @@
   // can throttle page setTimeout, so delivery must not depend on that timer.
   function submitDirect(receiptId) {
     const previous = phases.get(receiptId);
-    if (previous === "click_invoked" || previous === "form_submitted")
+    if (previous === "click_invoked" || previous === "form_submitted" ||
+        previous?.startsWith("blocked_"))
       return previous;
     const pending = directPending.get(receiptId);
     if (!pending) return "unknown_receipt";
