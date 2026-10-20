@@ -2,6 +2,10 @@
 
 **Utworzono:** 2026-10-19, Europe/Warsaw. **Tryb pracy:** rozwój na SATANAMD, wydania PBOX1, bieżąca rozmowa Open Browser — rozwój aplikacji, techniczna synchronizacja Autosync. ŻADNYCH automatyzacji / przypominajek ChatGPT. **Zasady Git:** DO NOT COMMIT, bez ręcznego git push. Obecna kanoniczna ścieżka repo: `D:\projects\open-browser`. Dane konta/profil/sekrety nie opuszczają lokalnego profilu PBOX1.
 
+## Stan SOURCE 2026-10-20 06:27 CEST
+
+- LIVE PBOX1 v1.72.15, niezależny worker książki pokazuje poprawny adres i edytor, lecz **zero faktycznych elementów rozmowy** w DOM przy preflight. Naprawa SOURCE 1.72.16: nawigacja wymaga również węzłów wiadomości (DIL/legacy), odroczenie zamiast wklejenia do pustej powłoki; diagnostyka liczb bez treści. Test Release i sender 26 PASS, brak QA LIVE. Następne OB3-009/055/059/063: zweryfikować reakcję na pustą powłokę i rzeczywistą wysyłkę na dwie osobne rozmowy. Checkpoint docs/openbrowser-checkpoint-2026-10-20-0619-live-v17214-preflight.md.
+
 ## Stan LIVE 2026-10-20 06:19 CEST
 
 - PBOX1 v1.72.14 PID18424 uruchomiona 06:14 po potwierdzonym graceful close wcześniejszej 1.72.12; lokalny skrypt wycofania, kopia szyfrowanej konfiguracji. Starsze okno 1.64 niezmienione. Dwa harmonogramy osobne i aktywne.

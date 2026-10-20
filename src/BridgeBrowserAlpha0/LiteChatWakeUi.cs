@@ -223,10 +223,51 @@ internal sealed partial class ChatGptLiteForm
                 if (core.Source is null ||
                     !LiteDevWakeState.IsChatUrl(core.Source) ||
                     LiteDevWakeState.NormalizeUrl(core.Source) != url) return false;
+                // A composer can render before the selected conversation
+                // has loaded. Never type into a shell with zero chat turns.
                 string found = await ExecuteWorkerScriptAsync(core,
-                    "!!document.querySelector('#prompt-textarea,[data-testid=\"composer-text-input\"],textarea,[contenteditable=\"true\"]')");
+                    "(() => !!document.querySelector('#prompt-textarea,[data-testid=\"composer-text-input\"],textarea,[contenteditable=\"true\"]') " +
+                    "&& !!document.querySelector('[data-user-message-bubble],[data-message-author-role],[data-chatgpt-selection-message-id]'))()");
                 if (found == "true") return true;
                 await Task.Delay(700);
+            }
+            // Metadata-only diagnostic for app shell rendered without history.
+            try
+            {
+                const string countJs = @"JSON.stringify({
+                    bodyChars:document.body?.innerText?.length||0,
+                    mainCount:document.querySelectorAll('main').length,
+                    chatTurns:document.querySelectorAll('[data-testid^=""conversation-turn-""]').length,
+                    articles:document.querySelectorAll('article').length,
+                    userBubbles:document.querySelectorAll('[data-user-message-bubble]').length,
+                    assistantBubbles:document.querySelectorAll('[data-chatgpt-selection-message-id]').length,
+                    logInLinks:document.querySelectorAll('a[href*=""/auth/login""]').length,
+                    ready:document.readyState
+                })";
+                var encoded = await ExecuteWorkerScriptAsync(core, countJs);
+                var metadata = JsonSerializer.Deserialize<string>(encoded);
+                if (!string.IsNullOrEmpty(metadata))
+                {
+                    using var parsed = JsonDocument.Parse(metadata);
+                    var v = parsed.RootElement;
+                    LiteEventLog.Write("multi_wake_history_not_ready", new {
+                        domWaitSeconds = 25,
+                        bodyChars = v.GetProperty("bodyChars").GetInt32(),
+                        mainCount = v.GetProperty("mainCount").GetInt32(),
+                        chatTurns = v.GetProperty("chatTurns").GetInt32(),
+                        articles = v.GetProperty("articles").GetInt32(),
+                        userBubbles = v.GetProperty("userBubbles").GetInt32(),
+                        assistantBubbles = v.GetProperty("assistantBubbles").GetInt32(),
+                        logInLinks = v.GetProperty("logInLinks").GetInt32(),
+                        ready = v.GetProperty("ready").GetString()
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                LiteEventLog.Write("multi_wake_history_not_ready", new {
+                    domWaitSeconds = 25, diagnosticError = ex.GetType().Name
+                });
             }
             return false;
         }

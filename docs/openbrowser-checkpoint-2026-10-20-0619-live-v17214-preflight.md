@@ -33,3 +33,11 @@ Every stated LIVE or real-delivery claim must match an observed process, test or
 - Expanded observation schema with LastAssistantChars and UserNodeCount; backwards compatible.
 - SATANAMD Release publish exit0 and all 16 JS test suites passed at 06:19:15. Next existing Autosync due about 06:20:56, then isolated PBOX build and safe graceful deploy after staged verification.
 - Pending: examine real metadata, fix root cause (not simply bypass all guards), then confirm a unique book receipt, notes inclusion, two independent natural wake cycles and durable once-per-answer fencing. New version 1.72.15 SOURCE ONLY at this checkpoint.
+
+## 2026-10-20 06:27 CEST, root cause narrowed, SOURCE v1.72.16
+
+- Real PBOX1 LIVE 1.72.15 PID24672 after second successful graceful deploy at 06:22:57; old 1.72.14 PID18424 closed normally and fallback script exited 0. Legacy separate dev v1.64 PID18064 left untouched. Source autosync snapshot c5a522d.
+- Initial book preflight 1.72.15 event at 06:25:06: targetMatches=true, composer=true, but firstRole=secondRole=unknown, firstChars=secondChars=0, assistantNodes=userNodes=turns=0, generating=false, toolBusy=false, draft=false, error=false. Thus ChatGPT editor shell had rendered at target URL, but **zero conversation messages existed in the worker DOM**. Do not misreport this as a genuinely unfinished answer. Prior implementation treated composer alone as navigation readiness. The worker correctly did not send.
+- Production event metadata contains no chat content or target IDs; inferred source is book schedule because of configured due. At this point book remains waiting_assistant_not_complete; no unverified send.
+- New source **v1.72.16** changes NavigateWorkerAsync readiness: wait for both composer AND at least one ChatGPT user/assistant conversation DOM element (legacy or DIL) during bounded ~25s polling after navigation. A rendered empty shell is no longer accepted. At timeout log only metadata counts: bodyChars, main, conversation turns, articles, DIL user/assistant bubbles, login link count, document.readyState; never text. If history never appears, return false and defer without sending.
+- SATANAMD Release publish 0 errors and sender JS 26 PASS at 06:27:34. **v1.72.16 SOURCE only** until Autosync/PBOX1 build+real QA. No ChatGPT Tasks, manual Git commit/push or indiscriminate kills.
