@@ -156,9 +156,12 @@ internal sealed partial class ChatGptLiteForm
         await _chatWakeWorker.EnsureCoreWebView2Async(env);
         var scriptPath = Path.Combine(AppContext.BaseDirectory, "LiteResumeSender.js");
         var script = await File.ReadAllTextAsync(scriptPath);
+        var probeScript = await File.ReadAllTextAsync(
+            Path.Combine(AppContext.BaseDirectory, "LiteResumeProbe.js"));
         var core = _chatWakeWorker.CoreWebView2
             ?? throw new InvalidOperationException("Background WebView2 not initialized");
         await core.AddScriptToExecuteOnDocumentCreatedAsync(script);
+        await core.AddScriptToExecuteOnDocumentCreatedAsync(probeScript);
         core.Settings.AreDevToolsEnabled = false;
         LiteEventLog.Write("multi_wake_worker_initialized");
     }
@@ -189,6 +192,49 @@ internal sealed partial class ChatGptLiteForm
             return false;
         }
         finally { core.NavigationCompleted -= OnCompleted; }
+    }
+
+    private async Task<LiteChatWakePreflight.Observation?> ReadWorkerObservationAsync(
+        CoreWebView2 core)
+    {
+        const string script = "window.__OPENBROWSER_RESUME_PROBE__ ? " +
+            "JSON.stringify(window.__OPENBROWSER_RESUME_PROBE__.observe()) : null";
+        string result = await core.ExecuteScriptAsync(script);
+        string? json = JsonSerializer.Deserialize<string>(result);
+        return string.IsNullOrEmpty(json) ? null :
+            JsonSerializer.Deserialize<LiteChatWakePreflight.Observation>(json,
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+    }
+
+    private async Task<(string Reason, string Hash, bool Complete)>
+        CheckWorkerPreflightAsync(CoreWebView2 core, string url, string previousHash)
+    {
+        var first = await ReadWorkerObservationAsync(core);
+        await Task.Delay(1500);
+        var second = await ReadWorkerObservationAsync(core);
+        string expectedPath = new Uri(url).AbsolutePath;
+        string reason = LiteChatWakePreflight.Eligibility(
+            first, second, expectedPath, previousHash);
+        string answer = second?.Text ?? "";
+        string hash = reason == "ready" ?
+            LiteChatWakePreflight.Fingerprint(answer) : "";
+        return (reason, hash,
+            reason == "ready" && LiteChatWakePreflight.IsCompletion(answer));
+    }
+
+    private void DeferWakeWithoutSend(string url, DateTimeOffset now,
+        string reason, int minutes = 2)
+    {
+        var registered = LiteChatWakeRegistry.Read();
+        var entry = registered.FirstOrDefault(c => c.Url == url && c.Enabled);
+        if (entry is null) return;
+        entry.DueUtc = now.AddMinutes(minutes);
+        entry.LastState = "waiting_" + reason;
+        LiteChatWakeRegistry.Write(registered);
+        LiteEventLog.Write("multi_wake_preflight_skipped", new {
+            reason, retryMinutes = minutes, definitelyNotSent = true
+        });
+        UpdateMultiWakeStatus();
     }
 
     private async Task<string> RetryWithNativeInputAsync(CoreWebView2 core,
@@ -260,19 +306,53 @@ internal sealed partial class ChatGptLiteForm
                 LiteEventLog.Write("multi_wake_deferred", new { reason = "notes_save_failed" });
                 return;
             }
-            // Commit a single attempt BEFORE touching a browser; the user tab is unaffected.
-            due.LastAttemptUtc = now;
-            due.DueUtc = now.AddMinutes(due.Minutes);
-            due.LastState = "attempting";
-            LiteChatWakeRegistry.Write(entries);
+            // Navigation and read-only checks do not count as send attempts.
+            // Commit only after the target conversation is stable and eligible.
             string state = "unknown";
             try
             {
                 await EnsureWakeWorkerAsync();
                 if (!await NavigateWorkerAsync(due.Url))
-                    state = "background_navigation_failed";
+                {
+                    DeferWakeWithoutSend(due.Url, now, "background_navigation_failed");
+                    return;
+                }
                 else
                 {
+                    // Re-read the settings in case the operator paused the chat
+                    // while the worker was navigating.
+                    entries = LiteChatWakeRegistry.Read();
+                    var selected = entries.FirstOrDefault(x => x.Url == due.Url);
+                    if (selected is null || !selected.Enabled ||
+                        selected.DueUtc > DateTimeOffset.UtcNow)
+                        return;
+                    due = selected;
+                    var preflight = await CheckWorkerPreflightAsync(
+                        _chatWakeWorker.CoreWebView2, due.Url,
+                        due.LastAnswerFingerprint);
+                    if (preflight.Complete)
+                    {
+                        due.Enabled = false;
+                        due.LastState = "complete";
+                        LiteChatWakeRegistry.Write(entries);
+                        LiteEventLog.Write("multi_wake_completed");
+                        UpdateMultiWakeStatus();
+                        return;
+                    }
+                    if (preflight.Reason != "ready")
+                    {
+                        DeferWakeWithoutSend(due.Url, now, preflight.Reason,
+                            preflight.Reason == "same_answer_already_woken"
+                                ? due.Minutes : 2);
+                        return;
+                    }
+                    // Durable fingerprint fences uncertain sends: never resend
+                    // for an unchanged assistant answer after a crash/restart.
+                    due.LastAnswerFingerprint = preflight.Hash;
+                    due.LastAttemptUtc = now;
+                    due.DueUtc = now.AddMinutes(due.Minutes);
+                    due.LastState = "attempting";
+                    LiteChatWakeRegistry.Write(entries);
                     var key = LiteChatNotes.NormalizeKey(due.Url);
                     string text = LiteChatWakeRegistry.Message(due,
                         _noteStore.Load(key));
@@ -280,7 +360,7 @@ internal sealed partial class ChatGptLiteForm
                     string payload = "[OB-" + receipt + "]\n" + text;
                     string js = "window.__OPENBROWSER_RESUME_SENDER__?.sendDirect(" +
                         JsonSerializer.Serialize(payload) + "," +
-                        JsonSerializer.Serialize(receipt) + ")";
+                        JsonSerializer.Serialize(receipt) + ",true)";
                     var result = await _chatWakeWorker.CoreWebView2.ExecuteScriptAsync(js);
                     state = JsonSerializer.Deserialize<string>(result) ?? "sender_missing";
                     // Page timers may be throttled when the worker is occluded.

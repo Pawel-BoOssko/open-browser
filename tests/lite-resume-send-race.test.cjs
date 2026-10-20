@@ -51,7 +51,7 @@ function setup(options = {}) {
     }
   };
   const win = {
-    document: doc, location: { hostname: "chatgpt.com", pathname: "/c/test" },
+    document: doc, location: { hostname: "chatgpt.com", pathname: "/c/11111111-2222-3333-4444-555555555555" },
     setTimeout(callback) { scheduled = callback; },
     HTMLTextAreaElement: function() {}
   };
@@ -195,10 +195,9 @@ function setup(options = {}) {
 {
   const p = setup();
   p.setBusy(true);
-  assert.equal(p.sender.sendDirect(prompt, id), 'submission_requested',
-    'direct sender bypasses the former generation/ACK preflight');
-  p.run();
-  assert.equal(p.count(), 1, 'direct sender still attempts click');
+  assert.equal(p.sender.sendDirect(prompt, id), 'busy_generating',
+    'direct sender must not interrupt active generation');
+  assert.equal(p.count(), 0, 'no click while generating');
 }
 {
   const p = setup({ formButton: true, missingSendButton: true });
@@ -216,4 +215,32 @@ function setup(options = {}) {
     'missing Send button is reported instead of pretending to send');
   assert.equal(p.count(), 0);
 }
-console.log("LiteResumeSenderRace: 20 PASS");
+{
+  const p = setup();
+  p.editor.innerText = "private draft";
+  assert.equal(p.sender.sendDirect(prompt, id), "busy_draft_present");
+  assert.equal(p.count(), 0, "direct sender preserves user draft");
+}
+{
+  const p = setup();
+  assert.equal(p.sender.sendDirect(prompt, id), "submission_requested");
+  p.editor.innerText = "user changed draft";
+  assert.equal(p.sender.submitDirect(id), "blocked_editor_changed");
+  assert.equal(p.count(), 0, "no click after editor was changed");
+}
+{
+  const p = setup();
+  assert.equal(p.sender.sendDirect(prompt, id), "submission_requested");
+  p.setBusy(true);
+  assert.equal(p.sender.submitDirect(id), "blocked_generation");
+  assert.equal(p.count(), 0, "no click when generation started after injection");
+}
+{
+  const p = setup();
+  assert.equal(p.sender.sendDirect(prompt, id), "submission_requested");
+  assert.equal(p.sender.submitDirect(id), "click_invoked");
+  assert.equal(p.sender.sendDirect(prompt, id), "already_attempted");
+  assert.equal(p.sender.submitDirect(id), "click_invoked");
+  assert.equal(p.count(), 1, "same receipt may click at most once");
+}
+console.log("LiteResumeSenderRace: 24 PASS");

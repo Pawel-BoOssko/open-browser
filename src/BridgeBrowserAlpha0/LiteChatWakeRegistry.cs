@@ -15,6 +15,7 @@ internal static class LiteChatWakeRegistry
         public DateTimeOffset DueUtc { get; set; }
         public DateTimeOffset LastAttemptUtc { get; set; }
         public string LastState { get; set; } = "armed";
+        public string LastAnswerFingerprint { get; set; } = "";
         public string Prompt { get; set; } = "";
     }
 
@@ -60,7 +61,10 @@ internal static class LiteChatWakeRegistry
             foreach (var c in store.Chats)
             {
                 if (!LiteDevWakeState.IsChatUrl(c.Url) || !urls.Add(c.Url) ||
-                    c.Minutes is < 20 or > 1440 || c.Prompt.Length > 16000)
+                    c.Minutes is < 20 or > 1440 || c.Prompt.Length > 16000 ||
+                    (c.LastAnswerFingerprint.Length != 0 &&
+                     (c.LastAnswerFingerprint.Length != 64 ||
+                      !c.LastAnswerFingerprint.All(Uri.IsHexDigit))))
                     throw new InvalidDataException("Invalid scheduled chat");
             }
             return store.Chats;
@@ -72,7 +76,10 @@ internal static class LiteChatWakeRegistry
     {
         if (chats.Count > 48 || chats.Any(c =>
             !LiteDevWakeState.IsChatUrl(c.Url) || c.Minutes is < 20 or > 1440 ||
-            c.Prompt.Length > 16000) ||
+            c.Prompt.Length > 16000 ||
+            (c.LastAnswerFingerprint.Length != 0 &&
+             (c.LastAnswerFingerprint.Length != 64 ||
+              !c.LastAnswerFingerprint.All(Uri.IsHexDigit)))) ||
             chats.Select(c => c.Url).Distinct(StringComparer.Ordinal).Count() != chats.Count)
             throw new InvalidDataException("Invalid chat wakes");
         var plain = JsonSerializer.SerializeToUtf8Bytes(new Store { Chats = chats });
@@ -102,6 +109,7 @@ internal static class LiteChatWakeRegistry
         entry.Minutes = minutes;
         entry.Prompt = prompt;
         entry.DueUtc = now.AddMinutes(minutes);
+        entry.LastAnswerFingerprint = ""; // explicit reconfiguration permits one fresh wake
         entry.LastState = "armed";
         return entry;
     }
@@ -140,7 +148,11 @@ internal static class LiteChatWakeRegistry
             if (!Message(list[1], "Zarys bohatera").Contains("Zarys bohatera")) return 4;
             if (Message(list[1], "").Contains("Notatki właściciela")) return 5;
             if (!Message(list[0], new string('x', 25000)).Contains("Dalsza część")) return 6;
-            return 0;
+            list[0].LastAnswerFingerprint = new string('A', 64);
+            Configure(list, a, 25, "Renewed project work", now);
+            if (list[0].LastAnswerFingerprint != "") return 7;
+            int preflight = LiteChatWakePreflight.SelfTest();
+            return preflight == 0 ? 0 : 10 + preflight;
         }
         catch { return 7; }
     }

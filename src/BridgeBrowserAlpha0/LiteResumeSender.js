@@ -140,12 +140,21 @@
   }
   // Bring back the pre-Lite direct editor injection path. Delivery auditing is
   // intentionally not a prerequisite for trying the Send action.
-  function sendDirect(text, receiptId) {
+  function sendDirect(text, receiptId, hostManaged = false) {
+    if (!/^\/c\/[a-z0-9-]{30,80}$/.test(w.location.pathname) ||
+        !/^[a-f0-9]{32}$/.test(receiptId) ||
+        typeof text !== "string" || text.length < 16 || text.length > 45000)
+      return "invalid";
+    if (hasAck(receiptId)) return "already_visible";
+    if (attempted.has(receiptId)) return "already_attempted";
+    const reason = busyReason();
+    if (reason) return "busy_" + reason;
     const el = composer();
     if (!el) return "missing_composer";
     const targetPath = w.location.pathname;
-    const payload = String(text || "");
-    directPending.set(receiptId, { editor: el, path: targetPath });
+    const payload = text;
+    attempted.add(receiptId);
+    directPending.set(receiptId, { editor: el, path: targetPath, payload });
     el.focus();
     try {
       if ("value" in el) {
@@ -164,10 +173,15 @@
     }
     phases.set(receiptId, "direct_injected");
     const trySubmit = (remaining) => {
-      if (phases.get(receiptId) === "click_invoked" ||
-          phases.get(receiptId) === "form_submitted") return;
+      const phaseNow = phases.get(receiptId) || "";
+      if (phaseNow === "click_invoked" || phaseNow === "form_submitted" ||
+          phaseNow.startsWith("blocked_")) return;
       if (w.location.pathname !== targetPath) {
         phases.set(receiptId, "blocked_navigation"); return;
+      }
+      if (composer() !== el || busy() ||
+          !samePayload(el.value || el.innerText || el.textContent, payload)) {
+        phases.set(receiptId, "blocked_changed_or_busy"); return;
       }
       const form = el.closest?.("form") || w.document.querySelector("form[data-chatgpt-composer]");
       const btn = sendButton(el) ||
@@ -178,15 +192,12 @@
         phases.set(receiptId, "click_invoked");
       } else if (remaining > 0) {
         w.setTimeout(() => trySubmit(remaining - 1), 250);
-      } else if (typeof form?.requestSubmit === "function") {
-        form.requestSubmit();
-        phases.set(receiptId, "form_submitted");
       } else {
-        // Synthetic Enter is not reliable for ChatGPT's React composer.
+        // requestSubmit on an unhydrated React form is not evidence of delivery.
         phases.set(receiptId, "draft_button_missing");
       }
     };
-    w.setTimeout(() => trySubmit(6), 500);
+    if (!hostManaged) w.setTimeout(() => trySubmit(6), 500);
     return "submission_requested";
   }
   // Called synchronously by the host after an awaited delay. Background tabs
@@ -202,6 +213,18 @@
       return "blocked_navigation";
     }
     const el = pending.editor;
+    if (composer() !== el) {
+      phases.set(receiptId, "blocked_editor_replaced");
+      return "blocked_editor_replaced";
+    }
+    if (busy()) {
+      phases.set(receiptId, "blocked_generation");
+      return "blocked_generation";
+    }
+    if (!samePayload(el.value || el.innerText || el.textContent, pending.payload)) {
+      phases.set(receiptId, "blocked_editor_changed");
+      return "blocked_editor_changed";
+    }
     const form = el.closest?.("form") ||
       w.document.querySelector("form[data-chatgpt-composer]");
     const button = sendButton(el) ||
@@ -213,11 +236,7 @@
       phases.set(receiptId, "click_invoked");
       return "click_invoked";
     }
-    if (typeof form?.requestSubmit === "function") {
-      form.requestSubmit();
-      phases.set(receiptId, "form_submitted");
-      return "form_submitted";
-    }
+    // Fail closed rather than silently submitting a stale or unhydrated form.
     return "draft_button_missing";
   }
   w.__OPENBROWSER_RESUME_SENDER__ = { send, sendDirect, submitDirect, hasAck, diagnose, phase };
