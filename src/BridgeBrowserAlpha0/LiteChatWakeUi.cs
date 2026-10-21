@@ -398,6 +398,32 @@ internal sealed partial class ChatGptLiteForm
                         UpdateMultiWakeStatus();
                         return;
                     }
+                    if (preflight.Reason == "draft_present")
+                    {
+                        // A previous attempt may have left OUR unique OB wake
+                        // in the editor. Retry only that draft, never user text.
+                        var encoded = await ExecuteWorkerScriptAsync(wakeCore,
+                            "window.__OPENBROWSER_RESUME_SENDER__?.submitOwnDraft()");
+                        var recovery = JsonSerializer.Deserialize<string>(encoded)
+                            ?? "sender_missing";
+                        if (recovery is "click_invoked" or "already_visible")
+                        {
+                            entries = LiteChatWakeRegistry.Read();
+                            var active = entries.FirstOrDefault(x => x.Url == due.Url);
+                            if (active is not null && active.Enabled)
+                            {
+                                active.LastState = recovery == "click_invoked"
+                                    ? "own_draft_clicked_unconfirmed"
+                                    : "own_draft_already_visible";
+                                active.DueUtc = DateTimeOffset.UtcNow.AddMinutes(2);
+                                LiteChatWakeRegistry.Write(entries);
+                            }
+                            LiteEventLog.Write("multi_wake_own_draft_recovery",
+                                new { result = recovery, receiptConfirmed = recovery == "already_visible" });
+                            UpdateMultiWakeStatus();
+                            return;
+                        }
+                    }
                     if (preflight.Reason != "ready")
                     {
                         DeferWakeWithoutSend(due.Url, now, preflight.Reason,

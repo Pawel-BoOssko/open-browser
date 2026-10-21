@@ -240,5 +240,27 @@
     // Fail closed rather than silently submitting a stale or unhydrated form.
     return "draft_button_missing";
   }
-  w.__OPENBROWSER_RESUME_SENDER__ = { send, sendDirect, submitDirect, hasAck, diagnose, phase };
+  // Recover only our own persisted wake draft after a stopped or interrupted
+  // send. Never touch ordinary user text. The host still confirms delivery.
+  function submitOwnDraft() {
+    if (busy()) return "busy_generating";
+    const el = composer();
+    if (!el) return "missing_composer";
+    const value = String(el.value || el.innerText || el.textContent || "");
+    const match = /^\[OB-([a-f0-9]{32})\]\s*\n[\s\S]{16,45000}$/.exec(value);
+    if (!match) return "not_own_draft";
+    if (hasAck(match[1])) return "already_visible";
+    const form = el.closest?.("form") ||
+      w.document.querySelector("form[data-chatgpt-composer]");
+    const btn = sendButton(el) ||
+      form?.querySelector?.('button[type="submit"]:not([disabled])') ||
+      w.document.querySelector('[data-testid="send-button"],button[aria-label="Wyślij"],button[aria-label="Send"],button[aria-label="Send message"]');
+    if (!btn || btn.disabled || btn.getAttribute?.("aria-disabled") === "true")
+      return "draft_button_missing";
+    try {
+      btn.click();
+      return "click_invoked";
+    } catch (_) { return "click_failed"; }
+  }
+  w.__OPENBROWSER_RESUME_SENDER__ = { send, sendDirect, submitDirect, submitOwnDraft, hasAck, diagnose, phase };
 })(window);

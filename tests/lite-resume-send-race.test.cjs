@@ -277,4 +277,26 @@ function setup(options = {}) {
   assert.equal(p.sender.sendDirect(prompt, id, true), "invalid",
     "unexpected URL escape remains rejected");
 }
-console.log("LiteResumeSenderRace: 28 PASS");
+{
+  const p = setup({ formButton: true, missingSendButton: true });
+  p.editor.innerText = "[OB-" + id + "]\n" + prompt;
+  assert.equal(p.sender.submitOwnDraft(), "click_invoked",
+    "only a persisted own wake draft may be retried");
+  assert.equal(p.count(), 1);
+}
+{
+  const p = setup();
+  p.editor.innerText = "Private text of the user";
+  assert.equal(p.sender.submitOwnDraft(), "not_own_draft",
+    "never send an ordinary unsent owner draft");
+  assert.equal(p.count(), 0);
+}
+{
+  const p = setup();
+  p.editor.innerText = "[OB-" + id + "]\n" + prompt;
+  p.setBusy(true);
+  assert.equal(p.sender.submitOwnDraft(), "busy_generating",
+    "never submit a persisted draft during generation");
+  assert.equal(p.count(), 0);
+}
+console.log("LiteResumeSenderRace: 31 PASS");
