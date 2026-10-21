@@ -36,7 +36,7 @@
         if (error) break;
       }
     }
-    const stop = !!doc.querySelector('[data-testid="stop-button"],button[aria-label="Stop generating"],button[aria-label="Przerwij generowanie"]');
+    const stop = !!doc.querySelector('[data-testid="stop-button"],button[aria-label="Stop generating"],button[aria-label="Przerwij generowanie"],button[aria-label="Zatrzymaj"]');
     return {
       documentReady: doc.readyState,
       hasComposer: !!doc.querySelector('textarea,[contenteditable="true"]'),

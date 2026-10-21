@@ -16,7 +16,7 @@
     // Match the probe's supported Stop controls, including ChatGPT variants
     // that expose only an accessible label and no data-testid.
     const button = w.document.querySelector(
-      '[data-testid="stop-button"],button[aria-label*="Stop generating"],button[aria-label*="Przerwij generowanie"]');
+      '[data-testid="stop-button"],button[aria-label*="Stop generating"],button[aria-label*="Przerwij generowanie"],button[aria-label="Zatrzymaj"]');
     if (!button || button.disabled || button.hidden ||
         button.getAttribute?.('aria-hidden') === 'true') return false;
     if (typeof button.getClientRects === 'function' &&
@@ -141,7 +141,7 @@
   // Bring back the pre-Lite direct editor injection path. Delivery auditing is
   // intentionally not a prerequisite for trying the Send action.
   function sendDirect(text, receiptId, hostManaged = false) {
-    if (!/^\/c\/[a-z0-9-]{30,80}$/.test(w.location.pathname) ||
+    if (!/^\/c\/(?:[a-z0-9-]|%3[Aa]){30,80}$/.test(w.location.pathname) ||
         !/^[a-f0-9]{32}$/.test(receiptId) ||
         typeof text !== "string" || text.length < 16 || text.length > 45000)
       return "invalid";

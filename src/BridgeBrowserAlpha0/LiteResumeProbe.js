@@ -53,7 +53,7 @@
     const lastAssistant = parts.slice().reverse().find(isAssistant);
     const lastAssistantChars = visibleText(lastAssistant).length;
     const stop = !!d.querySelector(
-      '[data-testid="stop-button"],button[aria-label*="Stop generating"],button[aria-label*="Przerwij generowanie"]');
+      '[data-testid="stop-button"],button[aria-label*="Stop generating"],button[aria-label*="Przerwij generowanie"],button[aria-label="Zatrzymaj"]');
     // An unrelated busy sidebar must not suppress the current chat.
     const activeTurn = last?.closest?.('[data-testid^="conversation-turn-"]');
     const toolBusy = !!d.querySelector(
@@ -73,7 +73,11 @@
     // The centralized detector also checks short DIL assistant error placeholders.
     // User quotations are deliberately excluded by that detector.
     const responseError = w.__OPENBROWSER_RESPONSE_SIGNALS__?.read()?.visibleError;
-    const error = alertError || !!responseError;
+    // Old failed turns and stale toasts can persist in long DIL chats. A
+    // substantial, completed newest assistant reply supersedes old errors.
+    // A short current error placeholder is still treated as an error.
+    const error = !(role === 'assistant' && text.trim().length >= 180) &&
+      (alertError || !!responseError);
     const modelModes = Array.from(d.querySelectorAll('button')).slice(-45)
       .map(button => String(button.innerText || button.textContent || '').trim().toLowerCase())
       .filter(value => /^(high|instant|medium|extra high)$/.test(value));

@@ -79,3 +79,13 @@
 - [KEY FINDING] UIAutomation w foreground odczytuje przygotowany tekst z [OB-receipt] i przycisk Zatrzymaj przy edytorze. Aktualny LiteResumeProbe i LiteResumeSender nie rozpoznają tego wariantu Stop. Trzeba bezpiecznie wyjaśnić generowanie i własny niewysłany szkic; nie mnożyć kolejnych wiadomości.
 - [SOURCE v1.72.18] JS LiteResumeProbe pobiera assistant tekst przez innerText, następnie textContent i najbliższy element jednej tury. Test mixed 6 PASS, wszystkie suite JS pass, .NET Release build exit0. Nie wdrożono tej wersji.
 - [NEXT] Dodać rozpoznawanie Zatrzymaj i obsłużyć przygotowany własny szkic po ustaniu generowania. Test z faktycznie widocznym user bubble unique receipt; potem naturalne cykle. Dopiero po działaniu dwóch wake wrócić do DOM/RAM.
+
+## 2026-10-21 23:51–23:57: zgłoszenie: nieudane wybudzenie o 23:50
+
+- Właściciel: nie było automatycznego wznowienia o 23:50, więc wznowił ręcznie.
+- LIVE PBOX1 v1.72.17 PID20392 od 23:15, Responding=True o 23:52. Windows Keepalive 23:48:48 exit0, state=running, existingProcesses=1. Nie jest to awaria startu EXE.
+- Nadzorca co 2 minuty próbował kontynuacji: 23:38:26, 23:40:26, 23:42:26, 23:44:26, 23:46:26, 23:48:26 i 23:50:26, ale preflight response_error, bez wysyłki. O 23:50 ostatnia odpowiedź assistant miała 561 znaków, draft=true. O 23:52:26 po ręcznej czynności latest role user, assistant_not_complete.
+- Kod odczytu sygnałów błędów mógł rozpoznawać stare toasty/błędy z historii, zatrzymując automatyczną kontynuację nawet po nowej pełnej odpowiedzi.
+- SOURCE v1.72.19: zmieniono LiteResumeProbe.js: najnowsza, zakończona odpowiedź >=180 znaków nie jest blokowana starym sygnałem błędu; krótkie błędne odpowiedzi nadal są wykrywane. LiteResumeProbe.js, LiteResumeSender.js oraz LiteResponseSignal.js rozpoznają button aria-label=Zatrzymaj. Testy focused probe 9 PASS, sender 26 PASS, signals 10 PASS, całe node --test 16 plików exit0, dotnet Release exit0, 0 errors, znane MSB3277.
+- Windows Task PBOX1 poprawiony: StartWhenAvailable True, WakeToRun True, DisallowStartIfOnBatteries False, StopIfGoingOnBatteries False, IgnoreNew True. Nie ma jeszcze testu rzeczywistego wybudzenia systemu ze Sleep.
+- SOURCE 1.72.19 jeszcze nie LIVE: czeka na naturalny Autosync i kwalifikację na PBOX1. Niewysłany szkic draft=true jest niezależną przeszkodą i trzeba sprawdzić rzeczywisty stan edytora. Potwierdzenie delivery wymaga unikalnego user bubble i nowej odpowiedzi, nie samego click ani wpisania tekstu.

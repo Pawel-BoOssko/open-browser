@@ -14,9 +14,10 @@ function node(index, role, modern) {
       "data-chatgpt-selection-message-id" : "data-user-message-bubble"); }
   };
 }
-function observe(legacy, modern) {
+function observe(legacy, modern, options = {}) {
   const w = {
     location: { hostname: "chatgpt.com", pathname: "/c/00000000-1111-2222-3333-444444444444" },
+    __OPENBROWSER_RESPONSE_SIGNALS__: { read() { return { visibleError: options.responseError ? 'response_load_failed' : null }; } },
     document: {
       querySelectorAll(selector) {
         if (selector === "[data-message-author-role]") return legacy;
@@ -24,7 +25,10 @@ function observe(legacy, modern) {
         if (selector === "button") return [{ innerText: "High" }];
         return [];
       },
-      querySelector(selector) { return selector === '#prompt-textarea' ? {} : null; }
+      querySelector(selector) {
+        if (selector.includes('button[aria-label="Zatrzymaj"]')) return options.polishStop ? {} : null;
+        return selector === '#prompt-textarea' ? {} : null;
+      }
     }
   };
   vm.runInNewContext(source, { window: w });
@@ -78,4 +82,21 @@ function observe(legacy, modern) {
   const s = observe([], [a]);
   assert.equal(s.text, "Completed text from enclosing turn");
 }
-console.log("LiteResumeProbeMixed: 6 PASS");
+{
+  const a = node(1, "assistant", true);
+  a.innerText = "Completed assistant response. ".repeat(11);
+  const s = observe([], [a], { responseError: true });
+  assert.equal(s.error, false, "stale error must not block substantial newest assistant response");
+}
+{
+  const a = node(1, "assistant", true);
+  a.innerText = "Failed to load this response";
+  const s = observe([], [a], { responseError: true });
+  assert.equal(s.error, true, "short current failure must remain recognized");
+}
+{
+  const a = node(1, "assistant", true);
+  const s = observe([], [a], { polishStop: true });
+  assert.equal(s.generating, true, "Polish Stop button indicates active generation");
+}
+console.log("LiteResumeProbeMixed: 9 PASS");

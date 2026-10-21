@@ -39,6 +39,8 @@ function setup(options = {}) {
         return options.formButton ? form : null;
       if (selector === 'button[aria-label="Tryb głosowy"]') return voice;
       // Simulate a DIL Stop control identified by aria-label only.
+      if (options.polishStopLabel && selector.includes('aria-label="Zatrzymaj"'))
+        return busy ? {} : null;
       if (options.alternateStopLabel && selector.includes('stop-button'))
         return selector.includes('Stop generating') && busy ? {} : null;
       if (selector.includes("stop-button") || selector.includes("aria-busy"))
@@ -179,6 +181,13 @@ function setup(options = {}) {
   assert.equal(p.sender.phase(id), 'blocked_generation');
 }
 {
+  const p = setup({ polishStopLabel: true });
+  p.setBusy(true);
+  assert.equal(p.sender.sendDirect(prompt, id), 'busy_generating',
+    'Polish Zatrzymaj indicates generation, no draft injection');
+  assert.equal(p.count(), 0);
+}
+{
   const p = setup({ alternateStopLabel: true });
   p.setBusy(true);
   assert.equal(p.sender.send(prompt, id), 'busy_generating',
@@ -256,4 +265,16 @@ function setup(options = {}) {
   assert.equal(p.sender.sendDirect(prompt, id, true), "busy_draft_present");
   assert.equal(p.count(), 0, "host-managed wake does not overwrite owner draft");
 }
-console.log("LiteResumeSenderRace: 26 PASS");
+{
+  const p = setup();
+  p.win.location.pathname = "/c/abcdefabcdef%3A123456789012345678901234567890";
+  assert.equal(p.sender.sendDirect(prompt, id, true), "submission_requested",
+    "encoded colon in ChatGPT conversation ID must allow a wake");
+}
+{
+  const p = setup();
+  p.win.location.pathname = "/c/abcdefabcdef%2F123456789012345678901234567890";
+  assert.equal(p.sender.sendDirect(prompt, id, true), "invalid",
+    "unexpected URL escape remains rejected");
+}
+console.log("LiteResumeSenderRace: 28 PASS");
