@@ -68,3 +68,14 @@
 - [TEST] SATANAMD dotnet build Release: exit 0, 0 errors, znane warning MSB3277. Headless --lite-dev-wake-selftest, --lite-chat-wake-selftest, --lite-resume-selftest: exit 0 każde.
 - [LIVE] PBOX1 1.72.16 nadal bez potwierdzonej wysyłki; główne WebView2 na stronie startowej, ukryte WebView2 pokazuje rozmowę książki. Nie oznaczać P0 jako DONE.
 - [NEXT] Po Autosync wydać i kwalifikować 1.72.17 na PBOX1, z backupem i graceful deploy. Następnie rebind własnego czatu b7af... przez nową binarkę, pauza dawnych dwóch harmonogramów, jeden test due i następnie naturalny cykl z unikalnym receipt + checkpointem.
+
+## 2026-10-21 23:01–23:19: odzyskiwanie programu i autopraca
+
+- [LIVE_VERIFIED] Test Windows Keepalive o 23:01: zamknięto v1.72.16 PID16600, zadanie uruchomiło nowy proces PID7380, status launched, LastTaskResult=0, nowy proces odpowiada. To rzeczywisty test powrotu do działania.
+- [LIVE] Autosync 3ae7550 (23:01), niezależny PBOX1 publish 1.72.17 exit0, RELEASE_IDENTITY_OK, SHA256 04a7dfa4ace352bcd5284ca8c0c8aaf0016905224caa5166055d6348b0635eb7. Pięć testów headless plus izolowany WebView2 exit0. Kontrolowany deploy z backupem 23:07:46, wynik RESULT_NEW_HEALTHY, PID19112.
+- [CONFIG] Bieżący czat z 21:37, suffix b7af00a39c5f, ma kodowany dwukropek %3A, ale w profilu PBOX1 jest przekierowywany na pustą stronę startową ChatGPT. Wybrano dostępny chat projektu Open Browser Lite suffix 10ebfae59c8f, aktywny 20 min, z pełnym promptem do czytania planu i checkpointów.
+- [LIVE] Stare trzy harmonogramy b74, bb42, b7af są finalnie paused. 10eb aktywny. Kolejny test Keepalive po zamknięciu v1.72.17 PID19112 poprawnie uruchomił PID20392, status launched.
+- [WAKE FAILED] Wymuszono pojedyncze wake na 10eb; pierwsza próba foreground=true skończyła się TimeoutException 6500ms (na pewno niewysłane), retry po 2m. Druga próba o 23:18 przeszła preflight w załadowanej rozmowie (DOM 12 turns), ale sender wstawił unikalny receipt i polecenie tylko do EDYTORA. multi_wake_send: phase=draft_button_missing, receiptConfirmed=false, sendButtons=0, submitButtons=0. To NIE jest dostarczona wiadomość.
+- [KEY FINDING] UIAutomation w foreground odczytuje przygotowany tekst z [OB-receipt] i przycisk Zatrzymaj przy edytorze. Aktualny LiteResumeProbe i LiteResumeSender nie rozpoznają tego wariantu Stop. Trzeba bezpiecznie wyjaśnić generowanie i własny niewysłany szkic; nie mnożyć kolejnych wiadomości.
+- [SOURCE v1.72.18] JS LiteResumeProbe pobiera assistant tekst przez innerText, następnie textContent i najbliższy element jednej tury. Test mixed 6 PASS, wszystkie suite JS pass, .NET Release build exit0. Nie wdrożono tej wersji.
+- [NEXT] Dodać rozpoznawanie Zatrzymaj i obsłużyć przygotowany własny szkic po ustaniu generowania. Test z faktycznie widocznym user bubble unique receipt; potem naturalne cykle. Dopiero po działaniu dwóch wake wrócić do DOM/RAM.
