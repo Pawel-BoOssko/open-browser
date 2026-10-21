@@ -26,7 +26,7 @@ function createTest(turnCount, options = {}) {
       return nodes;
     },
     querySelector(selector) {
-      return options.busy && selector === '[aria-busy="true"]' ? {} : null;
+      return options.busy && selector === 'main [aria-busy="true"]' ? {} : null;
     },
     getElementById(id) { return styles.find(style => style.id === id) || null; },
     createElement(tag) { assert.equal(tag, "style"); return {}; },

@@ -202,11 +202,11 @@ internal sealed partial class ChatGptLiteForm
         await core.AddScriptToExecuteOnDocumentCreatedAsync(script);
         await core.AddScriptToExecuteOnDocumentCreatedAsync(probeScript);
         core.Settings.AreDevToolsEnabled = false;
-        // The hidden worker wakes chats only occasionally. Low is a best-effort
-        // WebView2 memory target; scripts and network traffic still run.
-        core.MemoryUsageTargetLevel = CoreWebView2MemoryUsageTargetLevel.Low;
+        // Keep worker responsive while loading a real conversation. Switch to
+        // Low only once the wake attempt ends and the worker is idle.
+        core.MemoryUsageTargetLevel = CoreWebView2MemoryUsageTargetLevel.Normal;
         LiteEventLog.Write("multi_wake_worker_initialized",
-            new { memoryTarget = "low" });
+            new { memoryTarget = "normal_active" });
     }
 
     private async Task<bool> NavigateWorkerAsync(string url)
@@ -372,7 +372,12 @@ internal sealed partial class ChatGptLiteForm
                 bool useForeground = foreground is not null &&
                     LiteDevWakeState.IsChatUrl(foreground.Source) &&
                     LiteDevWakeState.NormalizeUrl(foreground.Source) == due.Url;
-                if (!useForeground) await EnsureWakeWorkerAsync();
+                if (!useForeground)
+                {
+                    await EnsureWakeWorkerAsync();
+                    if (_chatWakeWorker.CoreWebView2 is { } workerCore)
+                        workerCore.MemoryUsageTargetLevel = CoreWebView2MemoryUsageTargetLevel.Normal;
+                }
                 var wakeCore = useForeground ? foreground! : _chatWakeWorker.CoreWebView2;
                 if (wakeCore is null || (!useForeground && !await NavigateWorkerAsync(due.Url)))
                 {
@@ -585,6 +590,21 @@ internal sealed partial class ChatGptLiteForm
             LiteEventLog.Write("multi_wake_scheduler_failed",
                 new { errorType = ex.GetType().Name });
         }
-        finally { _chatWakeBusy = false; }
+        finally
+        {
+            try
+            {
+                // One shared background worker, memory target reduced between
+                // chats. Never lower the visible chat's performance target.
+                if (_chatWakeWorker.CoreWebView2 is { } idleCore)
+                    idleCore.MemoryUsageTargetLevel = CoreWebView2MemoryUsageTargetLevel.Low;
+            }
+            catch (Exception ex)
+            {
+                LiteEventLog.Write("multi_wake_worker_memory_target_failed",
+                    new { errorType = ex.GetType().Name });
+            }
+            _chatWakeBusy = false;
+        }
     }
 }

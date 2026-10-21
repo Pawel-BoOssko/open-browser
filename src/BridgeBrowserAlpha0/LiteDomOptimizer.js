@@ -9,7 +9,7 @@
   const flag = "data-ob-lite-offscreen";
   const styleId = "openbrowser-lite-content-visibility";
   const state = {
-    enabled: true, supported: !!(global.CSS && global.CSS.supports &&
+    enabled: true, modernSoftEnabled: false, supported: !!(global.CSS && global.CSS.supports &&
       global.CSS.supports("content-visibility", "auto")),
     keepRecent: 40, minTurns: 60, turnCount: 0, optimized: 0,
     dilAssistantCount: 0, dilUserCount: 0,
@@ -19,8 +19,10 @@
   let timer = null;
 
   function busy() {
-    return !!(doc.querySelector('[aria-busy="true"]') ||
-      doc.querySelector('[data-testid="stop-button"]'));
+    // A sidebar may retain aria-busy even when the assistant is idle.
+    // Only an active response in main or a visible Stop control blocks CSS changes.
+    return !!(doc.querySelector('main [aria-busy="true"]') ||
+      doc.querySelector('[data-testid="stop-button"],button[aria-label="Zatrzymaj"]'));
   }
 
   function ensureStyle() {
@@ -30,6 +32,15 @@
     css.textContent = '[data-ob-lite-offscreen="1"] {' +
       'content-visibility:auto;contain-intrinsic-size:auto 360px;}';
     (doc.head || doc.documentElement).appendChild(css);
+  }
+
+  function safeModernBlock(node) {
+    if (!node || !['DIV', 'ARTICLE', 'SECTION'].includes(node.tagName))
+      return false;
+    const rect = node.getBoundingClientRect?.();
+    if (!rect || rect.height < 80) return false;
+    const display = global.getComputedStyle?.(node)?.display;
+    return display === 'block' || display === 'flex' || display === 'grid';
   }
 
   function check() {
@@ -50,7 +61,8 @@
         }
       }
       const turns = modern ? modernTurns : oldTurns;
-      state.domVariant = modern ? 'dil_observe_only' : 'legacy';
+      const maySoftModern = modern && state.modernSoftEnabled && oldTurns.length === 0;
+      state.domVariant = modern ? (maySoftModern ? 'dil_soft_pilot' : 'dil_observe_only') : 'legacy';
       state.turnCount = turns.length;
       // DIL role metadata only. A node matching both markers is a user bubble,
       // so the two role counters cannot exceed the total message count.
@@ -61,14 +73,15 @@
         !n.hasAttribute?.('data-user-message-bubble')).length;
       state.skippedBusy = busy();
       const mayOptimize = state.enabled && state.supported &&
-        !modern && !state.skippedBusy && turns.length >= state.minTurns;
+        (!modern || maySoftModern) && !state.skippedBusy && turns.length >= state.minTurns;
       if (mayOptimize) ensureStyle();
       const recentStart = Math.max(0, turns.length - state.keepRecent);
       let optimized = 0;
       for (let i = 0; i < turns.length; i++) {
         const turn = turns[i];
         const focused = !!(doc.activeElement && turn.contains(doc.activeElement));
-        const shouldOptimize = mayOptimize && i < recentStart && !focused;
+        const shouldOptimize = mayOptimize && i < recentStart && !focused &&
+          (!modern || safeModernBlock(turn));
         if (shouldOptimize) {
           if (turn.getAttribute(flag) !== "1") turn.setAttribute(flag, "1");
           optimized++;
@@ -91,9 +104,15 @@
     return check();
   }
 
+  function setModernSoftEnabled(value) {
+    state.modernSoftEnabled = value === true;
+    return check();
+  }
+
   function getStatus() {
     return {
-      enabled: state.enabled, supported: state.supported,
+      enabled: state.enabled, modernSoftEnabled: state.modernSoftEnabled,
+      supported: state.supported,
       keepRecent: state.keepRecent, turnCount: state.turnCount,
       dilAssistantCount: state.dilAssistantCount, dilUserCount: state.dilUserCount,
       optimized: state.optimized, domVariant: state.domVariant,
@@ -108,7 +127,8 @@
     if (!timer) timer = global.setInterval(check, 30000);
   }
 
-  global.__OPENBROWSER_LITE_DOM__ = { check, setEnabled, getStatus };
+  global.__OPENBROWSER_LITE_DOM__ = { check, setEnabled,
+    setModernSoftEnabled, getStatus };
   if (doc.readyState === "loading") {
     doc.addEventListener("DOMContentLoaded", begin, { once: true });
   } else begin();

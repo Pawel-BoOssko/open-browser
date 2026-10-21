@@ -20,3 +20,11 @@
 
 - Po uzyskaniu **dwóch niezależnych naturalnych wybudzeń** z receipt i nową odpowiedzią: pilotaż bezpiecznego DIL soft optimization, z pomiarami w trybie włączonym i wyłączonym.
 - Nie dodawać nowego collectora, ponieważ istniejące pliki `resources-YYYY-MM-DD.jsonl` i dashboard HTML zawierają potrzebne dane.
+
+## Postęp SOURCE 1.72.23 / 00:48
+
+- Pilotaż `LiteDomOptimizer.js`: opt-in `__OPENBROWSER_LITE_DOM__.setModernSoftEnabled(true)`. Przy co najmniej 60 nowoczesnych wiadomościach i bez legacy React wrappers zakłada `content-visibility:auto` wyłącznie na starsze niż 40 wiadomości elementy DIV/ARTICLE/SECTION w układzie blokowym, mające realną wysokość >=80px, bez fokusu i bez aktywnego generowania. Domyślnie **OFF**, wyłączenie usuwa wszystkie własne flagi. Nie usuwa treści ani node'ów i nie może samo w sobie ograniczyć liczby DOM nodes; teoretycznie może zmniejszyć pracę layout/paint.
+- 5 nowych testów pilotażu PASS, razem 20/20 testów JS PASS i C# Release build exit0 na SatanAMD. Rzeczywisty DOM QA nieprzeprowadzony; bez niego nie włączać dla głównej rozmowy.
+- Ukryty worker WebView2: normalny poziom zużycia pamięci podczas nawigacji/wysyłki, `Low` tylko w spoczynku po zakończeniu kroku. Oczekiwana oszczędność nie jest liczbą stałą; wymaga testu porównawczego w produkcji i nie może pogorszyć liczby potwierdzonych pobudek.
+- Kontrola PBOX1 LIVE v1.72.21 PID8216: próbki 00:45 i 00:47 mierzyły odpowiednio 649,5 i 637,4 MiB prywatnej pamięci wszystkich 7 procesów WebView2 Lite; największy renderer 469,8 i 458,4 MiB. Jest to ciągle **stan sprzed** wdrożenia SOURCE 1.72.23, nie dowód efektu zmiany.
+- Publikacja kandydata 1.72.22 na PBOX1 odmówiona przez zabezpieczenia narzędzia; brak dalszej próby po tej odmowie, kandydat 1.72.23 nie jest wdrożony.

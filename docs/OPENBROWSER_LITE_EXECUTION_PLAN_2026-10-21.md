@@ -1,9 +1,9 @@
 # Open Browser Lite: plan wykonawczy po przejęciu, 2026-10-21
 
-**Status 22.10.2026:** ACTIVE. PBOX1 LIVE v1.72.20, pierwszy faktyczny cykl automatycznej wiadomości zakończony dostawą 00:21; drugi niezależny naturalny cykl i własne potwierdzenie ACK nadal otwarte. Priorytet: niezawodna autokontynuacja, następnie RAM/DOM.  
+**Status 22.10.2026 00:48:** ACTIVE. DWA naturalne cykle autowybudzania potwierdzone (00:21 i 00:41, drugi receiptConfirmed=true), PBOX1 LIVE v1.72.21. Etap 0 dla jednego foreground czatu wstępnie zaliczony. Teraz główny priorytet: stabilny, lekki DOM/RAM; SOURCE v1.72.23 posiada domyślnie wyłączony pilot soft DIL i dynamiczny cel pamięci ukrytego worker. Gate produkcyjny oraz 8h soak nadal otwarte.  
 **Punkt wznowienia:** `docs/OPENBROWSER_LITE_HANDOFF_ODTWORZENIE_2026-10-21_ChatGPT.md`, aktualny checkpoint `docs/OPENBROWSER_LITE_WORK_STATUS_2026-10-21.md`.  
 **Dokument historyczny:** `docs/design/openbrowser-master-roadmap-v3-2026-10-19.md` ma 86 zadań. Nie traktować ich jako 86 równoległych priorytetów.  
-**Źródła aktualne 22.10 00:38:** SOURCE 1.72.22 SATANAMD; PBOX1 LIVE 1.72.20 PID8352; kandydat 1.72.21 STAGED z zadaniem Windows Pending Update aktywowanym dopiero po stanie Gotowe; Autosync ostatniego potwierdzonego wydania 1.72.21 b2b92ae. Najnowszy status i kolejne instrukcje: `docs/OPENBROWSER_LITE_WORK_STATUS_2026-10-21.md`.  
+**Źródła aktualne 22.10 00:48:** SOURCE 1.72.23 SATANAMD, PBOX1 LIVE 1.72.21 PID8216 (autodeploy po idle 00:41:44). Autosync e49c276 zawiera 1.72.22; publikacja na PBOX1 zablokowana przez narzędzie i nie została ponowiona. Ostatni dowód i następne kroki w `docs/OPENBROWSER_LITE_WORK_STATUS_2026-10-21.md`.  
 **Reguły:** bez ChatGPT Tasks, ręcznego commit/push, resetu dirty repo, masowego zamykania okien. Autosync dostarcza wersje źródłowe. Checkpoint po każdym etapie.
 
 ## Zasady produktu
@@ -16,9 +16,9 @@ Tylko jeden właściciel, maksymalnie kilkanaście rozmów (typowo 5–10), loka
 - [x] **OBL-0.2: Własny czat projektu**. Wyraźnie identyfikować URL aktualnego czatu projektowego (nie zgadywać na podstawie suffixu poprzedniego czatu); do rejestru przypisać `Enabled=true, Minutes=25`, tekst poniżej. Inne czaty zachowują ustawienia.
 - [ ] **OBL-0.3: Naprawa worker WebView2**. Obserwowany 21.10 defekt: 111 preflight + 118 skips, `composer=true`, `targetMatches=true`, 0 user/assistant/turn nodes. Wersja SOURCE 1.72.16 wymaga DOM historii i zapisuje liczby, ale nie przywraca gwarantowanie historii. Odróżnić niezhydratowaną powłokę od ukrytej/zalogowanej historii, skontrolować NavigationCompleted, gotowość rozpoznania DIL, dopiero realny test. Nie znosić sprawdzenia celu i aktywnego generowania.
 - [x] **OBL-0.4: Gate wydania**. Dla kandydata 1.72.16: pełne JS, .NET headless, izolowany WebView2, manifest SHA, przygotowanie backupu DPAPI, graceful switch z LIVE 1.72.15 przy idle, zachowanie fallbacku. Nie twierdzić, że folder kandydata = wdrożenie.
-- [ ] **OBL-0.5: Realne wybudzenie**. Właściwy czat projektu otrzymuje jeden unikalny `[OB-receipt]`, widać nową wiadomość użytkownika, następuje nowa odpowiedź modelu i powstaje następny checkpoint. Potem potwierdzić drugi naturalny cykl. Jeden czat w foreground, drugi w tle; osobna walidacja bez pomylenia rozmów.
+- [x] **OBL-0.5: Realne wybudzenie**. Właściwy czat projektu otrzymuje jeden unikalny `[OB-receipt]`, widać nową wiadomość użytkownika, następuje nowa odpowiedź modelu i powstaje następny checkpoint. Potem potwierdzić drugi naturalny cykl. Jeden czat w foreground, drugi w tle; osobna walidacja bez pomylenia rozmów.
 - [ ] **OBL-0.6: Recovery przerwań**. Jeśli odpowiedź modelu została przerwana, powtórny start czyta ten dokument i plik statusu. Raz na etap krótki, jawny zapis wyniku, PID, wersji, testów, blokad i następnego kroku. Powtarzanie niepewnych wysyłek: użytkownik w historii 19.10 preferuje rzadki dubel nad trwałe zatrzymanie, ale trzeba rozstrzygnąć dopiero po naprawieniu faktycznej wysyłki i zachować licznik prób.
-- [ ] **OBL-0.7: Stwierdzenie autonomii**. Dwa naturalne wybudzenia bez ręcznej interwencji użytkownika + checkpoints + brak wzrostu liczby okien. Dopiero wtedy przejście do priorytetu zasobowego i deklaracja, że autopraca działa.
+- [x] **OBL-0.7: Stwierdzenie autonomii tej rozmowy (wstępne)**. Dwa naturalne wybudzenia bez ręcznej interwencji użytkownika + checkpoints + brak wzrostu liczby okien. Dopiero wtedy przejście do priorytetu zasobowego i deklaracja, że autopraca działa.
 
 ### Tekst wybudzenia czatu projektu
 
