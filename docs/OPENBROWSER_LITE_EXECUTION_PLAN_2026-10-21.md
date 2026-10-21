@@ -3,7 +3,7 @@
 **Status 22.10.2026:** ACTIVE. PBOX1 LIVE v1.72.20, pierwszy faktyczny cykl automatycznej wiadomości zakończony dostawą 00:21; drugi niezależny naturalny cykl i własne potwierdzenie ACK nadal otwarte. Priorytet: niezawodna autokontynuacja, następnie RAM/DOM.  
 **Punkt wznowienia:** `docs/OPENBROWSER_LITE_HANDOFF_ODTWORZENIE_2026-10-21_ChatGPT.md`, aktualny checkpoint `docs/OPENBROWSER_LITE_WORK_STATUS_2026-10-21.md`.  
 **Dokument historyczny:** `docs/design/openbrowser-master-roadmap-v3-2026-10-19.md` ma 86 zadań. Nie traktować ich jako 86 równoległych priorytetów.  
-**Źródła:** historia rozmów i bezpośrednie polecenie użytkownika 21.10, obecne SOURCE 1.72.16, PBOX1 LIVE 1.72.15, logi 21.10, autosync f3240c7.  
+**Źródła aktualne 22.10 00:38:** SOURCE 1.72.22 SATANAMD; PBOX1 LIVE 1.72.20 PID8352; kandydat 1.72.21 STAGED z zadaniem Windows Pending Update aktywowanym dopiero po stanie Gotowe; Autosync ostatniego potwierdzonego wydania 1.72.21 b2b92ae. Najnowszy status i kolejne instrukcje: `docs/OPENBROWSER_LITE_WORK_STATUS_2026-10-21.md`.  
 **Reguły:** bez ChatGPT Tasks, ręcznego commit/push, resetu dirty repo, masowego zamykania okien. Autosync dostarcza wersje źródłowe. Checkpoint po każdym etapie.
 
 ## Zasady produktu

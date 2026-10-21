@@ -202,7 +202,11 @@ internal sealed partial class ChatGptLiteForm
         await core.AddScriptToExecuteOnDocumentCreatedAsync(script);
         await core.AddScriptToExecuteOnDocumentCreatedAsync(probeScript);
         core.Settings.AreDevToolsEnabled = false;
-        LiteEventLog.Write("multi_wake_worker_initialized");
+        // The hidden worker wakes chats only occasionally. Low is a best-effort
+        // WebView2 memory target; scripts and network traffic still run.
+        core.MemoryUsageTargetLevel = CoreWebView2MemoryUsageTargetLevel.Low;
+        LiteEventLog.Write("multi_wake_worker_initialized",
+            new { memoryTarget = "low" });
     }
 
     private async Task<bool> NavigateWorkerAsync(string url)
