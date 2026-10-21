@@ -212,27 +212,32 @@ internal sealed partial class ChatGptLiteForm
             new { memoryTarget = "normal_active" });
     }
 
+    internal static async Task<bool> IsWorkerHydratedForChatAsync(
+        CoreWebView2 core, string url)
+    {
+        // The caller may reuse only a hydrated view of this exact chat.
+        if (!LiteDevWakeState.IsChatUrl(core.Source) ||
+            LiteDevWakeState.NormalizeUrl(core.Source) != url) return false;
+        try
+        {
+            return await ExecuteWorkerScriptAsync(core, WakeWorkerHydratedScript) == "true";
+        }
+        catch (TimeoutException)
+        {
+            LiteEventLog.Write("multi_wake_worker_reuse_probe_timeout");
+            return false;
+        }
+    }
+
     private async Task<bool> NavigateWorkerAsync(string url)
     {
         var core = _chatWakeWorker.CoreWebView2;
         if (core is null) return false;
-        // If this single worker is already on the requested hydrated chat,
-        // preserve its DOM instead of forcing a full reload on each due tick.
-        if (LiteDevWakeState.IsChatUrl(core.Source) &&
-            LiteDevWakeState.NormalizeUrl(core.Source) == url)
+        // Reuse this worker only after checking both URL and hydrated history.
+        if (await IsWorkerHydratedForChatAsync(core, url))
         {
-            try
-            {
-                if (await ExecuteWorkerScriptAsync(core, WakeWorkerHydratedScript) == "true")
-                {
-                    LiteEventLog.Write("multi_wake_worker_reused_hydrated");
-                    return true;
-                }
-            }
-            catch (TimeoutException)
-            {
-                LiteEventLog.Write("multi_wake_worker_reuse_probe_timeout");
-            }
+            LiteEventLog.Write("multi_wake_worker_reused_hydrated");
+            return true;
         }
         var completed = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         void OnCompleted(object? sender, CoreWebView2NavigationCompletedEventArgs e) =>

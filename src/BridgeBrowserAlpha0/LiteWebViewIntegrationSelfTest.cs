@@ -98,6 +98,29 @@ internal static class LiteWebViewIntegrationSelfTest
                         "window.__OPENBROWSER_RESUME_PROBE__?.observe()?.text"))
                         .Contains("Czarny kompas"),
                         "read last DIL assistant content");
+                    phase = "worker_reuse_same_chat_isolated";
+                    const string chatUrl =
+                        "https://chatgpt.com/c/11111111-1111-1111-1111-111111111111";
+                    const string otherUrl =
+                        "https://chatgpt.com/c/22222222-2222-2222-2222-222222222222";
+                    await core.ExecuteScriptAsync(
+                        "history.replaceState({},'', '/c/11111111-1111-1111-1111-111111111111')");
+                    Ensure(LiteDevWakeState.NormalizeUrl(core.Source) == chatUrl,
+                        "offline fixture now has a valid normalized chat URL");
+                    Ensure(await ChatGptLiteForm.IsWorkerHydratedForChatAsync(core, chatUrl),
+                        "hydrated background chat may be reused without reload");
+                    Ensure(!await ChatGptLiteForm.IsWorkerHydratedForChatAsync(core, otherUrl),
+                        "a different background chat may never reuse the current DOM");
+                    await core.ExecuteScriptAsync("""
+                        window.__qaSavedTurns = Array.from(document.querySelector('main').children);
+                        document.querySelector('main').replaceChildren();
+                        """);
+                    Ensure(!await ChatGptLiteForm.IsWorkerHydratedForChatAsync(core, chatUrl),
+                        "composer-only application shell cannot be reused");
+                    await core.ExecuteScriptAsync(
+                        "document.querySelector('main').replaceChildren(...window.__qaSavedTurns)");
+                    Ensure(await ChatGptLiteForm.IsWorkerHydratedForChatAsync(core, chatUrl),
+                        "background chat becomes reusable when history returns");
                     const string receipt = "1234567890abcdef1234567890abcdef";
                     var js = "window.__OPENBROWSER_RESUME_SENDER__?.send(" +
                         JsonSerializer.Serialize("Napisz ósmy rozdział tej testowej książki.") +
@@ -183,7 +206,7 @@ internal static class LiteWebViewIntegrationSelfTest
                         "document.querySelectorAll('[data-ob-lite-offscreen]').length") == "0",
                         "soft CSS pilot is fully reversible");
                     LiteEventLog.Write("webview_integration_selftest", new {
-                        passed = true, checks = 21, offline = true
+                        passed = true, checks = 26, offline = true
                     });
                     code = 0;
                 }
