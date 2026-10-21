@@ -359,14 +359,20 @@ internal sealed partial class ChatGptLiteForm
             bool attemptCommitted = false;
             try
             {
-                await EnsureWakeWorkerAsync();
-                if (!await NavigateWorkerAsync(due.Url))
+                var foreground = _browser.CoreWebView2;
+                bool useForeground = foreground is not null &&
+                    LiteDevWakeState.IsChatUrl(foreground.Source) &&
+                    LiteDevWakeState.NormalizeUrl(foreground.Source) == due.Url;
+                if (!useForeground) await EnsureWakeWorkerAsync();
+                var wakeCore = useForeground ? foreground! : _chatWakeWorker.CoreWebView2;
+                if (wakeCore is null || (!useForeground && !await NavigateWorkerAsync(due.Url)))
                 {
                     DeferWakeWithoutSend(due.Url, now, "background_navigation_failed");
                     return;
                 }
                 else
                 {
+                    LiteEventLog.Write("multi_wake_target_selected", new { foreground = useForeground });
                     // Re-read the settings in case the operator paused the chat
                     // while the worker was navigating.
                     entries = LiteChatWakeRegistry.Read();
@@ -376,7 +382,7 @@ internal sealed partial class ChatGptLiteForm
                         return;
                     due = selected;
                     var preflight = await CheckWorkerPreflightAsync(
-                        _chatWakeWorker.CoreWebView2, due.Url,
+                        wakeCore, due.Url,
                         due.LastAnswerFingerprint);
                     if (preflight.Complete)
                     {
@@ -411,7 +417,7 @@ internal sealed partial class ChatGptLiteForm
                         JsonSerializer.Serialize(payload) + "," +
                         JsonSerializer.Serialize(receipt) + ",true)";
                     var result = await ExecuteWorkerScriptAsync(
-                        _chatWakeWorker.CoreWebView2, js);
+                        wakeCore, js);
                     state = JsonSerializer.Deserialize<string>(result) ?? "sender_missing";
                     if (state.StartsWith("busy_", StringComparison.Ordinal) ||
                         state is "missing_composer" or "invalid" or "already_attempted")
@@ -439,7 +445,7 @@ internal sealed partial class ChatGptLiteForm
                     {
                         await Task.Delay(attempt == 0 ? 750 : 400);
                         string flush = await ExecuteWorkerScriptAsync(
-                            _chatWakeWorker.CoreWebView2,
+                            wakeCore,
                             "window.__OPENBROWSER_RESUME_SENDER__?.submitDirect(" +
                             JsonSerializer.Serialize(receipt) + ")");
                         phase = JsonSerializer.Deserialize<string>(flush) ?? "sender_missing";
@@ -459,7 +465,7 @@ internal sealed partial class ChatGptLiteForm
                                 sendCount:document.querySelectorAll('[data-testid=""send-button""],button[aria-label=""Send""],button[aria-label=""Wyślij""]').length
                             })";
                             string encoded = await ExecuteWorkerScriptAsync(
-                                _chatWakeWorker.CoreWebView2, domState);
+                                wakeCore, domState);
                             string metadata = JsonSerializer.Deserialize<string>(encoded) ?? "{}";
                             using var parsed = JsonDocument.Parse(metadata);
                             var root = parsed.RootElement;
@@ -486,7 +492,7 @@ internal sealed partial class ChatGptLiteForm
                             ".slice(-6).some(x => String(x.innerText || x.textContent || '').includes(" +
                             JsonSerializer.Serialize(snippet) + "))";
                         visible = await ExecuteWorkerScriptAsync(
-                            _chatWakeWorker.CoreWebView2, check) == "true";
+                            wakeCore, check) == "true";
                     }
                     LiteEventLog.Write("multi_wake_send", new {
                         state, phase, visibleUserBubble = visible,
