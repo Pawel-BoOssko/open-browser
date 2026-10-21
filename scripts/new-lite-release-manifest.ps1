@@ -17,7 +17,14 @@ $built = [DateTime]::ParseExact($stamp, "yyyyMMdd'T'HHmmss'Z'",
 $built = $built.ToUniversalTime()
 $zone = [TimeZoneInfo]::FindSystemTimeZoneById('Central European Standard Time')
 $local = [TimeZoneInfo]::ConvertTimeFromUtc($built, $zone)
-$hash = (Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash.ToLowerInvariant()
+$sha = [Security.Cryptography.SHA256]::Create()
+$stream = [IO.File]::OpenRead($exe)
+try {
+    $hash = [BitConverter]::ToString($sha.ComputeHash($stream)).Replace('-', '').ToLowerInvariant()
+} finally {
+    $stream.Dispose()
+    $sha.Dispose()
+}
 $manifest = [ordered]@{
     schema = 1
     channel = $Channel

@@ -31,8 +31,15 @@ if ($m.version -ne $version -or
     $m.sourceCommit -ne $source) {
     throw 'Manifest identity does not match embedded EXE identity'
 }
-$hash = (Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash
-if ([string]$m.executableSha256 -ne $hash.ToLowerInvariant()) {
+$sha = [Security.Cryptography.SHA256]::Create()
+$stream = [IO.File]::OpenRead($exe)
+try {
+    $hash = [BitConverter]::ToString($sha.ComputeHash($stream)).Replace('-', '').ToLowerInvariant()
+} finally {
+    $stream.Dispose()
+    $sha.Dispose()
+}
+if ([string]$m.executableSha256 -ne $hash) {
     throw 'Manifest SHA256 mismatch'
 }
 Write-Output ('RELEASE_IDENTITY_OK v' + $version + ' sha256=' + $hash.ToLowerInvariant())
