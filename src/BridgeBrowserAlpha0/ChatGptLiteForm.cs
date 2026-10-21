@@ -316,9 +316,11 @@ internal sealed partial class ChatGptLiteForm : Form
             {
                 turns, optimized, duration, supported,
                 totalDomElements = root.TryGetProperty("totalDomElements", out var countElement) &&
-                    countElement.ValueKind == JsonValueKind.Number ? countElement.GetInt32() : (int?)null,
+                    countElement.ValueKind == JsonValueKind.Number &&
+                    countElement.TryGetInt32(out int elementCount) ? elementCount : (int?)null,
                 domSampleAt = root.TryGetProperty("domSampleAt", out var sampleElement) &&
-                    sampleElement.ValueKind == JsonValueKind.Number ? sampleElement.GetInt64() : (long?)null,
+                    sampleElement.ValueKind == JsonValueKind.Number &&
+                    sampleElement.TryGetInt64(out long sampledAt) ? sampledAt : (long?)null,
                 modeEnabled = root.GetProperty("enabled").GetBoolean(),
                 errorCount = root.GetProperty("errorCount").GetInt32()
             });

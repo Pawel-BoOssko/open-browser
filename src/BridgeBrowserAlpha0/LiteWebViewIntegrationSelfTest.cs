@@ -75,6 +75,10 @@ internal static class LiteWebViewIntegrationSelfTest
                         TimeSpan.FromSeconds(18));
                     core.NavigationCompleted -= onNavigated;
                     Ensure(success, "local virtual host navigation");
+                    phase = "check_hydrated_worker";
+                    Ensure(await EvaluateAsync(core,
+                        ChatGptLiteForm.WakeWorkerHydratedScript) == "true",
+                        "background worker readiness requires composer and message history");
                     phase = "check_high";
                     Ensure(await EvaluateAsync(core,
                         "window.__OPENBROWSER_HIGH_GUARD__?.audit()?.mode") == "high",
@@ -161,6 +165,13 @@ internal static class LiteWebViewIntegrationSelfTest
                     Ensure(await EvaluateAsync(core,
                         "window.__OPENBROWSER_LITE_DOM__.getStatus().modernSoftEnabled") == "false",
                         "modern soft optimizer remains disabled by default");
+                    string elementCount = await EvaluateAsync(core,
+                        "window.__OPENBROWSER_LITE_DOM__.getStatus().totalDomElements");
+                    Ensure(int.TryParse(elementCount, out int totalElements) && totalElements > 0,
+                        "WebView2 periodically records DOM element count");
+                    Ensure(await EvaluateAsync(core,
+                        "Number.isFinite(window.__OPENBROWSER_LITE_DOM__.getStatus().domSampleAt) && window.__OPENBROWSER_LITE_DOM__.getStatus().domSampleAt > 0") == "true",
+                        "WebView2 records time of the DOM census");
                     string softCount = await EvaluateAsync(core,
                         "window.__OPENBROWSER_LITE_DOM__.setModernSoftEnabled(true).optimized");
                     Ensure(int.TryParse(softCount, out int softTurns) &&
@@ -172,7 +183,7 @@ internal static class LiteWebViewIntegrationSelfTest
                         "document.querySelectorAll('[data-ob-lite-offscreen]').length") == "0",
                         "soft CSS pilot is fully reversible");
                     LiteEventLog.Write("webview_integration_selftest", new {
-                        passed = true, checks = 18, offline = true
+                        passed = true, checks = 21, offline = true
                     });
                     code = 0;
                 }

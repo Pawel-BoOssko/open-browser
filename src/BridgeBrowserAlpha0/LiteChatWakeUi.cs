@@ -6,6 +6,9 @@ namespace BridgeBrowserAlpha0;
 
 internal sealed partial class ChatGptLiteForm
 {
+    internal const string WakeWorkerHydratedScript =
+        "!!document.querySelector('#prompt-textarea,[data-testid=composer-text-input],textarea,[contenteditable=true]') " +
+        "&& !!document.querySelector('[data-user-message-bubble],[data-message-author-role],[data-chatgpt-selection-message-id]')";
     private readonly System.Windows.Forms.Timer _chatWakeTimer = new() { Interval = 20000 };
     private bool _multiWakeEnabled;
     private bool _chatWakeBusy;
@@ -213,6 +216,24 @@ internal sealed partial class ChatGptLiteForm
     {
         var core = _chatWakeWorker.CoreWebView2;
         if (core is null) return false;
+        // If this single worker is already on the requested hydrated chat,
+        // preserve its DOM instead of forcing a full reload on each due tick.
+        if (LiteDevWakeState.IsChatUrl(core.Source) &&
+            LiteDevWakeState.NormalizeUrl(core.Source) == url)
+        {
+            try
+            {
+                if (await ExecuteWorkerScriptAsync(core, WakeWorkerHydratedScript) == "true")
+                {
+                    LiteEventLog.Write("multi_wake_worker_reused_hydrated");
+                    return true;
+                }
+            }
+            catch (TimeoutException)
+            {
+                LiteEventLog.Write("multi_wake_worker_reuse_probe_timeout");
+            }
+        }
         var completed = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         void OnCompleted(object? sender, CoreWebView2NavigationCompletedEventArgs e) =>
             completed.TrySetResult(e.IsSuccess);
@@ -229,9 +250,7 @@ internal sealed partial class ChatGptLiteForm
                     LiteDevWakeState.NormalizeUrl(core.Source) != url) return false;
                 // A composer can render before the selected conversation
                 // has loaded. Never type into a shell with zero chat turns.
-                string found = await ExecuteWorkerScriptAsync(core,
-                    "(() => !!document.querySelector('#prompt-textarea,[data-testid=\"composer-text-input\"],textarea,[contenteditable=\"true\"]') " +
-                    "&& !!document.querySelector('[data-user-message-bubble],[data-message-author-role],[data-chatgpt-selection-message-id]'))()");
+                string found = await ExecuteWorkerScriptAsync(core, WakeWorkerHydratedScript);
                 if (found == "true") return true;
                 await Task.Delay(700);
             }

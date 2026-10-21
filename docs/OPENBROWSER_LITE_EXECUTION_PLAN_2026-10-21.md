@@ -1,9 +1,9 @@
 # Open Browser Lite: plan wykonawczy po przejęciu, 2026-10-21
 
-**Status 22.10.2026 około 01:04:** ACTIVE. Dwa naturalne wybudzenia 00:21 i 00:41 potwierdzone, drugie receiptConfirmed=true. PBOX1 LIVE 1.72.21 PID8216. SOURCE/TEST 1.72.24: bounded WebView2 response/DOM probes + Low/Normal worker + domyślnie wyłączony DIL soft pilot + skuteczniejszy odczyt archiwum DIL po odpowiedzi i 30s zamiast 12s interwał. 20 testów JS, .NET Release i izolowany WebView2 PASS. PBOX1 produkcja bez nowej wersji po odmowie publikacji 1.72.22. Test rzeczywisty i 8h soak otwarte.  
+**Status 22.10.2026 01:18:** ACTIVE. TRZY naturalne wybudzenia 00:21, 00:41, 01:07 potwierdzone (ostatni receiptConfirmed=true). PBOX1 LIVE 1.72.21 PID8216. SOURCE/TEST 1.72.26: wszystkie poprawki 1.72.25 plus reużycie nawigacji zhydratowanego background workera z warunkiem poprawnego URL i historii. 20 JS test files, .NET Release i izolowany WebView2 21 kontroli PASS. REAL background multi-chat nadal nieprzetestowany; PBOX1 publikacja zablokowana na wcześniejszym etapie; 8h soak/QA DOM nadal otwarte.  
 **Punkt wznowienia:** `docs/OPENBROWSER_LITE_HANDOFF_ODTWORZENIE_2026-10-21_ChatGPT.md`, aktualny checkpoint `docs/OPENBROWSER_LITE_WORK_STATUS_2026-10-21.md`.  
 **Dokument historyczny:** `docs/design/openbrowser-master-roadmap-v3-2026-10-19.md` ma 86 zadań. Nie traktować ich jako 86 równoległych priorytetów.  
-**Źródła aktualne 22.10 około 01:04:** SOURCE/TEST 1.72.24 na SATANAMD (20 zestawów JS, dotnet Release, realny izolowany WebView2 PASS); PBOX1 LIVE 1.72.21 PID8216. Ostatni snapshot Autosync da38a63 z 01:01 (nie zakładać, że obejmuje późniejsze źródła). Wcześniejsza odmowa publikacji 1.72.22 na PBOX1 bez obchodzenia ograniczenia. Raport i kolejne kroki w `docs/OPENBROWSER_LITE_WORK_STATUS_2026-10-21.md`.  
+**Źródła aktualne 22.10 01:18:** SOURCE/TEST 1.72.26 na SATANAMD, PBOX1 LIVE 1.72.21 PID8216. Tylko źródło i lokalne testy, nie LIVE. Trzy realne wybudzenia w foreground. Poprzednia odmowa publikacji PBOX1 1.72.22 bez obejścia. Najnowszy checkpoint: `docs/OPENBROWSER_LITE_WORK_STATUS_2026-10-21.md`; resource baseline: `docs/OPENBROWSER_LITE_RESOURCE_BASELINE_2026-10-22.md`.  
 **Reguły:** bez ChatGPT Tasks, ręcznego commit/push, resetu dirty repo, masowego zamykania okien. Autosync dostarcza wersje źródłowe. Checkpoint po każdym etapie.
 
 ## Zasady produktu

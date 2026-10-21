@@ -28,3 +28,11 @@
 - Ukryty worker WebView2: normalny poziom zużycia pamięci podczas nawigacji/wysyłki, `Low` tylko w spoczynku po zakończeniu kroku. Oczekiwana oszczędność nie jest liczbą stałą; wymaga testu porównawczego w produkcji i nie może pogorszyć liczby potwierdzonych pobudek.
 - Kontrola PBOX1 LIVE v1.72.21 PID8216: próbki 00:45 i 00:47 mierzyły odpowiednio 649,5 i 637,4 MiB prywatnej pamięci wszystkich 7 procesów WebView2 Lite; największy renderer 469,8 i 458,4 MiB. Jest to ciągle **stan sprzed** wdrożenia SOURCE 1.72.23, nie dowód efektu zmiany.
 - Publikacja kandydata 1.72.22 na PBOX1 odmówiona przez zabezpieczenia narzędzia; brak dalszej próby po tej odmowie, kandydat 1.72.23 nie jest wdrożony.
+
+## Aktualizacja 2026-10-22 01:18 CEST: 30-min obserwacja produkcji i licznik DOM w SOURCE
+
+- LIVE v1.72.21 PID8216 (7 własnych WebView2 processów), 16 próbek 00:43–01:13: sum(privateMiB) start 561.9, koniec 882.3, average 707.3, max 882.3; max(largest renderer) 687.6 MiB. CPU po odrzuceniu jednej niepełnej próbki: 15 kompletnych, average sum WebView cpuMachinePercent 5.25%, peak 8.24%. To nie jest dowód memory leak, ale wzrost związany w czasie z długim generowaniem, wymagający dalszej obserwacji.
+- SOURCE v1.72.26: LiteDomOptimizer.js wykonuje lekki DOM census getElementsByTagName('*').length najwyżej co 120 sekund wyłącznie poza generowaniem. ChatGptLiteForm.cs serializuje totalDomElements oraz domSampleAt do istniejących zdarzeń dom_status, bez nowych usług i bez odczytu prywatnej treści. W przypadku braku pola lub formatu nienumerycznego stan jest null, nie wyjątek.
+- Testy: 7 scenariuszy DIL soft pilot (w tym limit próbkowania i brak census podczas Stop), 20/20 plików Node test PASS, Release .NET 0 errors, izolowany WebView2 21 checks PASS. To testy źródeł, nie produkcyjny trend DOM.
+- SOURCE v1.72.26 zwiększa możliwość reużycia zhydratowanego worker WebView2, zamiast wymuszać reload przy tym samym due URL. Konkretny wpływ RAM/CPU i poprawność wieloczatowa wymagają dopiero LIVE E2E.
+- Cel: po dozwolonej publikacji v1.72.26 korelować dom_status.totalDomElements z privateMiB renderera i cpuMachinePercent w godzinowych oknach oraz 8h soak; rozróżniać stały wzrost liczby elementów i wzrost pamięci przy stałym DOM. Do prawdziwego DIL QA nie uruchamiać domyślnie CSS pilota ani hard prune.
