@@ -6,7 +6,8 @@ namespace BridgeBrowserAlpha0;
 internal sealed partial class ChatGptLiteForm
 {
     private readonly LiteSecureArchive _archive = new();
-    private readonly System.Windows.Forms.Timer _captureTimer = new() { Interval = 12000 };
+    // Completed-answer snapshots only. Avoid a full DOM read every 12 seconds.
+    private readonly System.Windows.Forms.Timer _captureTimer = new() { Interval = 30000 };
     private readonly Button _archiveToggle = new()
     {
         Text = "Kopie: włączone", Width = 125

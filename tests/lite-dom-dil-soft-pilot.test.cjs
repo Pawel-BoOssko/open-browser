@@ -24,9 +24,15 @@ function rig(count = 100, options = {}) {
     };
   });
   const styles = [];
+  let domCensusCalls = 0;
   const old = options.mixed ? [{ hasAttribute() { return false; } }] : [];
   const doc = {
     readyState: "complete", activeElement: null,
+    getElementsByTagName(selector) {
+      assert.equal(selector, "*");
+      domCensusCalls++;
+      return { length: options.domElements ?? 7777 };
+    },
     querySelectorAll(selector) {
       if (selector === '[data-testid^="conversation-turn-"]') return old;
       if (selector === '[data-user-message-bubble],[data-chatgpt-selection-message-id]')
@@ -52,9 +58,25 @@ function rig(count = 100, options = {}) {
   vm.runInNewContext(source, { window: win, Date });
   return { nodes, doc, win, styles,
     api: win.__OPENBROWSER_LITE_DOM__,
-    get changes() { return changes; } };
+    get changes() { return changes; },
+    get domCensusCalls() { return domCensusCalls; } };
 }
 const flag = "data-ob-lite-offscreen";
+{
+  const t = rig(90, { domElements: 12345 });
+  assert.equal(t.api.getStatus().totalDomElements, 12345);
+  assert.equal(t.domCensusCalls, 1);
+  t.api.check();
+  t.api.check();
+  assert.equal(t.domCensusCalls, 1,
+    "DOM census must not rescan on each 30-second optimizer check");
+}
+{
+  const t = rig(90, { busy: true, domElements: 22222 });
+  assert.equal(t.api.getStatus().totalDomElements, null,
+    "busy page must not perform whole-document enumeration");
+  assert.equal(t.domCensusCalls, 0);
+}
 {
   const t = rig();
   assert.equal(t.api.getStatus().domVariant, "dil_observe_only");
@@ -95,4 +117,4 @@ const flag = "data-ob-lite-offscreen";
   t.api.setModernSoftEnabled(true);
   assert.equal(t.api.getStatus().optimized, 0, "Polish Stop pauses DOM mutations");
 }
-console.log("LiteDomDilSoftPilot: 5 PASS (feature disabled by default)");
+console.log("LiteDomDilSoftPilot: 7 PASS (feature disabled by default)");

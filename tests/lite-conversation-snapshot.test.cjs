@@ -8,24 +8,38 @@ const script = fs.readFileSync(
   "utf8"
 );
 function init(opts = {}) {
-  const nodes = (opts.texts || []).map((text, n) => ({
-    innerText: text, closest() { return {
+  const make = (text, n, modern) => ({
+    innerText: text,
+    getAttribute(name) {
+      return modern && name === "data-chatgpt-selection-message-id"
+        ? (opts.ids?.[n] ?? "dil-" + n) : null;
+    },
+    closest() { return {
       getAttribute() { return "conversation-turn-" + n; }
     }; }
-  }));
+  });
+  const legacy = (opts.texts || []).map((t, n) => make(t, n, false));
+  const modern = (opts.modernTexts || []).map((t, n) => make(t, n, true));
   let reads = 0;
   const window = {
-    location: { hostname: opts.host || "chatgpt.com", pathname: opts.pathname || "/c/one" },
+    location: { hostname: opts.host || "chatgpt.com",
+      pathname: opts.pathname || "/c/one" },
     document: {
       querySelectorAll(sel) {
-        assert.equal(sel, '[data-message-author-role="assistant"]');
         reads++;
-        return nodes;
+        if (sel === '[data-chatgpt-selection-message-id]') return modern;
+        if (sel === '[data-message-author-role="assistant"]') return legacy;
+        throw new Error("unknown selector " + sel);
+      },
+      querySelector(sel) {
+        if (sel.includes('aria-label="Zatrzymaj"')) return opts.generating ? {} : null;
+        return null;
       }
     }
   };
   vm.runInNewContext(script, { window });
-  return { api: window.__OPENBROWSER_LITE_SNAPSHOT__, reads };
+  return { api: window.__OPENBROWSER_LITE_SNAPSHOT__,
+    get reads() { return reads; } };
 }
 {
   const a = init({ texts: ["First answer", "Second answer", "Third answer"] });
@@ -45,9 +59,41 @@ function init(opts = {}) {
 {
   const a = init({ pathname: "/", texts: ["Visible answer"] });
   assert.equal(a.api.collect().length, 0);
+  assert.equal(a.reads, 0, "non-conversation pages are not inspected");
 }
 {
   const a = init({ host: "example.com" });
   assert.equal(a.api, undefined);
 }
-console.log("LiteConversationSnapshot: 5 PASS");
+{
+  const a = init({ modernTexts: ["First modern answer",
+    "Second modern answer", "Third modern answer"] });
+  const results = a.api.collect();
+  assert.equal(results.length, 2);
+  assert.equal(results[0].turnId, "dil-2");
+  assert.equal(results[0].text, "Third modern answer");
+  assert.equal(results[1].turnId, "dil-1");
+}
+{
+  const a = init({ texts: ["Legacy answer"],
+    modernTexts: ["Modern answer"] });
+  assert.equal(a.api.collect()[0].text, "Modern answer",
+    "modern DIL wins in mixed layouts");
+}
+{
+  const a = init({ modernTexts: ["Answer A", "Answer B", "Answer C"],
+    ids: ["one", "same", "same"] });
+  const results = a.api.collect();
+  assert.equal(results.length, 2);
+  assert.equal(results[0].text, "Answer C");
+  assert.equal(results[1].text, "Answer A",
+    "duplicate DIL IDs cannot overwrite saved answers");
+}
+{
+  const a = init({ modernTexts: ["Streaming partial answer"],
+    generating: true });
+  assert.equal(a.api.collect().length, 0,
+    "never archive partial output while Stop is visible");
+  assert.equal(a.reads, 0, "do not read long DOM while generating");
+}
+console.log("LiteConversationSnapshot: 9 PASS");

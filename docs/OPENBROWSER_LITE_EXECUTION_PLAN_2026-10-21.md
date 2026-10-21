@@ -1,9 +1,9 @@
 # Open Browser Lite: plan wykonawczy po przejęciu, 2026-10-21
 
-**Status 22.10.2026 00:48:** ACTIVE. DWA naturalne cykle autowybudzania potwierdzone (00:21 i 00:41, drugi receiptConfirmed=true), PBOX1 LIVE v1.72.21. Etap 0 dla jednego foreground czatu wstępnie zaliczony. Teraz główny priorytet: stabilny, lekki DOM/RAM; SOURCE v1.72.23 posiada domyślnie wyłączony pilot soft DIL i dynamiczny cel pamięci ukrytego worker. Gate produkcyjny oraz 8h soak nadal otwarte.  
+**Status 22.10.2026 około 01:04:** ACTIVE. Dwa naturalne wybudzenia 00:21 i 00:41 potwierdzone, drugie receiptConfirmed=true. PBOX1 LIVE 1.72.21 PID8216. SOURCE/TEST 1.72.24: bounded WebView2 response/DOM probes + Low/Normal worker + domyślnie wyłączony DIL soft pilot + skuteczniejszy odczyt archiwum DIL po odpowiedzi i 30s zamiast 12s interwał. 20 testów JS, .NET Release i izolowany WebView2 PASS. PBOX1 produkcja bez nowej wersji po odmowie publikacji 1.72.22. Test rzeczywisty i 8h soak otwarte.  
 **Punkt wznowienia:** `docs/OPENBROWSER_LITE_HANDOFF_ODTWORZENIE_2026-10-21_ChatGPT.md`, aktualny checkpoint `docs/OPENBROWSER_LITE_WORK_STATUS_2026-10-21.md`.  
 **Dokument historyczny:** `docs/design/openbrowser-master-roadmap-v3-2026-10-19.md` ma 86 zadań. Nie traktować ich jako 86 równoległych priorytetów.  
-**Źródła aktualne 22.10 00:48:** SOURCE 1.72.23 SATANAMD, PBOX1 LIVE 1.72.21 PID8216 (autodeploy po idle 00:41:44). Autosync e49c276 zawiera 1.72.22; publikacja na PBOX1 zablokowana przez narzędzie i nie została ponowiona. Ostatni dowód i następne kroki w `docs/OPENBROWSER_LITE_WORK_STATUS_2026-10-21.md`.  
+**Źródła aktualne 22.10 około 01:04:** SOURCE/TEST 1.72.24 na SATANAMD (20 zestawów JS, dotnet Release, realny izolowany WebView2 PASS); PBOX1 LIVE 1.72.21 PID8216. Ostatni snapshot Autosync da38a63 z 01:01 (nie zakładać, że obejmuje późniejsze źródła). Wcześniejsza odmowa publikacji 1.72.22 na PBOX1 bez obchodzenia ograniczenia. Raport i kolejne kroki w `docs/OPENBROWSER_LITE_WORK_STATUS_2026-10-21.md`.  
 **Reguły:** bez ChatGPT Tasks, ręcznego commit/push, resetu dirty repo, masowego zamykania okien. Autosync dostarcza wersje źródłowe. Checkpoint po każdym etapie.
 
 ## Zasady produktu

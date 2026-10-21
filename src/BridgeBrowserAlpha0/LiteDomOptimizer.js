@@ -14,7 +14,8 @@
     keepRecent: 40, minTurns: 60, turnCount: 0, optimized: 0,
     dilAssistantCount: 0, dilUserCount: 0,
     domVariant: 'unknown',
-    skippedBusy: false, lastDurationMs: 0, lastCheckedAt: null, errorCount: 0
+    skippedBusy: false, lastDurationMs: 0, lastCheckedAt: null, errorCount: 0,
+    totalDomElements: null, domSampleAt: null
   };
   let timer = null;
 
@@ -72,6 +73,14 @@
         n.hasAttribute?.('data-chatgpt-selection-message-id') &&
         !n.hasAttribute?.('data-user-message-bubble')).length;
       state.skippedBusy = busy();
+      // Metadata-only DOM sample every ~2 minutes. Existing resource logs
+      // then reveal whether DOM node growth correlates with renderer RAM.
+      if (!state.skippedBusy &&
+          (!state.domSampleAt || Date.now() - state.domSampleAt >= 120000) &&
+          typeof doc.getElementsByTagName === 'function') {
+        state.totalDomElements = doc.getElementsByTagName('*').length;
+        state.domSampleAt = Date.now();
+      }
       const mayOptimize = state.enabled && state.supported &&
         (!modern || maySoftModern) && !state.skippedBusy && turns.length >= state.minTurns;
       if (mayOptimize) ensureStyle();
@@ -118,7 +127,9 @@
       optimized: state.optimized, domVariant: state.domVariant,
       skippedBusy: state.skippedBusy,
       lastDurationMs: state.lastDurationMs, lastCheckedAt: state.lastCheckedAt,
-      errorCount: state.errorCount
+      errorCount: state.errorCount,
+      totalDomElements: state.totalDomElements,
+      domSampleAt: state.domSampleAt
     };
   }
 
