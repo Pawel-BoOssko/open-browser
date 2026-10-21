@@ -90,3 +90,9 @@ Wiele funkcji ma status SOURCE lub TEST, część STAGED lub pojedyncze LIVE_VER
 - `docs/Rejestr nieudanych komend.md` (modyfikowany 19.10 14:55, rzeczywiste blokady narzędzi).
 
 **Źródła dowodów 21.10:** PBOX1 proces 11188, log `lite-events-2026-10-21.jsonl`, SHA256 kandydata, 4 selftesty exit 0; SATANAMD `git status`, `git log origin/autosync/SATANAMD`, najnowszy kod 1.72.16; GitHub `autosync/SATANAMD` weryfikowany przez bezpośredni odczyt kodu i checkpointu. 
+
+## 8. Dodatkowa walidacja bieżącego przejęcia, 21.10
+
+- Na SATANAMD uruchomiono 16 plików testów JavaScript `tests/lite-*.test.cjs` z ostatnich siedmiu dni przez `node --test`; kod wyjścia 0.
+- Następnie `dotnet build D:\projects\open-browser\src\BridgeBrowserAlpha0\BridgeBrowserAlpha0.csproj --configuration Release --no-restore -v:q` zakończył się kodem 0: błędów 0, jedno znane ostrzeżenie MSB3277 (konflikt WindowsBase v4/v5 w zależności WebView2).
+- Żaden z tych testów nie stanowi realnego testu loginu ChatGPT, hydracji ukrytego WebView2 ani naturalnej wysyłki. Nie zmieniono aktywnego procesu PBOX1, nie uruchomiono przypominajki ChatGPT i nie wykonano ręcznego commit/push.
