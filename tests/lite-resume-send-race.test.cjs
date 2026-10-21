@@ -283,6 +283,11 @@ function setup(options = {}) {
   assert.equal(p.sender.submitOwnDraft(), "click_invoked",
     "only a persisted own wake draft may be retried");
   assert.equal(p.count(), 1);
+  assert.equal(p.sender.recoveredDraftVisible(), false,
+    "click alone cannot confirm delivery");
+  p.showAcknowledgment("[OB-" + id + "]\n" + prompt);
+  assert.equal(p.sender.recoveredDraftVisible(), true,
+    "receipt in user bubble confirms recovered wake delivery");
 }
 {
   const p = setup();

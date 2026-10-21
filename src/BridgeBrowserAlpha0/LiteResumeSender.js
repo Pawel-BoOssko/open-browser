@@ -242,6 +242,10 @@
   }
   // Recover only our own persisted wake draft after a stopped or interrupted
   // send. Never touch ordinary user text. The host still confirms delivery.
+  let lastRecoveredReceipt = null;
+  function recoveredDraftVisible() {
+    return lastRecoveredReceipt !== null && hasAck(lastRecoveredReceipt);
+  }
   function submitOwnDraft() {
     if (busy()) return "busy_generating";
     const el = composer();
@@ -249,6 +253,7 @@
     const value = String(el.value || el.innerText || el.textContent || "");
     const match = /^\[OB-([a-f0-9]{32})\]\s*\n[\s\S]{16,45000}$/.exec(value);
     if (!match) return "not_own_draft";
+    lastRecoveredReceipt = match[1];
     if (hasAck(match[1])) return "already_visible";
     const form = el.closest?.("form") ||
       w.document.querySelector("form[data-chatgpt-composer]");
@@ -262,5 +267,6 @@
       return "click_invoked";
     } catch (_) { return "click_failed"; }
   }
-  w.__OPENBROWSER_RESUME_SENDER__ = { send, sendDirect, submitDirect, submitOwnDraft, hasAck, diagnose, phase };
+  w.__OPENBROWSER_RESUME_SENDER__ = { send, sendDirect, submitDirect,
+    submitOwnDraft, recoveredDraftVisible, hasAck, diagnose, phase };
 })(window);

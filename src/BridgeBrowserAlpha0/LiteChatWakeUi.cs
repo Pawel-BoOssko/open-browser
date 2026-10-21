@@ -408,18 +408,36 @@ internal sealed partial class ChatGptLiteForm
                             ?? "sender_missing";
                         if (recovery is "click_invoked" or "already_visible")
                         {
+                            // A click is not delivery. Wait briefly for the
+                            // unique receipt in a real user message bubble.
+                            bool receiptVisible = recovery == "already_visible";
+                            if (!receiptVisible)
+                            {
+                                for (int check = 0; check < 6 && !receiptVisible; check++)
+                                {
+                                    await Task.Delay(650);
+                                    try
+                                    {
+                                        receiptVisible = await ExecuteWorkerScriptAsync(wakeCore,
+                                            "window.__OPENBROWSER_RESUME_SENDER__?.recoveredDraftVisible()")
+                                            == "true";
+                                    }
+                                    catch (TimeoutException) { break; }
+                                }
+                            }
                             entries = LiteChatWakeRegistry.Read();
                             var active = entries.FirstOrDefault(x => x.Url == due.Url);
                             if (active is not null && active.Enabled)
                             {
-                                active.LastState = recovery == "click_invoked"
-                                    ? "own_draft_clicked_unconfirmed"
-                                    : "own_draft_already_visible";
-                                active.DueUtc = DateTimeOffset.UtcNow.AddMinutes(2);
+                                active.LastState = receiptVisible
+                                    ? "own_draft_visible_ack"
+                                    : "own_draft_clicked_unconfirmed";
+                                active.DueUtc = DateTimeOffset.UtcNow.AddMinutes(
+                                    receiptVisible ? active.Minutes : 2);
                                 LiteChatWakeRegistry.Write(entries);
                             }
                             LiteEventLog.Write("multi_wake_own_draft_recovery",
-                                new { result = recovery, receiptConfirmed = recovery == "already_visible" });
+                                new { result = recovery, receiptConfirmed = receiptVisible });
                             UpdateMultiWakeStatus();
                             return;
                         }

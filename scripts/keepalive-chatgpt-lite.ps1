@@ -20,8 +20,34 @@ function Save-Status([string]$state, [string]$details) {
 try {
     $existing = @(Get-Process -Name 'BridgeBrowserAlpha0' -ErrorAction SilentlyContinue)
     if ($existing.Count -gt 0) {
-        Save-Status 'running' ("existingProcesses=" + $existing.Count)
-        return
+        if (@($existing | Where-Object { $_.Responding }).Count -gt 0) {
+            Save-Status 'running' ("existingProcesses=" + $existing.Count)
+            return
+        }
+        # Only recover a persistently frozen window. One failed heartbeat can
+        # be transient while WebView2 handles a very large conversation.
+        $pids = ($existing | Select-Object -ExpandProperty Id | Sort-Object) -join ','
+        $previous = if (Test-Path -LiteralPath $statusFile) {
+            try { Get-Content -LiteralPath $statusFile -Raw | ConvertFrom-Json }
+            catch { $null }
+        } else { $null }
+        $again = $previous -and $previous.state -eq 'unresponsive_once' -and
+            $previous.details -eq ("pids=" + $pids) -and
+            ((Get-Date) - [datetime]$previous.checkedAt).TotalMinutes -le 12
+        if (-not $again) {
+            Save-Status 'unresponsive_once' ("pids=" + $pids)
+            return
+        }
+        if ($DryRun) {
+            Save-Status 'would_recover_hung' ("pids=" + $pids)
+            return
+        }
+        $existing | Stop-Process -Force
+        Start-Sleep -Seconds 2
+        if (@(Get-Process -Name 'BridgeBrowserAlpha0' -ErrorAction SilentlyContinue).Count -gt 0) {
+            Save-Status 'recovery_waiting' ("pids=" + $pids)
+            return
+        }
     }
 
     $shortcut = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Open Browser - ChatGPT Lite.lnk'
