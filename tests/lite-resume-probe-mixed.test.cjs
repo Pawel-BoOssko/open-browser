@@ -61,4 +61,21 @@ function observe(legacy, modern) {
   assert.equal(s.userNodeCount, 0);
   assert.equal(s.lastAssistantChars, 0);
 }
-console.log("LiteResumeProbeMixed: 4 PASS");
+{
+  const a = node(1, "assistant", true);
+  a.innerText = "";
+  a.textContent = "Recovered visible assistant content";
+  const s = observe([], [a]);
+  assert.equal(s.role, "assistant");
+  assert.equal(s.text, "Recovered visible assistant content");
+  assert.equal(s.lastAssistantChars, a.textContent.length);
+}
+{
+  const a = node(1, "assistant", true);
+  a.innerText = "";
+  a.textContent = "";
+  a.closest = () => ({ innerText: "Completed text from enclosing turn" });
+  const s = observe([], [a]);
+  assert.equal(s.text, "Completed text from enclosing turn");
+}
+console.log("LiteResumeProbeMixed: 6 PASS");

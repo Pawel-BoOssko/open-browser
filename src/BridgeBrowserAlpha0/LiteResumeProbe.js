@@ -3,6 +3,20 @@
   if (w.__OPENBROWSER_RESUME_PROBE__) return;
   if (!w.document || w.location.hostname !== "chatgpt.com") return;
 
+  function visibleText(node) {
+    if (!node) return "";
+    const rendered = String(node.innerText || "").trim();
+    if (rendered) return rendered;
+    const content = String(node.textContent || "").trim();
+    if (content) return content;
+    // Some DIL wrappers identify a message but contain no visible text
+    // themselves. Use only that message's enclosing turn, never all of main.
+    const turn = node.closest?.('[data-testid^="conversation-turn-"],article,[role="article"]');
+    if (turn && turn !== node)
+      return String(turn.innerText || turn.textContent || "").trim();
+    return "";
+  }
+
   function observe() {
     const d = w.document;
     // ChatGPT's DIL UI (verified 2026-10-18 on the owner's test chat)
@@ -27,7 +41,7 @@
         last.hasAttribute?.('data-user-message-bubble') ? 'user' : 'unknown')) :
       'unknown';
     const text = last && role === "assistant" ?
-      String(last.innerText || "").slice(-8000) : "";
+      visibleText(last).slice(-8000) : "";
     // Metadata only: distinguish an empty assistant reply from a stale user
     // bubble without copying any extra conversation text into diagnostics.
     const isAssistant = n => n.getAttribute?.('data-message-author-role') === 'assistant' ||
@@ -37,7 +51,7 @@
     const assistantNodeCount = parts.filter(isAssistant).length;
     const userNodeCount = parts.filter(isUser).length;
     const lastAssistant = parts.slice().reverse().find(isAssistant);
-    const lastAssistantChars = String(lastAssistant?.innerText || '').length;
+    const lastAssistantChars = visibleText(lastAssistant).length;
     const stop = !!d.querySelector(
       '[data-testid="stop-button"],button[aria-label*="Stop generating"],button[aria-label*="Przerwij generowanie"]');
     // An unrelated busy sidebar must not suppress the current chat.
