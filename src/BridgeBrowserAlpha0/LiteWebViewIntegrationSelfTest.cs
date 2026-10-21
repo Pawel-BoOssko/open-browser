@@ -23,6 +23,17 @@ internal static class LiteWebViewIntegrationSelfTest
             Directory.CreateDirectory(Path.Combine(site, "c", "test"));
             File.WriteAllText(Path.Combine(site, "c", "test", "index.html"),
                 FixtureHtml, new System.Text.UTF8Encoding(false));
+            const string firstChatId = "11111111-1111-1111-1111-111111111111";
+            const string secondChatId = "22222222-2222-2222-2222-222222222222";
+            string firstDir = Path.Combine(site, "c", firstChatId);
+            string secondDir = Path.Combine(site, "c", secondChatId);
+            Directory.CreateDirectory(firstDir);
+            Directory.CreateDirectory(secondDir);
+            File.WriteAllText(Path.Combine(firstDir, "index.html"),
+                FixtureHtml, new System.Text.UTF8Encoding(false));
+            File.WriteAllText(Path.Combine(secondDir, "index.html"),
+                FixtureHtml.Replace("Czarny kompas", "Zielona latarnia",
+                    StringComparison.Ordinal), new System.Text.UTF8Encoding(false));
             using var form = new Form {
                 ShowInTaskbar = false, StartPosition = FormStartPosition.Manual,
                 Location = new Point(-20000, -20000), Size = new Size(640, 420),
@@ -205,8 +216,52 @@ internal static class LiteWebViewIntegrationSelfTest
                     Ensure(await EvaluateAsync(core,
                         "document.querySelectorAll('[data-ob-lite-offscreen]').length") == "0",
                         "soft CSS pilot is fully reversible");
+
+                    // The same WebView2 worker must isolate two different
+                    // chat histories after real document navigations.
+                    phase = "background_two_chat_navigation";
+                    var secondNavigation = new TaskCompletionSource<bool>(
+                        TaskCreationOptions.RunContinuationsAsynchronously);
+                    void secondCompleted(object? sender, CoreWebView2NavigationCompletedEventArgs e) =>
+                        secondNavigation.TrySetResult(e.IsSuccess);
+                    core.NavigationCompleted += secondCompleted;
+                    core.Navigate("https://chatgpt.com/c/" + secondChatId + "/index.html");
+                    Ensure(await secondNavigation.Task.WaitAsync(TimeSpan.FromSeconds(18)),
+                        "second offline chat loaded in existing worker");
+                    core.NavigationCompleted -= secondCompleted;
+                    await core.ExecuteScriptAsync(
+                        "history.replaceState({}, '', '/c/" + secondChatId + "')");
+                    Ensure(LiteDevWakeState.NormalizeUrl(core.Source) == otherUrl,
+                        "second chat has its own exact UUID URL");
+                    Ensure(!await ChatGptLiteForm.IsWorkerHydratedForChatAsync(core, chatUrl),
+                        "first chat cannot use second chat's hydrated DOM");
+                    Ensure(await ChatGptLiteForm.IsWorkerHydratedForChatAsync(core, otherUrl),
+                        "second chat can reuse its own loaded history");
+                    Ensure((await EvaluateAsync(core,
+                        "window.__OPENBROWSER_RESUME_PROBE__?.observe()?.text"))
+                        .Contains("Zielona latarnia"),
+                        "second chat has its distinct assistant answer");
+                    var firstNavigation = new TaskCompletionSource<bool>(
+                        TaskCreationOptions.RunContinuationsAsynchronously);
+                    void firstCompleted(object? sender, CoreWebView2NavigationCompletedEventArgs e) =>
+                        firstNavigation.TrySetResult(e.IsSuccess);
+                    core.NavigationCompleted += firstCompleted;
+                    core.Navigate("https://chatgpt.com/c/" + firstChatId + "/index.html");
+                    Ensure(await firstNavigation.Task.WaitAsync(TimeSpan.FromSeconds(18)),
+                        "first offline chat reloads in the same worker");
+                    core.NavigationCompleted -= firstCompleted;
+                    await core.ExecuteScriptAsync(
+                        "history.replaceState({}, '', '/c/" + firstChatId + "')");
+                    Ensure(!await ChatGptLiteForm.IsWorkerHydratedForChatAsync(core, otherUrl),
+                        "second chat cannot use reloaded first chat DOM");
+                    Ensure(await ChatGptLiteForm.IsWorkerHydratedForChatAsync(core, chatUrl),
+                        "first chat hydrates again after switching back");
+                    Ensure((await EvaluateAsync(core,
+                        "window.__OPENBROWSER_RESUME_PROBE__?.observe()?.text"))
+                        .Contains("Czarny kompas"),
+                        "original answer returns without cross-chat contamination");
                     LiteEventLog.Write("webview_integration_selftest", new {
-                        passed = true, checks = 26, offline = true
+                        passed = true, checks = 34, offline = true
                     });
                     code = 0;
                 }
