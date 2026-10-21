@@ -57,3 +57,14 @@
 - Lokalny legacy DPAPI `dev-wake-settings.dpapi`: Enabled=True, URL suffix `b74f0fc1f389` (projekt), ale aktualna strona startowa nie odpowiada przypiętemu czatowi. Nie wiadomo, czy ChatGPT przekierował z /c/ na /.
 - [SOURCE] `src/BridgeBrowserAlpha0/LiteChatWakeUi.cs` na SatanAMD zmieniony: gdy foreground WebView2 jest na due URL, nadzorca używa tego CoreWebView2; dla innego URL nadal używa osobnego worker. Zamieniono pięć wywołań ExecuteWorkerScript/Preflight na zmienną `wakeCore`; dodatkowy event `multi_wake_target_selected foreground=true/false`. .NET Release build exit0, błędów 0, jedno dotychczasowe MSB3277. **SOURCE ONLY, niewdrożone, nieprzetestowane na realnym URL.**
 - NEXT: wyjaśnić przekierowanie głównego `/c/<id>` na stronę startową oraz zero selektorów DIL, zweryfikować dokładną nazwę i tożsamość czatu. Źródłowa v1.72.17 powinna mieć startup z aktualnego rejestru czatów, nie wyłącznie historycznego legacy, oraz diagnostykę DOM metadata-only. Pełne testy i promocja dopiero po realnym E2E.
+
+## 2026-10-21 22:48–22:57: diagnoza i poprawki SOURCE 1.72.17
+
+- Historia WebView2 na PBOX1: rozmowa „open browser lite” odwiedzona 21:37:44 Warszawa, przy rozpoczęciu tego czatu, kończy się identyfikatorem b7af00a39c5f. Inny rekord „Open Browser Lite” odwiedzono o 22:02:10, końcówka 10ebfae59c8f; nie utożsamiać ich.
+- [ROOT CAUSE] Identyfikator bieżącego URL zawiera zakodowany dwukropek %3A. LIVE 1.72.16 odrzuca ten format w LiteDevWakeState.IsChatUrl, więc wcześniejsze wywołania konfiguracji zatrzymały się przed zapisaniem. Kopia DPAPI zabezpieczona na PBOX1.
+- [SOURCE v1.72.17] LiteDevWakeState.IsChatUrl akceptuje wyłącznie escape %3A obok dotychczasowych znaków; dodano dwa testy regresji %3A i odrzucenia %2F.
+- [SOURCE v1.72.17] LiteChatWakeUi.cs: próba w prawidłowym już otwartym czacie korzysta z foreground CoreWebView2, w przeciwnym razie ze wspólnego background worker. Preferuje aktywny foreground w kolejce due.
+- [SOURCE v1.72.17] ChatGptLiteForm.cs: wybiera startup URL z włączonego harmonogramu wieloczatowego zamiast starego legacy pin, który obecnie prowadził do strony startowej ChatGPT.
+- [TEST] SATANAMD dotnet build Release: exit 0, 0 errors, znane warning MSB3277. Headless --lite-dev-wake-selftest, --lite-chat-wake-selftest, --lite-resume-selftest: exit 0 każde.
+- [LIVE] PBOX1 1.72.16 nadal bez potwierdzonej wysyłki; główne WebView2 na stronie startowej, ukryte WebView2 pokazuje rozmowę książki. Nie oznaczać P0 jako DONE.
+- [NEXT] Po Autosync wydać i kwalifikować 1.72.17 na PBOX1, z backupem i graceful deploy. Następnie rebind własnego czatu b7af... przez nową binarkę, pauza dawnych dwóch harmonogramów, jeden test due i następnie naturalny cykl z unikalnym receipt + checkpointem.

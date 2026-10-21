@@ -224,8 +224,11 @@ internal sealed partial class ChatGptLiteForm : Form
                 // Preserve session data. The user can use Odśwież to retry.
             };
 
-            var startUrl = _devWake.Enabled && LiteDevWakeState.IsChatUrl(_devWake.TargetUrl)
-                ? _devWake.TargetUrl : HomeUrl;
+            // Start on an explicitly enabled chat, not an obsolete legacy pin.
+            var scheduled = LiteChatWakeRegistry.Read().Where(c => c.Enabled).ToArray();
+            var preferred = scheduled.FirstOrDefault(c => c.Url == _devWake.TargetUrl)
+                ?? scheduled.OrderByDescending(c => c.DueUtc).FirstOrDefault();
+            var startUrl = preferred?.Url ?? HomeUrl;
             core.Navigate(startUrl);
             _domMonitor.Start();
             _captureTimer.Start();

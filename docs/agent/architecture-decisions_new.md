@@ -46,6 +46,10 @@ Latest:
 
 ## Accepted Decisions
 
+## 2026-10-21: One-user Open Browser Lite autowork and keepalive
+
+The owner authorizes an application-local scheduled wake for the Open Browser Lite development conversation, as well as one Windows Scheduled Task that checks whether the browser process is running and starts it when absent. A controlled restart of Open Browser Lite is authorized; recoverability has priority. There are approximately 5–10 chats and one owner, not a multi-tenant deployment. Reuse the existing DPAPI chat registry and one WebView2 worker; prefer the already open foreground chat to avoid needless rendering. Focus first on actual conversation continuation with persisted checkpoints, second on RAM/CPU/DOM. Avoid speculative layers or burdensome edge-case controls. Native ChatGPT Tasks/reminders remain disallowed; Windows Autosync performs Git synchronization without manual commits/pushes. Each release must distinguish SOURCE, TEST, STAGED and observed LIVE behavior.
+
 ## 2026-10-19 02:24 — Permit bounded repeats of unconfirmed wake messages
 
 The owner now prefers an occasional duplicate message to a stopped development chat. An ambiguous send, lack of visible ACK, or renderer timeout must NOT permanently disable the application-local wake. Retry after the normal ~25-minute interval, only in the bound chat when High, a stable finished assistant response, no draft and idle UI are verified. Check for the previous receipt before retry, keep encrypted delivery history and the existing daily limit. No native ChatGPT scheduled Tasks; this decision supersedes the older no-retry rule below.

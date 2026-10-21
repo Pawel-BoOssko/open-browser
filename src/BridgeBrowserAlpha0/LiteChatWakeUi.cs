@@ -345,8 +345,13 @@ internal sealed partial class ChatGptLiteForm
         {
             var entries = LiteChatWakeRegistry.Read();
             var now = DateTimeOffset.UtcNow;
-            var due = entries.Where(x => x.Enabled && x.DueUtc <= now)
-                .OrderBy(x => x.DueUtc).FirstOrDefault();
+            var foregroundUrl = _browser.CoreWebView2?.Source;
+            var dueChats = entries.Where(x => x.Enabled && x.DueUtc <= now)
+                .OrderBy(x => x.DueUtc).ToArray();
+            var due = dueChats.FirstOrDefault(x => foregroundUrl is not null &&
+                LiteDevWakeState.IsChatUrl(foregroundUrl) &&
+                LiteDevWakeState.NormalizeUrl(foregroundUrl) == x.Url)
+                ?? dueChats.FirstOrDefault();
             if (due is null) { UpdateMultiWakeStatus(); return; }
             if (!FlushNotes())
             {

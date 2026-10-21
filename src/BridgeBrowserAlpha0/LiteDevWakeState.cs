@@ -62,8 +62,10 @@ internal static class LiteDevWakeState
             uri.Scheme != Uri.UriSchemeHttps ||
             !string.Equals(uri.Host, "chatgpt.com", StringComparison.OrdinalIgnoreCase) ||
             uri.Query.Length != 0 || uri.Fragment.Length != 0) return false;
+        // Some current ChatGPT conversation IDs contain an encoded colon (%3A).
+        // Accept that exact escape without accepting arbitrary URL escapes.
         return Regex.IsMatch(uri.AbsolutePath,
-            @"^/c/[a-z0-9-]{30,80}$", RegexOptions.CultureInvariant);
+            @"^/c/(?:[a-z0-9-]|%3[Aa]){30,80}$", RegexOptions.CultureInvariant);
     }
 
     internal static string NormalizeUrl(string url)
@@ -406,7 +408,11 @@ internal static class LiteDevWakeState
             try { ArmForChat(rearmed, "https://example.org/c/not-a-chat", now); }
             catch (ArgumentException) { invalidChatRejected = true; }
             if (!invalidChatRejected) return 33;
-            LiteEventLog.Write("dev_wake_selftest", new { passed = true, checks = 33 });
+            string encodedId = "https://chatgpt.com/c/" + new string('a', 12) +
+                "%3A" + new string('b', 34);
+            if (!IsChatUrl(encodedId) || !IsChatUrl(NormalizeUrl(encodedId))) return 34;
+            if (IsChatUrl(encodedId.Replace("%3A", "%2F"))) return 35;
+            LiteEventLog.Write("dev_wake_selftest", new { passed = true, checks = 35 });
             return 0;
         }
         catch (Exception ex) {
