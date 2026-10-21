@@ -15,6 +15,7 @@ internal sealed partial class ChatGptLiteForm
     };
     private bool _hardPruneEnabled = false;
     private bool _pruneProbePending;
+    private Task<string>? _pruneProbeTask;
     private int _lastReportedPruned;
 
     private void InitializeHardPruneUi()
@@ -65,13 +66,23 @@ internal sealed partial class ChatGptLiteForm
     private async Task PollHardPruneStatusAsync()
     {
         var core = _browser.CoreWebView2;
-        if (core is null || _pruneProbePending) return;
+        // The hard-prune feature is OFF by default. Do not poll its JS every
+        // minute when it cannot remove anything.
+        if (core is null || !_hardPruneEnabled || _pruneProbePending ||
+            _pruneProbeTask is { IsCompleted: false }) return;
         _pruneProbePending = true;
         try
         {
             string script = "window.__OPENBROWSER_HARD_PRUNE__ ? " +
                 "JSON.stringify(window.__OPENBROWSER_HARD_PRUNE__.status()) : null";
-            string raw = await core.ExecuteScriptAsync(script);
+            var task = core.ExecuteScriptAsync(script);
+            _pruneProbeTask = task;
+            if (await Task.WhenAny(task, Task.Delay(6000)) != task)
+            {
+                LiteEventLog.Write("hard_dom_probe_timeout");
+                return;
+            }
+            string raw = await task;
             string? json = JsonSerializer.Deserialize<string>(raw);
             if (string.IsNullOrWhiteSpace(json)) return;
             using var doc = JsonDocument.Parse(json);
@@ -94,6 +105,10 @@ internal sealed partial class ChatGptLiteForm
             LiteEventLog.Write("hard_dom_status_failed",
                 new { errorType = ex.GetType().Name });
         }
-        finally { _pruneProbePending = false; }
+        finally
+        {
+            _pruneProbePending = false;
+            if (_pruneProbeTask is { IsCompleted: true }) _pruneProbeTask = null;
+        }
     }
 }

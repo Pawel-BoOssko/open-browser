@@ -42,8 +42,15 @@ internal static class LiteWebViewIntegrationSelfTest
                         userDataFolder: Path.Combine(temp, "profile"));
                     phase = "ensure_webview_core";
                     await view.EnsureCoreWebView2Async(env);
-                    phase = "virtual_host_mapping";
                     var core = view.CoreWebView2;
+                    phase = "check_worker_memory_target";
+                    core.MemoryUsageTargetLevel = CoreWebView2MemoryUsageTargetLevel.Low;
+                    Ensure(core.MemoryUsageTargetLevel == CoreWebView2MemoryUsageTargetLevel.Low,
+                        "WebView2 supports Low worker memory target");
+                    core.MemoryUsageTargetLevel = CoreWebView2MemoryUsageTargetLevel.Normal;
+                    Ensure(core.MemoryUsageTargetLevel == CoreWebView2MemoryUsageTargetLevel.Normal,
+                        "WebView2 restores Normal before wake navigation");
+                    phase = "virtual_host_mapping";
                     core.SetVirtualHostNameToFolderMapping("chatgpt.com", site,
                         CoreWebView2HostResourceAccessKind.DenyCors);
                     phase = "install_document_scripts";
@@ -136,8 +143,36 @@ internal static class LiteWebViewIntegrationSelfTest
                     Ensure(await EvaluateAsync(core,
                         "window.__OPENBROWSER_RESUME_PROBE__.observe().error") == "false",
                         "test fixture error can disappear without automatic retry");
+                    phase = "check_dil_soft_pilot";
+                    await core.ExecuteScriptAsync("""
+                        (() => {
+                          const root = document.querySelector('main');
+                          for (let i = 0; i < 95; i++) {
+                            const n = document.createElement('div');
+                            n.style.minHeight = '145px';
+                            n.setAttribute('data-chatgpt-selection-message-id', 'qa-' + i);
+                            n.textContent = 'Offline historical assistant turn ' + i;
+                            root.appendChild(n);
+                          }
+                        })()
+                        """);
+                    // Hidden sidebar aria-busy in the fixture must not block a
+                    // deliberately enabled, offscreen-only CSS pilot.
+                    Ensure(await EvaluateAsync(core,
+                        "window.__OPENBROWSER_LITE_DOM__.getStatus().modernSoftEnabled") == "false",
+                        "modern soft optimizer remains disabled by default");
+                    string softCount = await EvaluateAsync(core,
+                        "window.__OPENBROWSER_LITE_DOM__.setModernSoftEnabled(true).optimized");
+                    Ensure(int.TryParse(softCount, out int softTurns) &&
+                        softTurns >= 50 && softTurns <= 60,
+                        "real WebView2 applies soft CSS to old block DIL messages");
+                    await core.ExecuteScriptAsync(
+                        "window.__OPENBROWSER_LITE_DOM__.setModernSoftEnabled(false)");
+                    Ensure(await EvaluateAsync(core,
+                        "document.querySelectorAll('[data-ob-lite-offscreen]').length") == "0",
+                        "soft CSS pilot is fully reversible");
                     LiteEventLog.Write("webview_integration_selftest", new {
-                        passed = true, checks = 13, offline = true
+                        passed = true, checks = 18, offline = true
                     });
                     code = 0;
                 }

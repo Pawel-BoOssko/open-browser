@@ -19,6 +19,8 @@ internal sealed partial class ChatGptLiteForm : Form
     private readonly Label _domInfo = new() { AutoSize = true, Padding = new Padding(8, 8, 0, 0), Text = "DOM: oczekiwanie" };
     private bool _domEnabled = true;
     private bool _domProbePending;
+    // A timed-out WebView2 script may still run; keep one in-flight probe only.
+    private Task<string>? _domProbeTask;
     private DateTimeOffset _lastHeartbeat = DateTimeOffset.UtcNow;
     private readonly Button _back = new() { Text = "Wstecz", Width = 90 };
     private readonly Button _forward = new() { Text = "Dalej", Width = 85 };
@@ -198,6 +200,11 @@ internal sealed partial class ChatGptLiteForm : Form
 
             core.NavigationStarting += (_, e) =>
             {
+                // A new document is allowed a fresh DOM probe, even if a
+                // previous document left an unresolved ExecuteScriptAsync.
+                _domProbeTask = null;
+                _pruneProbeTask = null;
+                _responseProbeTask = null;
                 _status.Text = "Ładowanie...";
                 LiteEventLog.Write("navigation_start", new { host = LiteEventLog.HostOnly(e.Uri) });
             };
@@ -274,7 +281,8 @@ internal sealed partial class ChatGptLiteForm : Form
     private async Task PollDomAsync()
     {
         var core = _browser.CoreWebView2;
-        if (core is null || _domProbePending) return;
+        if (core is null || _domProbePending ||
+            _domProbeTask is { IsCompleted: false }) return;
         if (!Uri.TryCreate(core.Source, UriKind.Absolute, out var url) ||
             url.Host != "chatgpt.com") return;
 
@@ -283,12 +291,15 @@ internal sealed partial class ChatGptLiteForm : Form
         {
             var call = core.ExecuteScriptAsync(
                 "window.__OPENBROWSER_LITE_DOM__ ? JSON.stringify(window.__OPENBROWSER_LITE_DOM__.getStatus()) : null");
+            _domProbeTask = call;
             if (await Task.WhenAny(call, Task.Delay(7000)) != call)
             {
                 _domInfo.Text = "DOM: strona nie odpowiada";
                 LiteEventLog.Write("dom_probe_timeout");
+                // No second ExecuteScriptAsync until this one settles (or
+                // navigation replaces the document). Do not await a hung call.
+                return;
             }
-            // A single pending probe prevents piling up unresponsive script calls.
             var raw = await call;
             var decoded = JsonSerializer.Deserialize<string>(raw);
             if (string.IsNullOrWhiteSpace(decoded)) return;
@@ -315,6 +326,8 @@ internal sealed partial class ChatGptLiteForm : Form
         finally
         {
             _domProbePending = false;
+            if (_domProbeTask is { IsCompleted: true })
+                _domProbeTask = null;
         }
     }
 

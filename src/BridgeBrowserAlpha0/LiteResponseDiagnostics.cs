@@ -7,6 +7,7 @@ internal sealed partial class ChatGptLiteForm
 {
     private readonly System.Windows.Forms.Timer _responseTimer = new() { Interval = 20000 };
     private bool _responseProbePending;
+    private Task<string>? _responseProbeTask;
     private string _lastResponseFailure = "";
     private DateTimeOffset? _responseFailureSinceUtc;
     private bool _lastGenerationSignal;
@@ -52,7 +53,8 @@ internal sealed partial class ChatGptLiteForm
     private async Task PollResponseDiagnosticsAsync()
     {
         var core = _browser.CoreWebView2;
-        if (core is null || _responseProbePending) return;
+        if (core is null || _responseProbePending ||
+            _responseProbeTask is { IsCompleted: false }) return;
         if (!Uri.TryCreate(core.Source, UriKind.Absolute, out var uri) ||
             uri.Host != "chatgpt.com") return;
         _responseProbePending = true;
@@ -60,12 +62,15 @@ internal sealed partial class ChatGptLiteForm
         {
             var query = core.ExecuteScriptAsync(
                 "window.__OPENBROWSER_RESPONSE_SIGNALS__ ? JSON.stringify(window.__OPENBROWSER_RESPONSE_SIGNALS__.read()) : null");
+            _responseProbeTask = query;
             var winner = await Task.WhenAny(query, Task.Delay(8000));
             if (winner != query)
             {
                 LiteEventLog.Write("response_probe_delayed", new { beyondMs = 8000 });
+                // Never keep the Windows UI await hanging. An unfinished
+                // ExecuteScriptAsync stays tracked, so no second call piles up.
+                return;
             }
-            // Keep this probe single-flight even when WebView's JS is hung.
             var raw = await query;
             string? inner = JsonSerializer.Deserialize<string>(raw);
             if (string.IsNullOrEmpty(inner)) return;
@@ -135,6 +140,11 @@ internal sealed partial class ChatGptLiteForm
         {
             LiteEventLog.Write("response_probe_failed", new { errorType = ex.GetType().Name });
         }
-        finally { _responseProbePending = false; }
+        finally
+        {
+            _responseProbePending = false;
+            if (_responseProbeTask is { IsCompleted: true })
+                _responseProbeTask = null;
+        }
     }
 }
