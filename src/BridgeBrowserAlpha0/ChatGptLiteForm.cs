@@ -295,7 +295,7 @@ internal sealed partial class ChatGptLiteForm : Form
         try
         {
             var call = core.ExecuteScriptAsync(
-                "window.__OPENBROWSER_LITE_DOM__ ? JSON.stringify(window.__OPENBROWSER_LITE_DOM__.getStatus()) : null");
+                "window.__OPENBROWSER_LITE_DOM__ ? JSON.stringify(window.__OPENBROWSER_LITE_DOM__.check()) : null");
             _domProbeTask = call;
             if (await Task.WhenAny(call, Task.Delay(7000)) != call)
             {

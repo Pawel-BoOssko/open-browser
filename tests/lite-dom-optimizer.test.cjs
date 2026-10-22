@@ -37,7 +37,8 @@ function createTest(turnCount, options = {}) {
     document, location: { hostname: options.host || "chatgpt.com" },
     CSS: { supports: () => options.supported !== false },
     performance: { now: () => currentTime++ },
-    setInterval(fn) { this.interval = fn; return 1; }
+    intervalArms: 0,
+    setInterval(fn) { this.intervalArms++; this.interval = fn; return this.intervalArms; }
   };
   vm.runInNewContext(script, { window, Date });
   return { nodes, document, window, styles, api: window.__OPENBROWSER_LITE_DOM__ };
@@ -54,11 +55,16 @@ function createTest(turnCount, options = {}) {
   assert.equal(t.api.getStatus().optimized, 25);
   assert.equal(t.nodes.filter(n => n.hasAttribute(flag)).length, 25);
   assert.equal(t.styles.length, 1);
-  t.window.interval();
+  assert.equal(t.window.intervalArms, 0,
+    "Lite host owns the 30s DOM monitoring cycle; JS installs no duplicate timer");
+  assert.equal(t.api.getStatus().turnCount, 65);
+  t.api.check();
   assert.equal(t.styles.length, 1, "stylesheet must not be duplicated");
   t.api.setEnabled(false);
   assert.equal(t.nodes.filter(n => n.hasAttribute(flag)).length, 0);
   t.api.setEnabled(true);
+  assert.equal(t.window.intervalArms, 0,
+    "toggling optimizer does not install a second monitoring scheduler");
   assert.equal(t.nodes.filter(n => n.hasAttribute(flag)).length, 25);
   t.document.activeElement = t.nodes[2];
   t.api.check();

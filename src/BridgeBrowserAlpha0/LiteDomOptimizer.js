@@ -17,7 +17,8 @@
     skippedBusy: false, lastDurationMs: 0, lastCheckedAt: null, errorCount: 0,
     totalDomElements: null, domSampleAt: null
   };
-  let timer = null;
+  // The WinForms _domMonitor already invokes check() every 30 seconds.
+  // Do not install a competing JavaScript polling timer in the same page.
 
   function busy() {
     // A sidebar may retain aria-busy even when the assistant is idle.
@@ -134,8 +135,8 @@
   }
 
   function begin() {
+    // Initial on-load census; subsequent work is owned by the host.
     check();
-    if (!timer) timer = global.setInterval(check, 30000);
   }
 
   global.__OPENBROWSER_LITE_DOM__ = { check, setEnabled,
