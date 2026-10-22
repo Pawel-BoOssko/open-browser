@@ -318,6 +318,9 @@ internal static class LiteWebViewIntegrationSelfTest
                     Ensure(await EvaluateAsync(core,
                         "window.__OPENBROWSER_RESUME_SENDER__.hasAck('" + receiptB + "')") ==
                         "true", "second chat has a real unique user-bubble receipt");
+                    Ensure(await EvaluateAsync(core,
+                        "window.__OPENBROWSER_RESUME_SENDER__.diagnose().pendingReceipts") ==
+                        "0", "clicked background wake releases the full pending payload");
                     Ensure(await EvaluateAsync(core, directB) == "already_visible",
                         "second chat receipt cannot be sent twice");
                     string blockedPayload = "[OB-" + receiptBlocked +
@@ -337,6 +340,9 @@ internal static class LiteWebViewIntegrationSelfTest
                         "window.__OPENBROWSER_RESUME_SENDER__.hasAck('" +
                         receiptBlocked + "')") == "false",
                         "wrong-chat pending wake was never delivered");
+                    Ensure(await EvaluateAsync(core,
+                        "window.__OPENBROWSER_RESUME_SENDER__.diagnose().pendingReceipts") ==
+                        "0", "blocked cross-chat pending payload is released");
                     await core.ExecuteScriptAsync(
                         "document.querySelector('#prompt-textarea').innerText=''");
                     var firstNavigation = new TaskCompletionSource<bool>(
@@ -376,7 +382,7 @@ internal static class LiteWebViewIntegrationSelfTest
                         10, 10, new Uri(chatUrl), "about:blank"),
                         "archive rejects non-ChatGPT navigation result");
                     LiteEventLog.Write("webview_integration_selftest", new {
-                        passed = true, checks = 66, offline = true
+                        passed = true, checks = 68, offline = true
                     });
                     code = 0;
                 }

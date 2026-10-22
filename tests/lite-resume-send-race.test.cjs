@@ -304,4 +304,39 @@ function setup(options = {}) {
     "never submit a persisted draft during generation");
   assert.equal(p.count(), 0);
 }
-console.log("LiteResumeSenderRace: 31 PASS");
+{
+  // A long-lived SPA route may wake hundreds of times without a full reload.
+  // Successful sends must drop message bodies, not grow an in-memory outbox.
+  const p = setup();
+  for (let i = 0; i < 192; i++) {
+    const receipt = i.toString(16).padStart(32, "0");
+    assert.equal(p.sender.sendDirect(prompt, receipt, true), "submission_requested");
+    assert.equal(p.sender.submitDirect(receipt), "click_invoked");
+    assert.equal(p.sender.diagnose().pendingReceipts, 0,
+      "clicked payload must be released immediately");
+    p.editor.innerText = ""; // simulated successful composer clearance by React
+  }
+  assert.equal(p.count(), 192);
+  assert.ok(p.sender.diagnose().rememberedReceipts <= 128,
+    "attempted receipt metadata is bounded");
+  assert.ok(p.sender.diagnose().rememberedPhases <= 128,
+    "sender phase history is bounded");
+}
+{
+  // A permanently unclickable pending draft must never retain an
+  // unbounded number of old payloads across React SPA retries.
+  const p = setup({ missingSendButton: true });
+  const receipts = [];
+  for (let i = 0; i < 12; i++) {
+    const receipt = (i + 200).toString(16).padStart(32, "0");
+    receipts.push(receipt);
+    assert.equal(p.sender.sendDirect(prompt, receipt, true), "submission_requested");
+    p.editor.innerText = ""; // test page replaces the old composer contents
+  }
+  assert.ok(p.sender.diagnose().pendingReceipts <= 8,
+    "pending editor payloads have a hard memory bound");
+  assert.equal(p.sender.phase(receipts[0]), "blocked_pending_evicted",
+    "evicted oldest pending receipt cannot silently submit");
+  assert.equal(p.sender.submitDirect(receipts[0]), "blocked_pending_evicted");
+}
+console.log("LiteResumeSenderRace: 33 PASS");

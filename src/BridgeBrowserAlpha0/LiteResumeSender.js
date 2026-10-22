@@ -76,7 +76,11 @@
       stopPresent: !!w.document.querySelector('[data-testid="stop-button"]'),
       stopVisible: busy(),
       // Only counts; never copies user drafts or page content.
-      globalAriaBusyCount: w.document.querySelectorAll?.('[aria-busy="true"]')?.length || 0
+      globalAriaBusyCount: w.document.querySelectorAll?.('[aria-busy="true"]')?.length || 0,
+      // Counts only: no prompt text, drafts or receipt IDs in diagnostics.
+      rememberedReceipts: attempted.size,
+      rememberedPhases: phases.size,
+      pendingReceipts: directPending.size
     };
   }
   function composer() {
@@ -114,14 +118,14 @@
     if (!/^\/c\//.test(w.location.pathname) ||
         !/^[a-f0-9]{32}$/.test(receiptId) ||
         text.length < 16 || text.length > 1700) return "invalid";
-    if (hasAck(receiptId)) return "already_visible";
+    if (hasAck(receiptId)) { directPending.delete(receiptId); return "already_visible"; }
     if (attempted.has(receiptId)) return "already_attempted";
     const reason = busyReason();
     if (reason) return 'busy_' + reason;
     const el = composer();
     const targetPath = w.location.pathname;
-    attempted.add(receiptId);
-    phases.set(receiptId, "preparing");
+    rememberAttempt(receiptId);
+    rememberPhase(receiptId, "preparing");
     const payload = "[OB-" + receiptId + "]\n" + text;
     el.focus();
     if ("value" in el) {
@@ -137,35 +141,35 @@
     }
     // Never equate insertion into the editor with a send. Capture the click
     // outcome for the host; any missing control leaves an explicit draft state.
-    phases.set(receiptId, "draft_prepared");
+    rememberPhase(receiptId, "draft_prepared");
     w.setTimeout(() => {
       if (w.location.hostname !== "chatgpt.com" ||
           w.location.pathname !== targetPath) {
-        phases.set(receiptId, "blocked_navigation"); return;
+        rememberPhase(receiptId, "blocked_navigation"); return;
       }
       if (composer() !== el) {
-        phases.set(receiptId, "blocked_editor_replaced"); return;
+        rememberPhase(receiptId, "blocked_editor_replaced"); return;
       }
       if (busy()) {
-        phases.set(receiptId, "blocked_generation"); return;
+        rememberPhase(receiptId, "blocked_generation"); return;
       }
       if (!samePayload(el.value || el.innerText || el.textContent, payload)) {
-        phases.set(receiptId, "blocked_editor_changed"); return;
+        rememberPhase(receiptId, "blocked_editor_changed"); return;
       }
       // Observed ChatGPT DIL composer on 2026-10-19: the Send button has
       // no data-testid. Scope the exact submit action to the composer form;
       // never mistake the purple voice button for Send.
       const btn = sendButton(el);
       if (!btn) {
-        phases.set(receiptId, "draft_button_missing"); return;
+        rememberPhase(receiptId, "draft_button_missing"); return;
       }
       if (btn.disabled || btn.getAttribute?.('aria-disabled') === 'true') {
-        phases.set(receiptId, "draft_button_disabled"); return;
+        rememberPhase(receiptId, "draft_button_disabled"); return;
       }
       try {
         btn.click();
-        phases.set(receiptId, "click_invoked");
-      } catch (_) { phases.set(receiptId, "draft_click_failed"); }
+        rememberPhase(receiptId, "click_invoked");
+      } catch (_) { rememberPhase(receiptId, "draft_click_failed"); }
     }, 250);
     return "submission_requested";
   }
@@ -176,7 +180,8 @@
         !/^[a-f0-9]{32}$/.test(receiptId) ||
         typeof text !== "string" || text.length < 16 || text.length > 45000)
       return "invalid";
-    if (hasAck(receiptId)) return "already_visible";
+    expireDirectPending();
+    if (hasAck(receiptId)) { directPending.delete(receiptId); return "already_visible"; }
     if (attempted.has(receiptId)) return "already_attempted";
     const reason = busyReason();
     if (reason) return "busy_" + reason;
@@ -184,8 +189,10 @@
     if (!el) return "missing_composer";
     const targetPath = w.location.pathname;
     const payload = text;
-    attempted.add(receiptId);
-    directPending.set(receiptId, { editor: el, path: targetPath, payload });
+    rememberAttempt(receiptId);
+    directPending.set(receiptId, {
+      editor: el, path: targetPath, payload, createdAt: Date.now()
+    });
     el.focus();
     try {
       if ("value" in el) {
@@ -202,17 +209,20 @@
       el.textContent = payload;
       el.dispatchEvent(new w.Event("input", { bubbles: true }));
     }
-    phases.set(receiptId, "direct_injected");
+    rememberPhase(receiptId, "direct_injected");
     const trySubmit = (remaining) => {
       const phaseNow = phases.get(receiptId) || "";
       if (phaseNow === "click_invoked" || phaseNow === "form_submitted" ||
-          phaseNow.startsWith("blocked_")) return;
+          phaseNow.startsWith("blocked_")) {
+        directPending.delete(receiptId);
+        return;
+      }
       if (w.location.pathname !== targetPath) {
-        phases.set(receiptId, "blocked_navigation"); return;
+        forgetDirect(receiptId, "blocked_navigation"); return;
       }
       if (composer() !== el || busy() ||
           !samePayload(el.value || el.innerText || el.textContent, payload)) {
-        phases.set(receiptId, "blocked_changed_or_busy"); return;
+        forgetDirect(receiptId, "blocked_changed_or_busy"); return;
       }
       const form = el.closest?.("form") || w.document.querySelector("form[data-chatgpt-composer]");
       const btn = sendButton(el) ||
@@ -220,12 +230,12 @@
         w.document.querySelector('[data-testid="send-button"],button[aria-label="Wyślij"],button[aria-label="Send"],button[aria-label="Send message"]');
       if (btn && !btn.disabled) {
         btn.click();
-        phases.set(receiptId, "click_invoked");
+        forgetDirect(receiptId, "click_invoked");
       } else if (remaining > 0) {
         w.setTimeout(() => trySubmit(remaining - 1), 250);
       } else {
         // requestSubmit on an unhydrated React form is not evidence of delivery.
-        phases.set(receiptId, "draft_button_missing");
+        rememberPhase(receiptId, "draft_button_missing");
       }
     };
     if (!hostManaged) w.setTimeout(() => trySubmit(6), 500);
@@ -236,27 +246,21 @@
   function submitDirect(receiptId) {
     const previous = phases.get(receiptId);
     if (previous === "click_invoked" || previous === "form_submitted" ||
-        previous?.startsWith("blocked_"))
+        previous?.startsWith("blocked_")) {
+      directPending.delete(receiptId);
       return previous;
+    }
     const pending = directPending.get(receiptId);
     if (!pending) return "unknown_receipt";
-    if (w.location.pathname !== pending.path) {
-      phases.set(receiptId, "blocked_navigation");
-      return "blocked_navigation";
-    }
+    if (w.location.pathname !== pending.path)
+      return forgetDirect(receiptId, "blocked_navigation");
     const el = pending.editor;
-    if (composer() !== el) {
-      phases.set(receiptId, "blocked_editor_replaced");
-      return "blocked_editor_replaced";
-    }
-    if (busy()) {
-      phases.set(receiptId, "blocked_generation");
-      return "blocked_generation";
-    }
-    if (!samePayload(el.value || el.innerText || el.textContent, pending.payload)) {
-      phases.set(receiptId, "blocked_editor_changed");
-      return "blocked_editor_changed";
-    }
+    if (composer() !== el)
+      return forgetDirect(receiptId, "blocked_editor_replaced");
+    if (busy())
+      return forgetDirect(receiptId, "blocked_generation");
+    if (!samePayload(el.value || el.innerText || el.textContent, pending.payload))
+      return forgetDirect(receiptId, "blocked_editor_changed");
     const form = el.closest?.("form") ||
       w.document.querySelector("form[data-chatgpt-composer]");
     const button = sendButton(el) ||
@@ -265,8 +269,7 @@
     if (button && !button.disabled &&
         button.getAttribute?.('aria-disabled') !== 'true') {
       button.click();
-      phases.set(receiptId, "click_invoked");
-      return "click_invoked";
+      return forgetDirect(receiptId, "click_invoked");
     }
     // Fail closed rather than silently submitting a stale or unhydrated form.
     return "draft_button_missing";
