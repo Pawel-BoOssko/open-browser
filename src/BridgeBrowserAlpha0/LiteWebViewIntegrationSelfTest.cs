@@ -263,6 +263,44 @@ internal static class LiteWebViewIntegrationSelfTest
                     Ensure(LiteChatWakePreflight.StableAssistantFingerprint(
                         draftOld, draftOldAgain, recoverPath) == oldHash,
                         "stable assistant hash remains available behind a pending draft");
+                    phase = "assistant_history_structural_stability";
+                    Ensure(LiteChatWakePreflight.SameConversationHistory(
+                        draftOld, draftOldAgain),
+                        "unchanged turn and message counters define stable history");
+                    draftOldAgain.TurnCount++;
+                    Ensure(LiteChatWakePreflight.StableAssistantFingerprint(
+                        draftOld, draftOldAgain, recoverPath) == "",
+                        "new turn while assistant text is unchanged cannot certify baseline");
+                    draftOldAgain.TurnCount--;
+                    draftOldAgain.AssistantNodeCount++;
+                    Ensure(LiteChatWakePreflight.StableAssistantFingerprint(
+                        draftOld, draftOldAgain, recoverPath) == "",
+                        "assistant node count changing cannot certify history");
+                    draftOldAgain.AssistantNodeCount--;
+                    draftOldAgain.UserNodeCount++;
+                    Ensure(!LiteChatWakePreflight.SameConversationHistory(
+                        draftOld, draftOldAgain),
+                        "new user bubble invalidates two-snapshot history");
+                    draftOldAgain.UserNodeCount--;
+                    draftOldAgain.LastAssistantChars++;
+                    Ensure(LiteChatWakePreflight.StableAssistantFingerprint(
+                        draftOld, draftOldAgain, recoverPath) == "",
+                        "assistant character count changing invalidates old hash");
+                    draftOldAgain.LastAssistantChars--;
+                    draftOld.HasDraft = false; draftOldAgain.HasDraft = false;
+                    draftOldAgain.UserNodeCount++;
+                    Ensure(LiteChatWakePreflight.Eligibility(
+                        draftOld, draftOldAgain, recoverPath, "") == "history_not_stable",
+                        "same assistant text does not permit wake as user history changes");
+                    draftOldAgain.UserNodeCount--;
+                    Ensure(LiteChatWakePreflight.Eligibility(
+                        draftOld, draftOldAgain, recoverPath,
+                        oldHash.ToLowerInvariant()) == "same_answer_already_woken",
+                        "lowercase durable hash cannot trigger duplicate of same response");
+                    draftOld.HasDraft = true; draftOldAgain.HasDraft = true;
+                    Ensure(LiteChatWakePreflight.SameConversationHistory(
+                        draftOld, draftOldAgain),
+                        "stabilized history resumes eligibility normally");
                     Ensure(LiteChatWakePreflight.StableAssistantFingerprint(
                         draftOld, draftOldAgain, "/c/22222222-2222-2222-2222-222222222222") == "",
                         "foreign chat cannot provide recovery baseline fingerprint");
@@ -927,7 +965,7 @@ internal static class LiteWebViewIntegrationSelfTest
                         10, 10, new Uri(chatUrl), "about:blank"),
                         "archive rejects non-ChatGPT navigation result");
                     LiteEventLog.Write("webview_integration_selftest", new {
-                        passed = true, checks = 174, offline = true
+                        passed = true, checks = 182, offline = true
                     });
                     code = 0;
                 }

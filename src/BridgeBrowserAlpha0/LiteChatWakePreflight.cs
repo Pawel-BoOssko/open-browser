@@ -25,6 +25,16 @@ internal static class LiteChatWakePreflight
     internal static string Fingerprint(string answer) =>
         Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(answer.Trim())));
 
+    // A stable last-answer text alone does not imply stable history. React
+    // can insert an earlier/later turn while the last assistant text remains
+    // identical. Do not wake until both observations agree on the structure.
+    internal static bool SameConversationHistory(
+        Observation first, Observation second) =>
+        first.TurnCount == second.TurnCount &&
+        first.AssistantNodeCount == second.AssistantNodeCount &&
+        first.UserNodeCount == second.UserNodeCount &&
+        first.LastAssistantChars == second.LastAssistantChars;
+
     // A draft can mask an otherwise stable assistant turn in Eligibility().
     // Capture only its hash, never its text, so an uncertain recovery click
     // cannot be followed by a wake based on the SAME assistant answer.
@@ -39,6 +49,7 @@ internal static class LiteChatWakePreflight
             first.Role != "assistant" || second.Role != "assistant" ||
             first.TurnCount < 1 || second.TurnCount < 1 ||
             first.AssistantNodeCount < 1 || second.AssistantNodeCount < 1 ||
+            !SameConversationHistory(first, second) ||
             string.IsNullOrWhiteSpace(first.Text) ||
             string.IsNullOrWhiteSpace(second.Text)) return "";
         string firstHash = Fingerprint(first.Text);
@@ -61,9 +72,11 @@ internal static class LiteChatWakePreflight
             first.AssistantNodeCount < 1 || second.AssistantNodeCount < 1 ||
             string.IsNullOrWhiteSpace(first.Text) || string.IsNullOrWhiteSpace(second.Text))
             return "assistant_not_complete";
+        if (!SameConversationHistory(first, second)) return "history_not_stable";
         string hash = Fingerprint(second.Text);
         if (hash != Fingerprint(first.Text)) return "answer_not_stable";
-        if (hash == lastAttemptAnswerHash) return "same_answer_already_woken";
+        if (string.Equals(hash, lastAttemptAnswerHash,
+            StringComparison.OrdinalIgnoreCase)) return "same_answer_already_woken";
         return "ready";
     }
 
@@ -84,6 +97,18 @@ internal static class LiteChatWakePreflight
             Text = a.Text, ComposerReady = true, TurnCount = 4, AssistantNodeCount = 2 };
         if (Eligibility(a, b, path, "") != "ready") return 2;
         if (Eligibility(a, b, path, Fingerprint(a.Text)) != "same_answer_already_woken") return 3;
+        if (Eligibility(a, b, path, Fingerprint(a.Text).ToLowerInvariant()) !=
+            "same_answer_already_woken") return 10;
+        b.TurnCount = 5;
+        if (Eligibility(a, b, path, "") != "history_not_stable" ||
+            StableAssistantFingerprint(a, b, path) != "") return 11;
+        b.TurnCount = 4; b.UserNodeCount = 1;
+        if (Eligibility(a, b, path, "") != "history_not_stable") return 12;
+        b.UserNodeCount = 0; b.AssistantNodeCount = 3;
+        if (Eligibility(a, b, path, "") != "history_not_stable") return 13;
+        b.AssistantNodeCount = 2; b.LastAssistantChars = 5;
+        if (Eligibility(a, b, path, "") != "history_not_stable") return 14;
+        b.LastAssistantChars = 0;
         b.Generating = true;
         if (Eligibility(a, b, path, "") != "generating") return 4;
         b.Generating = false; b.HasDraft = true;
