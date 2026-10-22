@@ -129,10 +129,10 @@ internal sealed partial class ChatGptLiteForm
             Left = 15, Top = 12, Width = 530, Height = 36,
             Text = "Ustawienia dotyczą tylko aktualnej rozmowy. Inne czaty zachowują własny harmonogram."
         };
-        var intervalLabel = new Label { Text = "Odstęp (20–1440 min):", Left = 15, Top = 60, Width = 180 };
+        var intervalLabel = new Label { Text = "Odstęp (15–1440 min):", Left = 15, Top = 60, Width = 180 };
         var interval = new NumericUpDown
         {
-            Minimum = 20, Maximum = 1440, Value = existing?.Minutes ?? 25,
+            Minimum = 15, Maximum = 1440, Value = existing?.Minutes ?? 15,
             Left = 205, Top = 58, Width = 90
         };
         var messageLabel = new Label { Text = "Polecenie wysyłane przy wznowieniu:", Left = 15, Top = 98, Width = 450 };
@@ -914,13 +914,13 @@ internal sealed partial class ChatGptLiteForm
                     due.LastAttemptUtc = now;
                     due.DueUtc = now.AddMinutes(due.Minutes);
                     due.LastState = "attempting";
+                    due.WakeSequence = checked(due.WakeSequence + 1);
                     LiteChatWakeRegistry.Write(entries);
                     attemptCommitted = true;
                     var key = LiteChatNotes.NormalizeKey(due.Url);
-                    string text = LiteChatWakeRegistry.Message(due,
-                        _noteStore.Load(key));
                     string receipt = Guid.NewGuid().ToString("N");
-                    string payload = "[OB-" + receipt + "]\n" + text;
+                    string payload = LiteChatWakeRegistry.NumberedMessage(
+                        due, _noteStore.Load(key), receipt);
                     // Bind target identity inside the *same* script invocation
                     // that injects the prompt. A changed SPA route must not send.
                     string js = "window.__OPENBROWSER_RESUME_SENDER__?.sendDirect(" +
@@ -1021,6 +1021,7 @@ internal sealed partial class ChatGptLiteForm
                         return;
                     }
                     LiteEventLog.Write("multi_wake_send", new {
+                        wakeSequence = due.WakeSequence,
                         state, phase, visibleUserBubble = visible,
                         receiptConfirmed = visible, // unique receipt; never match older messages
                         includesNotes = !string.IsNullOrWhiteSpace(_noteStore.Load(key)),

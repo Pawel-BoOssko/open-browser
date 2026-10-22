@@ -12,6 +12,8 @@ internal static class LiteChatWakeRegistry
         public string Url { get; set; } = "";
         public bool Enabled { get; set; }
         public int Minutes { get; set; } = 25;
+        // Durable per-conversation wake attempt ID. Incremented before sending.
+        public long WakeSequence { get; set; }
         public DateTimeOffset DueUtc { get; set; }
         public DateTimeOffset LastAttemptUtc { get; set; }
         public string LastState { get; set; } = "armed";
@@ -61,7 +63,7 @@ internal static class LiteChatWakeRegistry
             foreach (var c in store.Chats)
             {
                 if (!LiteDevWakeState.IsChatUrl(c.Url) || !urls.Add(c.Url) ||
-                    c.Minutes is < 20 or > 1440 || c.Prompt.Length > 16000 ||
+                    c.Minutes is < 15 or > 1440 || c.Prompt.Length > 16000 || c.WakeSequence < 0 ||
                     (c.LastAnswerFingerprint.Length != 0 &&
                      (c.LastAnswerFingerprint.Length != 64 ||
                       !c.LastAnswerFingerprint.All(Uri.IsHexDigit))))
@@ -75,8 +77,8 @@ internal static class LiteChatWakeRegistry
     internal static void Write(List<Chat> chats)
     {
         if (chats.Count > 48 || chats.Any(c =>
-            !LiteDevWakeState.IsChatUrl(c.Url) || c.Minutes is < 20 or > 1440 ||
-            c.Prompt.Length > 16000 ||
+            !LiteDevWakeState.IsChatUrl(c.Url) || c.Minutes is < 15 or > 1440 ||
+            c.Prompt.Length > 16000 || c.WakeSequence < 0 ||
             (c.LastAnswerFingerprint.Length != 0 &&
              (c.LastAnswerFingerprint.Length != 64 ||
               !c.LastAnswerFingerprint.All(Uri.IsHexDigit)))) ||
@@ -101,7 +103,7 @@ internal static class LiteChatWakeRegistry
         string prompt, DateTimeOffset now)
     {
         url = LiteDevWakeState.NormalizeUrl(url);
-        if (minutes is < 20 or > 1440 || string.IsNullOrWhiteSpace(prompt) ||
+        if (minutes is < 15 or > 1440 || string.IsNullOrWhiteSpace(prompt) ||
             prompt.Length > 16000) throw new ArgumentException("Invalid wake options");
         var entry = chats.FirstOrDefault(c => c.Url == url);
         if (entry is null) { entry = new Chat { Url = url }; chats.Add(entry); }
@@ -130,6 +132,29 @@ internal static class LiteChatWakeRegistry
         return msg;
     }
 
+    // One stable numeric ID per attempted wake in this chat, even if
+    // the renderer later crashes or an ACK is missing. Gaps are intentional.
+    internal static string NumberedMessage(Chat entry, string notes, string receipt)
+    {
+        string body = Message(entry, notes);
+        string marker = "[OB-" + receipt + "] [OB-WAKE-" +
+            entry.WakeSequence.ToString("D6") + "]";
+        bool project = body.Contains("Open Browser Lite", StringComparison.OrdinalIgnoreCase) ||
+            body.Contains(@"D:\projects\open-browser", StringComparison.OrdinalIgnoreCase);
+        if (project)
+            body += "\n\nOBOWIĄZKOWY CHECKPOINT [OB-WAKE-" +
+                entry.WakeSequence.ToString("D6") +
+                "]: zapisuj regularnie krótkie, konkretne postępy do " +
+                @"D:\projects\open-browser\docs\OPENBROWSER_LITE_WORK_STATUS_2026-10-21.md" +
+                " na SatanAMD, także przed ryzykownym wdrożeniem i przed końcem tego " +
+                "przebiegu. Dopisz numer wywołania, czas, wersję SOURCE i LIVE, " +
+                "zmiany, wyniki testów, przeszkody oraz następny krok; " +
+                "5-10 krótkich linii wystarczy. Dzięki temu kolejny czat " +
+                "ma odzyskać pracę nawet po awarii interfejsu. " +
+                "Nie używaj ChatGPT Tasks ani wewnętrznych automatyzacji.";
+        return marker + "\n" + body;
+    }
+
     internal static int SelfTest()
     {
         try
@@ -151,6 +176,19 @@ internal static class LiteChatWakeRegistry
             list[0].LastAnswerFingerprint = new string('A', 64);
             Configure(list, a, 25, "Renewed project work", now);
             if (list[0].LastAnswerFingerprint != "") return 7;
+            Configure(list, a, 15, "Kontynuuj Open Browser Lite", now);
+            if (list[0].Minutes != 15 ||
+                list[0].DueUtc != now.AddMinutes(15)) return 8;
+            list[0].WakeSequence = 27;
+            string numbered = NumberedMessage(list[0], "",
+                "0123456789abcdef0123456789abcdef");
+            if (!numbered.Contains("[OB-WAKE-000027]") ||
+                !numbered.Contains("OBOWIĄZKOWY CHECKPOINT") ||
+                !numbered.Contains("OPENBROWSER_LITE_WORK_STATUS_2026-10-21.md"))
+                return 9;
+            list[1].WakeSequence = 2;
+            if (NumberedMessage(list[1], "", "0123456789abcdef0123456789abcdef")
+                .Contains("OBOWIĄZKOWY CHECKPOINT")) return 10;
             int preflight = LiteChatWakePreflight.SelfTest();
             return preflight == 0 ? 0 : 10 + preflight;
         }
