@@ -17,8 +17,14 @@ function createTest(turnCount, options = {}) {
       removeAttribute(name) { attrs.delete(name); }
     };
   });
+  if (options.busy && nodes.length) nodes[nodes.length - 1].setAttribute("aria-busy", "true");
+  if (options.recentBusy && nodes.length > 1) nodes[nodes.length - 2].setAttribute("aria-busy", "true");
+  if (options.staleBusy && nodes.length) nodes[0].setAttribute("aria-busy", "true");
   const styles = [];
   const main = {
+    getAttribute(name) {
+      return name === "aria-busy" && options.mainBusy ? "true" : null;
+    },
     querySelectorAll(selector) {
       if (selector === '[data-user-message-bubble],[data-chatgpt-selection-message-id]')
         return document.modernNodes || [];
@@ -120,6 +126,19 @@ function createTest(turnCount, options = {}) {
   const t = createTest(100, { busy: true });
   assert.equal(t.api.getStatus().optimized, 0);
   assert.equal(t.api.getStatus().skippedBusy, true);
+}
+{
+  const t = createTest(100, { staleBusy: true });
+  assert.equal(t.api.getStatus().skippedBusy, false,
+    "stale aria-busy in an old completed turn must not block the active chat");
+  assert.equal(t.api.getStatus().optimized, 60,
+    "old busy marker must not disable otherwise safe legacy CSS optimization");
+}
+{
+  const t = createTest(100, { mainBusy: true });
+  assert.equal(t.api.getStatus().skippedBusy, true,
+    "main itself busy still blocks mutations even without Stop button");
+  assert.equal(t.api.getStatus().optimized, 0);
 }
 {
   const t = createTest(100, { supported: false });

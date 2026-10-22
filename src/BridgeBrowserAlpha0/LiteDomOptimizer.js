@@ -20,7 +20,7 @@
   // The WinForms _domMonitor already invokes check() every 30 seconds.
   // Do not install a competing JavaScript polling timer in the same page.
 
-  function busy() {
+  function busy(main, turns) {
     // Sidebar Stop controls can belong to an unrelated chat. Evaluate ALL
     // candidates: the first match may be a sidebar button while the active
     // chat's real Stop lives in main or a top-level React portal.
@@ -33,7 +33,16 @@
         button.getAttribute?.('aria-hidden') !== 'true' &&
         (typeof button.getClientRects !== 'function' ||
           button.getClientRects().length !== 0));
-    return stop || !!doc.querySelector('main [aria-busy="true"]');
+    if (stop || main?.getAttribute?.('aria-busy') === 'true') return true;
+    // An old completed turn can retain aria-busy forever; it is not proof
+    // that the current answer is still generating. Only the newest two
+    // turns (and their enclosing turn wrappers) can block CSS mutations.
+    for (const turn of turns.slice(-2)) {
+      const wrapper = turn.closest?.('[data-testid^="conversation-turn-"]') || turn;
+      if (wrapper.getAttribute?.('aria-busy') === 'true' ||
+          wrapper.querySelector?.('[aria-busy="true"]')) return true;
+    }
+    return false;
   }
 
   function ensureStyle() {
@@ -86,7 +95,7 @@
       state.dilAssistantCount = modernTurns.filter(n =>
         n.hasAttribute?.('data-chatgpt-selection-message-id') &&
         !n.hasAttribute?.('data-user-message-bubble')).length;
-      state.skippedBusy = busy();
+      state.skippedBusy = busy(main, turns);
       // Metadata-only DOM sample every ~2 minutes. Existing resource logs
       // then reveal whether DOM node growth correlates with renderer RAM.
       if (!state.skippedBusy &&
