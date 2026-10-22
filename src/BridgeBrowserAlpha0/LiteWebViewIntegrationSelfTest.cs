@@ -237,6 +237,59 @@ internal static class LiteWebViewIntegrationSelfTest
                     Ensure(ChatGptLiteForm.NextStateAfterWakeDeferral(
                         "armed", "no_composer") == "waiting_no_composer",
                         "ordinary no-click deferrals retain existing retry semantics");
+                    phase = "unconfirmed_recovered_draft_old_answer_fingerprint";
+                    const string recoverPath = "/c/11111111-1111-1111-1111-111111111111";
+                    var draftOld = new LiteChatWakePreflight.Observation {
+                        Location = recoverPath, Role = "assistant",
+                        Text = "Original assistant answer before saved own draft",
+                        ComposerReady = true, TurnCount = 4,
+                        AssistantNodeCount = 2, HasDraft = true
+                    };
+                    var draftOldAgain = new LiteChatWakePreflight.Observation {
+                        Location = recoverPath, Role = "assistant",
+                        Text = draftOld.Text, ComposerReady = true,
+                        TurnCount = 4, AssistantNodeCount = 2, HasDraft = true
+                    };
+                    string oldHash = LiteChatWakePreflight.Fingerprint(draftOld.Text);
+                    string nextHash = LiteChatWakePreflight.Fingerprint(
+                        "A genuinely new assistant answer");
+                    Ensure(LiteChatWakePreflight.Eligibility(
+                        draftOld, draftOldAgain, recoverPath, "") == "draft_present",
+                        "existing own draft remains a blocker to ordinary wake");
+                    Ensure(LiteChatWakePreflight.StableAssistantFingerprint(
+                        draftOld, draftOldAgain, recoverPath) == oldHash,
+                        "stable assistant hash remains available behind a pending draft");
+                    Ensure(LiteChatWakePreflight.StableAssistantFingerprint(
+                        draftOld, draftOldAgain, "/c/22222222-2222-2222-2222-222222222222") == "",
+                        "foreign chat cannot provide recovery baseline fingerprint");
+                    draftOldAgain.Text = "Streaming, still changing";
+                    Ensure(LiteChatWakePreflight.StableAssistantFingerprint(
+                        draftOld, draftOldAgain, recoverPath) == "",
+                        "moving assistant answer cannot certify recovery baseline");
+                    draftOldAgain.Text = draftOld.Text;
+                    draftOldAgain.Generating = true;
+                    Ensure(LiteChatWakePreflight.StableAssistantFingerprint(
+                        draftOld, draftOldAgain, recoverPath) == "",
+                        "generating assistant cannot certify recovery baseline");
+                    Ensure(!ChatGptLiteForm.CanResumeAfterUnconfirmedRecovery(
+                        "own_draft_clicked_unconfirmed", "", "ready", oldHash),
+                        "old recovery without persisted baseline must remain fenced");
+                    Ensure(!ChatGptLiteForm.CanResumeAfterUnconfirmedRecovery(
+                        "own_draft_clicked_unconfirmed", oldHash, "ready", oldHash),
+                        "same old answer after disappearing draft cannot send a duplicate");
+                    Ensure(!ChatGptLiteForm.CanResumeAfterUnconfirmedRecovery(
+                        "own_draft_clicked_unconfirmed", oldHash.ToLowerInvariant(),
+                        "ready", oldHash),
+                        "lowercase legacy hash cannot bypass the old-answer duplicate fence");
+                    Ensure(!ChatGptLiteForm.CanResumeAfterUnconfirmedRecovery(
+                        "own_draft_clicked_unconfirmed", oldHash, "draft_present", nextHash),
+                        "even a changed draft does not prove a completed new answer");
+                    Ensure(ChatGptLiteForm.CanResumeAfterUnconfirmedRecovery(
+                        "own_draft_clicked_unconfirmed", oldHash, "ready", nextHash),
+                        "distinct stable new assistant answer releases recovery hold");
+                    Ensure(ChatGptLiteForm.CanResumeAfterUnconfirmedRecovery(
+                        "armed", "", "ready", nextHash),
+                        "ordinary schedules without uncertain recovery keep working");
                     Ensure(ChatGptLiteForm.IsDefinitelyUnsentWake(
                         "blocked_navigation", "not_submitted"),
                         "target mismatch before injection releases the durable answer fence");
@@ -854,7 +907,7 @@ internal static class LiteWebViewIntegrationSelfTest
                         10, 10, new Uri(chatUrl), "about:blank"),
                         "archive rejects non-ChatGPT navigation result");
                     LiteEventLog.Write("webview_integration_selftest", new {
-                        passed = true, checks = 156, offline = true
+                        passed = true, checks = 167, offline = true
                     });
                     code = 0;
                 }

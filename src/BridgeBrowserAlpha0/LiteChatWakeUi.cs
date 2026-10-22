@@ -594,6 +594,20 @@ internal sealed partial class ChatGptLiteForm
     internal static bool IsUnconfirmedRecoveredDraftState(string? state) =>
         state == "own_draft_clicked_unconfirmed";
 
+    internal static bool CanResumeAfterUnconfirmedRecovery(
+        string? priorState, string? priorHash, string preflightReason,
+        string? observedHash)
+    {
+        if (!IsUnconfirmedRecoveredDraftState(priorState)) return true;
+        // A "ready" answer alone is insufficient: without the hash of
+        // the preceding assistant response this may be the SAME answer
+        // which produced the recovered draft and the earlier click.
+        return preflightReason == "ready" &&
+            priorHash is { Length: 64 } &&
+            observedHash is { Length: 64 } &&
+            !string.Equals(priorHash, observedHash, StringComparison.OrdinalIgnoreCase);
+    }
+
     internal static string NextStateAfterWakeDeferral(string priorState,
         string reason) =>
         IsUnconfirmedRecoveredDraftState(priorState) ? priorState : "waiting_" + reason;
@@ -720,12 +734,12 @@ internal sealed partial class ChatGptLiteForm
                     var preflight = await CheckWorkerPreflightAsync(
                         wakeCore, due.Url,
                         due.LastAnswerFingerprint);
-                    if (IsUnconfirmedRecoveredDraftState(due.LastState) &&
-                        preflight.Reason != "ready")
+                    if (!CanResumeAfterUnconfirmedRecovery(due.LastState,
+                        due.LastAnswerFingerprint, preflight.Reason, preflight.Hash))
                     {
-                        // No fresh stable assistant answer has appeared. An
-                        // earlier click may be in-flight; never re-click its
-                        // lingering own draft after timeout, reload or restart.
+                        // Require a PROVEN NEW stable assistant answer, not
+                        // merely "ready" after the old draft disappears. A
+                        // missing previous hash must fail closed after restart.
                         due.DueUtc = DateTimeOffset.UtcNow.AddMinutes(5);
                         LiteChatWakeRegistry.Write(entries);
                         LiteEventLog.Write("multi_wake_own_draft_unconfirmed_held",
@@ -775,6 +789,13 @@ internal sealed partial class ChatGptLiteForm
                             var active = entries.FirstOrDefault(x => x.Url == due.Url);
                             if (active is not null && active.Enabled)
                             {
+                                // Persist the old response fingerprint before
+                                // recording an unconfirmed recovery click.
+                                // Without this, a later "ready" observation
+                                // could be the same answer and resend.
+                                if (active.LastAnswerFingerprint.Length == 0 &&
+                                    preflight.Hash.Length == 64)
+                                    active.LastAnswerFingerprint = preflight.Hash;
                                 active.LastState = receiptVisible
                                     ? "own_draft_visible_ack"
                                     : "own_draft_clicked_unconfirmed";
