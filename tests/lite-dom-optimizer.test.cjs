@@ -141,6 +141,12 @@ function createTest(turnCount, options = {}) {
   assert.equal(t.api.getStatus().optimized, 0);
 }
 {
+  const t = createTest(100, { recentBusy: true });
+  assert.equal(t.api.getStatus().skippedBusy, true,
+    "busy penultimate turn conservatively blocks while latest placeholder hydrates");
+  assert.equal(t.api.getStatus().optimized, 0);
+}
+{
   const t = createTest(100, { supported: false });
   assert.equal(t.api.getStatus().optimized, 0);
 }
@@ -199,4 +205,4 @@ function createTest(turnCount, options = {}) {
     "hidden, disabled and invisible stale buttons are not active responses");
   assert.equal(t.api.getStatus().optimized, 30);
 }
-console.log("LiteDomOptimizer: 14 PASS (main scoped, stop isolation, single host monitor)");
+console.log("LiteDomOptimizer: 17 PASS (stale aria-busy isolated, recent busy protected)");
