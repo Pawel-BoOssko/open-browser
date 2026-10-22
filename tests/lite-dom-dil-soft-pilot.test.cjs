@@ -40,6 +40,9 @@ function rig(count = 100, options = {}) {
       throw new Error("unexpected selector " + selector);
     },
     querySelector(selector) {
+      if (selector === 'main,[role="main"]') return {
+        querySelectorAll: sel => doc.querySelectorAll(sel)
+      };
       if (options.busy && selector.includes('aria-label="Zatrzymaj"')) return {};
       return null;
     },

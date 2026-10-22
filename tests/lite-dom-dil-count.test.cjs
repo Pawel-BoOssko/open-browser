@@ -27,7 +27,12 @@ function run(variant,n){
    if(sel.includes("data-user-message-bubble"))return variant==="dil"||variant==="mixed"?nodes:[];
    return [];
   },
-  querySelector(){return null;},
+  querySelector(selector) {
+   if(selector==="main,[role=\"main\"]")return {
+    querySelectorAll:sel=>doc.querySelectorAll(sel)
+   };
+   return null;
+  },
   getElementById(){return null;},
   createElement(){return {textContent:"",id:""};}
  };

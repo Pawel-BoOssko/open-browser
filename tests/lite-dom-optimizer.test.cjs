@@ -18,14 +18,24 @@ function createTest(turnCount, options = {}) {
     };
   });
   const styles = [];
+  const main = {
+    querySelectorAll(selector) {
+      if (selector === '[data-user-message-bubble],[data-chatgpt-selection-message-id]')
+        return document.modernNodes || [];
+      assert.equal(selector, '[data-testid^="conversation-turn-"]');
+      return nodes;
+    }
+  };
+  let globalScans = 0;
   const document = {
     readyState: "complete", activeElement: options.focus ?? null,
     querySelectorAll(selector) {
-      if (selector === '[data-user-message-bubble],[data-chatgpt-selection-message-id]') return this.modernNodes || [];
-      assert.equal(selector, '[data-testid^="conversation-turn-"]');
-      return nodes;
+      globalScans++;
+      throw new Error("whole-document message scan forbidden: " + selector);
     },
     querySelector(selector) {
+      if (selector === 'main,[role="main"]')
+        return options.noMain ? null : main;
       return options.busy && selector === 'main [aria-busy="true"]' ? {} : null;
     },
     getElementById(id) { return styles.find(style => style.id === id) || null; },
@@ -41,7 +51,9 @@ function createTest(turnCount, options = {}) {
     setInterval(fn) { this.intervalArms++; this.interval = fn; return this.intervalArms; }
   };
   vm.runInNewContext(script, { window, Date });
-  return { nodes, document, window, styles, api: window.__OPENBROWSER_LITE_DOM__ };
+  return { nodes, document, window, styles,
+    get globalScans() { return globalScans; },
+    api: window.__OPENBROWSER_LITE_DOM__ };
 }
 
 {
@@ -118,4 +130,19 @@ function createTest(turnCount, options = {}) {
     "legacy optimization flags must be cleared after DIL migration");
   assert.equal(t.nodes.length, 65, "no nodes may be removed");
 }
-console.log("LiteDomOptimizer: 8 PASS (single host DOM monitor)");
+{
+  const t = createTest(75, { noMain: true });
+  assert.equal(t.api.getStatus().domVariant, "unhydrated",
+    "missing active main must not look like an optimizable legacy conversation");
+  assert.equal(t.api.getStatus().turnCount, 0);
+  assert.equal(t.api.getStatus().optimized, 0);
+  assert.equal(t.globalScans, 0, "unhydrated shell must not scan sidebar messages");
+}
+{
+  const t = createTest(70);
+  assert.equal(t.api.getStatus().turnCount, 70);
+  assert.equal(t.api.getStatus().optimized, 30);
+  assert.equal(t.globalScans, 0,
+    "messages are scanned through main, never document");
+}
+console.log("LiteDomOptimizer: 10 PASS (main scoped, single host DOM monitor)");

@@ -48,10 +48,13 @@
   function check() {
     const start = global.performance.now();
     try {
-      const oldTurns = Array.from(doc.querySelectorAll(legacySelector));
-      // DIL changed its turn wrappers in 2026. Count it accurately, but do not
-      // change modern React message layout before standalone visual QA.
-      const modernTurns = Array.from(doc.querySelectorAll(dilSelector));
+      // Scope selectors to the active conversation only. Sidebar previews
+      // and unrelated widgets can reuse legacy or DIL message markers.
+      // A missing main means hydration is incomplete: fail closed.
+      const main = doc.querySelector('main,[role="main"]');
+      const oldTurns = main ? Array.from(main.querySelectorAll(legacySelector)) : [];
+      // DIL stays read-only until actual logged-in visual QA.
+      const modernTurns = main ? Array.from(main.querySelectorAll(dilSelector)) : [];
       // A mixed page can retain legacy wrappers alongside DIL messages.
       // Prefer modern counts, but never optimize a mixed React subtree.
       const modern = modernTurns.length > 0;
@@ -64,7 +67,8 @@
       }
       const turns = modern ? modernTurns : oldTurns;
       const maySoftModern = modern && state.modernSoftEnabled && oldTurns.length === 0;
-      state.domVariant = modern ? (maySoftModern ? 'dil_soft_pilot' : 'dil_observe_only') : 'legacy';
+      state.domVariant = !main ? 'unhydrated' :
+        modern ? (maySoftModern ? 'dil_soft_pilot' : 'dil_observe_only') : 'legacy';
       state.turnCount = turns.length;
       // DIL role metadata only. A node matching both markers is a user bubble,
       // so the two role counters cannot exceed the total message count.

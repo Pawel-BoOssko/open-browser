@@ -463,6 +463,16 @@ internal static class LiteWebViewIntegrationSelfTest
                     Ensure(await EvaluateAsync(core,
                         "window.__OPENBROWSER_RESUME_PROBE__.observe().turnCount") == "4",
                         "sidebar marker excluded from active conversation turn count");
+                    phase = "dom_optimization_sidebar_isolation";
+                    Ensure(await EvaluateAsync(core,
+                        "window.__OPENBROWSER_LITE_DOM__.check().turnCount") == "4",
+                        "DOM optimizer counts only the active main, not sidebar preview");
+                    Ensure(await EvaluateAsync(core,
+                        "window.__OPENBROWSER_LITE_DOM__.getStatus().domVariant") == "dil_observe_only",
+                        "sidebar fake assistant cannot change conservative DIL mode");
+                    Ensure(await EvaluateAsync(core,
+                        "document.querySelector('aside').hasAttribute('data-ob-lite-offscreen')") == "false",
+                        "sidebar is never tagged for content-visibility optimization");
                     phase = "sidebar_tool_and_error_fail_closed";
                     await core.ExecuteScriptAsync("""
                         (() => {
@@ -514,6 +524,12 @@ internal static class LiteWebViewIntegrationSelfTest
                     Ensure(await EvaluateAsync(core,
                         "window.__OPENBROWSER_RESUME_PROBE__.observe().turnCount") == "0",
                         "no active main produces zero observed turns");
+                    Ensure(await EvaluateAsync(core,
+                        "window.__OPENBROWSER_LITE_DOM__.check().domVariant") == "unhydrated",
+                        "missing main cannot trigger legacy DOM optimization");
+                    Ensure(await EvaluateAsync(core,
+                        "window.__OPENBROWSER_LITE_DOM__.getStatus().optimized") == "0",
+                        "missing main has zero marked offscreen turns");
                     await core.ExecuteScriptAsync("""
                         (() => {
                           window.__qaMainParent.insertBefore(window.__qaMain,window.__qaNext);
@@ -911,7 +927,7 @@ internal static class LiteWebViewIntegrationSelfTest
                         10, 10, new Uri(chatUrl), "about:blank"),
                         "archive rejects non-ChatGPT navigation result");
                     LiteEventLog.Write("webview_integration_selftest", new {
-                        passed = true, checks = 169, offline = true
+                        passed = true, checks = 174, offline = true
                     });
                     code = 0;
                 }
