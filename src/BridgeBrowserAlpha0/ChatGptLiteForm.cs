@@ -248,7 +248,8 @@ internal sealed partial class ChatGptLiteForm : Form
             _domMonitor.Start();
             _captureTimer.Start();
             _responseTimer.Start();
-            _pruneReportTimer.Start();
+            // Hard pruning is opt-in: its 60s report timer stays OFF until
+            // the owner explicitly enables it in the toolbar.
             _resumeTimer.Start();
             _devWakeTimer.Start();
             _chatWakeTimer.Start();

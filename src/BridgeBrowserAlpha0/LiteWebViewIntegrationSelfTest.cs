@@ -87,6 +87,10 @@ internal static class LiteWebViewIntegrationSelfTest
                     core.NavigationCompleted -= onNavigated;
                     Ensure(success, "local virtual host navigation");
                     phase = "hard_dom_idle_timer_lifecycle";
+                    Ensure(!ChatGptLiteForm.ShouldPollHardPrune(false),
+                        "WinForms hard-prune report timer stays stopped while OFF");
+                    Ensure(ChatGptLiteForm.ShouldPollHardPrune(true),
+                        "WinForms report timer can arm on deliberate owner opt-in");
                     Ensure(await EvaluateAsync(core,
                         "window.__OPENBROWSER_HARD_PRUNE__?.status().enabled") ==
                         "false", "hard DOM pruning defaults OFF in real WebView2");
@@ -907,7 +911,7 @@ internal static class LiteWebViewIntegrationSelfTest
                         10, 10, new Uri(chatUrl), "about:blank"),
                         "archive rejects non-ChatGPT navigation result");
                     LiteEventLog.Write("webview_integration_selftest", new {
-                        passed = true, checks = 167, offline = true
+                        passed = true, checks = 169, offline = true
                     });
                     code = 0;
                 }

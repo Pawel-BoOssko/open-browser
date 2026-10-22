@@ -25,10 +25,23 @@ internal sealed partial class ChatGptLiteForm
             _hardPruneEnabled = !_hardPruneEnabled;
             _hardPruneToggle.Text = _hardPruneEnabled
                 ? "DOM mocne: TAK" : "DOM mocne: NIE";
+            // Do not schedule a minute-by-minute WinForms callback while
+            // pruning is OFF. Arm only after explicit user opt-in.
+            UpdateHardPruneReportTimer();
             LiteEventLog.Write("hard_dom_mode_changed", new { enabled = _hardPruneEnabled });
             await ApplyHardPruneModeAsync();
         };
         _pruneReportTimer.Tick += async (_, _) => await PollHardPruneStatusAsync();
+    }
+
+    internal static bool ShouldPollHardPrune(bool ownerEnabled) => ownerEnabled;
+
+    private void UpdateHardPruneReportTimer()
+    {
+        if (ShouldPollHardPrune(_hardPruneEnabled))
+            _pruneReportTimer.Start();
+        else
+            _pruneReportTimer.Stop();
     }
 
     private async Task InstallHardPruneScriptAsync(CoreWebView2 core)

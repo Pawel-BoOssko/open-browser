@@ -6,6 +6,7 @@ const assert = require("node:assert/strict");
 
 const source = path.join(__dirname, "../src/BridgeBrowserAlpha0");
 const ui = fs.readFileSync(path.join(source, "LiteDomPruneUi.cs"), "utf8");
+const form = fs.readFileSync(path.join(source, "ChatGptLiteForm.cs"), "utf8");
 const js = fs.readFileSync(path.join(source, "LiteDomHardPrune.js"), "utf8");
 
 function getBoolean(text, regex, name) {
@@ -38,4 +39,15 @@ test("hard DOM install log reflects actual initial state", () => {
 test("hard DOM opt-in control is visible", () => {
   assert.match(ui, /Text\s*=\s*"DOM mocne: NIE"/);
   assert.match(ui, /_hardPruneToggle\.Click/);
+});
+test("hard prune report timer never starts unconditionally at startup", () => {
+  assert.doesNotMatch(form, /_pruneReportTimer\.Start\s*\(/,
+    "OFF feature must create zero periodic WinForms callbacks");
+  assert.match(form, /_pruneReportTimer\.Stop\s*\(/,
+    "form close still stops and disposes timer work");
+});
+test("hard prune report timer is armed ONLY by explicit UI opt-in", () => {
+  assert.match(ui, /_hardPruneToggle\.Click[\s\S]*?UpdateHardPruneReportTimer\(\)/);
+  assert.match(ui, /if\s*\(ShouldPollHardPrune\(_hardPruneEnabled\)\)[\s\S]*?_pruneReportTimer\.Start\(\)\s*;\s*else\s*_pruneReportTimer\.Stop\(\)/);
+  assert.match(ui, /private\s+bool\s+_hardPruneEnabled\s*=\s*false\s*;/);
 });
