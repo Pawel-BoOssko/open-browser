@@ -54,7 +54,25 @@ internal static class LiteDeliveryEvidenceSelfTest
                 "generation_in_progress", "no early completion");
             Check(LiteDeliveryEvidence.Classify(O()).Confidence == "unknown",
                 "unknown remains unknown");
-            LiteEventLog.Write("delivery_evidence_selftest", new { passed = true, checks = 12 });
+            var get = ChatGptLiteForm.DescribeBackendRequest(
+                "https://chatgpt.com/backend-api/conversation/chat-id?secret=never-log", "GET");
+            Check(get == ("conversation", "conversation_detail", "GET"),
+                "read-history request category without chat identifier");
+            var send = ChatGptLiteForm.DescribeBackendRequest(
+                "https://chatgpt.com/backend-api/conversation", "POST");
+            Check(send == ("conversation", "conversation_root", "POST"),
+                "message submission identified separately");
+            var list = ChatGptLiteForm.DescribeBackendRequest(
+                "https://chatgpt.com/backend-api/conversations?offset=0", "GET");
+            Check(list == ("conversation", "conversation_list", "GET"),
+                "conversation list separately identified");
+            Check(ChatGptLiteForm.DescribeBackendRequest(
+                "https://bad.example/backend-api/conversation", "POST").Endpoint == "ignore",
+                "other site not logged");
+            Check(ChatGptLiteForm.DescribeBackendRequest(
+                "https://chatgpt.com/backend-api/conversation/id", "CUSTOM").HttpMethod == "other",
+                "unexpected HTTP verb omitted");
+            LiteEventLog.Write("delivery_evidence_selftest", new { passed = true, checks = 18 });
             return 0;
         }
         catch (Exception ex)

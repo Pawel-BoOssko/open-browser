@@ -29,6 +29,9 @@
     <None Update="LiteResponseSignal.js">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <None Update="LiteTabSwitchSafety.js">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <None Update="LiteResumeProbe.js">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>

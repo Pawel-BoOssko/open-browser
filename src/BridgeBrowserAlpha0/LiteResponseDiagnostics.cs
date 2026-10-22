@@ -19,26 +19,7 @@ internal sealed partial class ChatGptLiteForm
             await File.ReadAllTextAsync(file));
 
         core.WebResourceResponseReceived += (_, e) =>
-        {
-            try
-            {
-                if (!Uri.TryCreate(e.Request.Uri, UriKind.Absolute, out var uri) ||
-                    uri.Host != "chatgpt.com" ||
-                    !uri.AbsolutePath.StartsWith("/backend-api/", StringComparison.OrdinalIgnoreCase))
-                    return;
-                int status = e.Response.StatusCode;
-                bool conversationEndpoint = uri.AbsolutePath.Contains("conversation", StringComparison.OrdinalIgnoreCase);
-                if (status < 400 && !conversationEndpoint) return;
-                LiteEventLog.Write("web_backend_response", new {
-                    endpoint = conversationEndpoint ? "conversation" : "other_backend",
-                    status, successHttp = status is >= 200 and < 400
-                });
-            }
-            catch (Exception ex)
-            {
-                LiteEventLog.Write("response_metadata_error", new { errorType = ex.GetType().Name });
-            }
-        };
+            LogBackendResponseMetadata(e, "foreground");
         _responseTimer.Tick += async (_, _) => await PollResponseDiagnosticsAsync();
         LiteEventLog.Write("response_signals_installed");
     }
