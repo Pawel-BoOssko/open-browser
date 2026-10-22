@@ -34,6 +34,12 @@ function rig(count = 100, options = {}) {
       return { length: options.domElements ?? 7777 };
     },
     querySelectorAll(selector) {
+      if (selector.startsWith('[data-testid="stop-button"],'))
+        return options.busy ? [{
+          hidden: false, disabled: false, closest() { return null; },
+          getAttribute() { return null; },
+          getClientRects() { return [{}]; }
+        }] : [];
       if (selector === '[data-testid^="conversation-turn-"]') return old;
       if (selector === '[data-user-message-bubble],[data-chatgpt-selection-message-id]')
         return nodes;

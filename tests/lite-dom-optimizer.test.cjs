@@ -156,4 +156,28 @@ function createTest(turnCount, options = {}) {
   assert.equal(t.globalScans, 0,
     "messages are scanned through main, never document");
 }
-console.log("LiteDomOptimizer: 10 PASS (main scoped, single host DOM monitor)");
+{
+  const t = createTest(70, { stopButtons: ['sidebar'] });
+  assert.equal(t.api.getStatus().skippedBusy, false,
+    "sidebar Stop must not block optimization of the active chat");
+  assert.equal(t.api.getStatus().optimized, 30);
+  assert.equal(t.globalScans, 0, "stop detector does not scan document messages");
+}
+{
+  const t = createTest(70, { stopButtons: ['sidebar', 'active'] });
+  assert.equal(t.api.getStatus().skippedBusy, true,
+    "active Stop must still block even if sidebar Stop is first");
+  assert.equal(t.api.getStatus().optimized, 0);
+}
+{
+  const t = createTest(70, { stopButtons: ['portal'] });
+  assert.equal(t.api.getStatus().skippedBusy, true,
+    "visible Stop in top-level portal also blocks legacy CSS changes");
+}
+{
+  const t = createTest(70, { stopButtons: ['hidden', 'disabled', 'aria-hidden', 'invisible'] });
+  assert.equal(t.api.getStatus().skippedBusy, false,
+    "hidden, disabled and invisible stale buttons are not active responses");
+  assert.equal(t.api.getStatus().optimized, 30);
+}
+console.log("LiteDomOptimizer: 14 PASS (main scoped, stop isolation, single host monitor)");

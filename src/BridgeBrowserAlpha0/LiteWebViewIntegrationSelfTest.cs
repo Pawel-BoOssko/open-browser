@@ -643,6 +643,9 @@ internal static class LiteWebViewIntegrationSelfTest
                         })()
                         """);
                     Ensure(await EvaluateAsync(core,
+                        "window.__OPENBROWSER_LITE_DOM__.check().skippedBusy") == "false",
+                        "sidebar Stop cannot suppress DOM optimization monitoring");
+                    Ensure(await EvaluateAsync(core,
                         "window.__OPENBROWSER_RESUME_PROBE__.observe().generating") == "false",
                         "sidebar stop cannot misidentify active chat as generating");
                     Ensure(await EvaluateAsync(core,
@@ -661,6 +664,9 @@ internal static class LiteWebViewIntegrationSelfTest
                         })()
                         """);
                     Ensure(await EvaluateAsync(core,
+                        "window.__OPENBROWSER_LITE_DOM__.check().skippedBusy") == "true",
+                        "active chat Stop blocks DOM CSS mutations even with sidebar Stop first");
+                    Ensure(await EvaluateAsync(core,
                         "window.__OPENBROWSER_RESUME_PROBE__.observe().generating") == "true",
                         "active chat Stop still blocks preflight while sidebar Stop exists");
                     Ensure(await EvaluateAsync(core,
@@ -675,6 +681,9 @@ internal static class LiteWebViewIntegrationSelfTest
                           document.querySelector('#qa-sidebar-stop').remove();
                         })()
                         """);
+                    Ensure(await EvaluateAsync(core,
+                        "window.__OPENBROWSER_LITE_DOM__.check().skippedBusy") == "false",
+                        "after Stop disappears the existing DOM monitor resumes normally");
                     await core.ExecuteScriptAsync("""
                         (() => {
                           document.querySelector('aside').removeAttribute('role');
@@ -1131,7 +1140,7 @@ internal static class LiteWebViewIntegrationSelfTest
                         10, 10, new Uri(chatUrl), "about:blank"),
                         "archive rejects non-ChatGPT navigation result");
                     LiteEventLog.Write("webview_integration_selftest", new {
-                        passed = true, checks = 216, offline = true
+                        passed = true, checks = 219, offline = true
                     });
                     code = 0;
                 }
