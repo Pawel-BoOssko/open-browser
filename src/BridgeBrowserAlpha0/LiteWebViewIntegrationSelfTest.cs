@@ -293,6 +293,52 @@ internal static class LiteWebViewIntegrationSelfTest
                         "window.__OPENBROWSER_RESUME_PROBE__?.observe()?.text"))
                         .Contains("Zielona latarnia"),
                         "second chat has its distinct assistant answer");
+
+                    // Exercise the SAME host-managed sendDirect + submitDirect
+                    // protocol as background waking, not only its URL guard.
+                    phase = "background_second_chat_receipt_isolation";
+                    const string receiptB = "fedcba0987654321fedcba0987654321";
+                    const string receiptBlocked = "abcdef0123456789abcdef0123456789";
+                    string payloadB = "[OB-" + receiptB +
+                        "]\nKontynuuj wyłącznie drugą testową rozmowę.";
+                    string directB = "window.__OPENBROWSER_RESUME_SENDER__.sendDirect(" +
+                        JsonSerializer.Serialize(payloadB) + "," +
+                        JsonSerializer.Serialize(receiptB) + ",true)";
+                    Ensure(await EvaluateAsync(core,
+                        "window.__OPENBROWSER_RESUME_SENDER__.hasAck('" + receipt + "')") ==
+                        "false", "receipt from chat A is absent in chat B");
+                    Ensure(await EvaluateAsync(core, directB) == "submission_requested",
+                        "host prepares a unique wake draft in chat B");
+                    Ensure(await EvaluateAsync(core,
+                        "window.__OPENBROWSER_RESUME_SENDER__.hasAck('" + receiptB + "')") ==
+                        "false", "injected draft is not mistaken for delivery ACK");
+                    Ensure(await EvaluateAsync(core,
+                        "window.__OPENBROWSER_RESUME_SENDER__.submitDirect('" + receiptB + "')") ==
+                        "click_invoked", "host flushes chat B using its composer form");
+                    Ensure(await EvaluateAsync(core,
+                        "window.__OPENBROWSER_RESUME_SENDER__.hasAck('" + receiptB + "')") ==
+                        "true", "second chat has a real unique user-bubble receipt");
+                    Ensure(await EvaluateAsync(core, directB) == "already_visible",
+                        "second chat receipt cannot be sent twice");
+                    string blockedPayload = "[OB-" + receiptBlocked +
+                        "]\nNie wysyłaj do rozmowy po zmianie adresu.";
+                    string blockedJs = "window.__OPENBROWSER_RESUME_SENDER__.sendDirect(" +
+                        JsonSerializer.Serialize(blockedPayload) + "," +
+                        JsonSerializer.Serialize(receiptBlocked) + ",true)";
+                    Ensure(await EvaluateAsync(core, blockedJs) == "submission_requested",
+                        "second test draft prepared before SPA navigation");
+                    await core.ExecuteScriptAsync(
+                        "history.replaceState({},'', '/c/" + firstChatId + "')");
+                    Ensure(await EvaluateAsync(core,
+                        "window.__OPENBROWSER_RESUME_SENDER__.submitDirect('" +
+                        receiptBlocked + "')") == "blocked_navigation",
+                        "host refuses a pending send after SPA chat change");
+                    Ensure(await EvaluateAsync(core,
+                        "window.__OPENBROWSER_RESUME_SENDER__.hasAck('" +
+                        receiptBlocked + "')") == "false",
+                        "wrong-chat pending wake was never delivered");
+                    await core.ExecuteScriptAsync(
+                        "document.querySelector('#prompt-textarea').innerText=''");
                     var firstNavigation = new TaskCompletionSource<bool>(
                         TaskCreationOptions.RunContinuationsAsynchronously);
                     void firstCompleted(object? sender, CoreWebView2NavigationCompletedEventArgs e) =>
@@ -312,6 +358,9 @@ internal static class LiteWebViewIntegrationSelfTest
                         "window.__OPENBROWSER_RESUME_PROBE__?.observe()?.text"))
                         .Contains("Czarny kompas"),
                         "original answer returns without cross-chat contamination");
+                    Ensure(await EvaluateAsync(core,
+                        "window.__OPENBROWSER_RESUME_SENDER__.hasAck('" + receiptB + "')") ==
+                        "false", "chat B receipt cannot appear inside reloaded chat A");
 
                     phase = "archive_cross_navigation_fence";
                     Ensure(ChatGptLiteForm.IsArchiveResultCurrent(
