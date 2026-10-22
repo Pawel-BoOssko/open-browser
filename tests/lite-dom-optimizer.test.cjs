@@ -30,6 +30,17 @@ function createTest(turnCount, options = {}) {
   const document = {
     readyState: "complete", activeElement: options.focus ?? null,
     querySelectorAll(selector) {
+      if (selector.startsWith('[data-testid="stop-button"],')) {
+        return (options.stopButtons || []).map(kind => ({
+          hidden: kind === 'hidden',
+          disabled: kind === 'disabled',
+          closest() { return kind === 'sidebar' ? {} : null; },
+          getAttribute(name) {
+            return name === 'aria-hidden' && kind === 'aria-hidden' ? 'true' : null;
+          },
+          getClientRects() { return kind === 'invisible' ? [] : [{}]; }
+        }));
+      }
       globalScans++;
       throw new Error("whole-document message scan forbidden: " + selector);
     },

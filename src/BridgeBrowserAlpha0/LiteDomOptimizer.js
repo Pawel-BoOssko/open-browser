@@ -21,10 +21,19 @@
   // Do not install a competing JavaScript polling timer in the same page.
 
   function busy() {
-    // A sidebar may retain aria-busy even when the assistant is idle.
-    // Only an active response in main or a visible Stop control blocks CSS changes.
-    return !!(doc.querySelector('main [aria-busy="true"]') ||
-      doc.querySelector('[data-testid="stop-button"],button[aria-label="Zatrzymaj"]'));
+    // Sidebar Stop controls can belong to an unrelated chat. Evaluate ALL
+    // candidates: the first match may be a sidebar button while the active
+    // chat's real Stop lives in main or a top-level React portal.
+    const stop = Array.from(doc.querySelectorAll(
+      '[data-testid="stop-button"],button[aria-label*="Stop generating"],' +
+      'button[aria-label*="Przerwij generowanie"],button[aria-label="Zatrzymaj"]'))
+      .some(button =>
+        !button.closest?.('aside,nav,[role="navigation"],[data-testid="sidebar"]') &&
+        !button.hidden && !button.disabled &&
+        button.getAttribute?.('aria-hidden') !== 'true' &&
+        (typeof button.getClientRects !== 'function' ||
+          button.getClientRects().length !== 0));
+    return stop || !!doc.querySelector('main [aria-busy="true"]');
   }
 
   function ensureStyle() {
