@@ -25,6 +25,26 @@ internal static class LiteChatWakePreflight
     internal static string Fingerprint(string answer) =>
         Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(answer.Trim())));
 
+    // A draft can mask an otherwise stable assistant turn in Eligibility().
+    // Capture only its hash, never its text, so an uncertain recovery click
+    // cannot be followed by a wake based on the SAME assistant answer.
+    internal static string StableAssistantFingerprint(
+        Observation? first, Observation? second, string expectedPath)
+    {
+        if (first is null || second is null ||
+            first.Location != expectedPath || second.Location != expectedPath ||
+            first.Error || second.Error || first.Generating || second.Generating ||
+            first.ToolBusy || second.ToolBusy ||
+            !first.ComposerReady || !second.ComposerReady ||
+            first.Role != "assistant" || second.Role != "assistant" ||
+            first.TurnCount < 1 || second.TurnCount < 1 ||
+            first.AssistantNodeCount < 1 || second.AssistantNodeCount < 1 ||
+            string.IsNullOrWhiteSpace(first.Text) ||
+            string.IsNullOrWhiteSpace(second.Text)) return "";
+        string firstHash = Fingerprint(first.Text);
+        return firstHash == Fingerprint(second.Text) ? firstHash : "";
+    }
+
     internal static string Eligibility(Observation? first, Observation? second,
         string expectedPath, string lastAttemptAnswerHash)
     {

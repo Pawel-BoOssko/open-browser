@@ -562,8 +562,11 @@ internal sealed partial class ChatGptLiteForm
             });
         }
         string answer = second?.Text ?? "";
-        string hash = reason == "ready" ?
-            LiteChatWakePreflight.Fingerprint(answer) : "";
+        // Stable assistant fingerprint is also useful for an OWN pending
+        // draft, even though draft_present correctly blocks normal sending.
+        string hash = reason is "ready" or "draft_present" ?
+            LiteChatWakePreflight.StableAssistantFingerprint(
+                first, second, expectedPath) : "";
         return (reason, hash,
             reason == "ready" && LiteChatWakePreflight.IsCompletion(answer));
     }
