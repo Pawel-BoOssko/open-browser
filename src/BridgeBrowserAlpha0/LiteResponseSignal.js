@@ -14,6 +14,17 @@
     return null;
   }
 
+  function isVisible(node) {
+    if (!node || node.hidden || node.getAttribute?.('aria-hidden') === 'true' ||
+        node.closest?.('[hidden],[aria-hidden="true"],[inert]')) return false;
+    if (typeof node.getClientRects === 'function' &&
+        node.getClientRects().length === 0) return false;
+    const style = typeof global.getComputedStyle === 'function'
+      ? global.getComputedStyle(node) : null;
+    return !style || (style.display !== 'none' &&
+      style.visibility !== 'hidden' && style.visibility !== 'collapse');
+  }
+
   function read() {
     const t0 = global.performance.now();
     const doc = global.document;
@@ -24,14 +35,21 @@
     const assistants = main?.querySelectorAll(
       '[data-message-author-role="assistant"],[data-chatgpt-selection-message-id]') || [];
     let error = null;
-    // Keep global error toasts, but ignore alerts inside sidebar/navigation.
+    let errorSource = 'none';
+    let ignoredHiddenAlerts = 0;
+    // Keep *visible* global error toasts, but ignore hidden stale alerts
+    // and any alerts inside sidebar/navigation.
     const alerts = Array.from(doc.querySelectorAll(
       '[role="alert"],[data-testid*="error"],[data-testid*="toast"]'))
       .filter(node => !node.closest?.(
         'aside,nav,[role="navigation"],[data-testid="sidebar"]'));
     for (const node of alerts.slice(-35)) {
+      if (!isVisible(node)) {
+        if (inspectNode(node)) ignoredHiddenAlerts++;
+        continue;
+      }
       error = inspectNode(node);
-      if (error) break;
+      if (error) { errorSource = 'visible_alert'; break; }
     }
     if (!error && main && turns.length === 0) {
       // A failed conversation fetch often leaves only a short shell in MAIN.
@@ -40,7 +58,10 @@
       const shell = String(main.textContent || "").trim();
       if (shell.length > 0 && shell.length < 350 &&
           /nie udało się wczytać tej rozmowy(?: chatgpt)?|couldn.t load (this |the )?conversation|failed to load (this |the )?conversation|unable to load conversation/i.test(shell))
+      {
         error = "conversation_load_failed";
+        errorSource = 'main_empty_shell';
+      }
     }
     if (!error) {
       // Never interpret a user's quote of an error as a browser failure.
@@ -48,8 +69,9 @@
       // discussing an error is not evidence that the UI itself failed.
       for (const node of Array.from(assistants).slice(-3)) {
         if (String(node.textContent || "").trim().length > 180) continue;
+        if (!isVisible(node)) continue;
         error = inspectNode(node);
-        if (error) break;
+        if (error) { errorSource = 'short_assistant_placeholder'; break; }
       }
     }
     const stop = Array.from(doc.querySelectorAll(
@@ -67,6 +89,8 @@
       assistantCount: assistants.length,
       generatingSignal: stop,
       visibleError: error,
+      errorSource,
+      ignoredHiddenAlerts,
       durationMs: Math.round(global.performance.now() - t0)
     };
   }

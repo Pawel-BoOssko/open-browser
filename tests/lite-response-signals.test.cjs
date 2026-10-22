@@ -7,8 +7,17 @@ const script = fs.readFileSync(path.join(__dirname, "../src/BridgeBrowserAlpha0/
 function run(text = "", busy = false, host = "chatgpt.com", speaker = "alert") {
   const node = {
     textContent: text,
+    hidden: speaker === "hiddenAlert",
+    getAttribute(name) {
+      return name === "aria-hidden" && speaker === "ariaHiddenAlert" ? "true" : null;
+    },
+    getClientRects() {
+      return speaker === "detachedAlert" ? [] : [{}];
+    },
     closest(selector) {
-      return speaker === "sidebar" && selector.includes("aside") ? {} : null;
+      if (speaker === "sidebar" && selector.includes("aside")) return {};
+      if (speaker === "parentHiddenAlert" && selector.includes("[hidden]")) return {};
+      return null;
     }
   };
   const main = {
@@ -24,6 +33,10 @@ function run(text = "", busy = false, host = "chatgpt.com", speaker = "alert") {
   const window = {
     performance: { now: () => 100 },
     location: { hostname: host },
+    getComputedStyle() {
+      return { display: speaker === "cssHiddenAlert" ? "none" : "block",
+        visibility: "visible" };
+    },
     document: {
       readyState: "complete",
       querySelectorAll(selector) {
@@ -32,7 +45,8 @@ function run(text = "", busy = false, host = "chatgpt.com", speaker = "alert") {
             ...(speaker === "sidebarStop" ?
               [{ closest() { return {}; } }] : [])];
         if (selector.startsWith('[role="alert"]'))
-          return (speaker === "alert" || speaker === "sidebar") && text
+          return ["alert", "sidebar", "hiddenAlert", "ariaHiddenAlert",
+            "parentHiddenAlert", "detachedAlert", "cssHiddenAlert"].includes(speaker) && text
             ? [node] : [];
         if (selector.startsWith('[data-testid^="conversation-turn-"]')) return [node];
         if (selector.startsWith('[data-message-author-role'))
@@ -85,4 +99,14 @@ assert.equal(sidebarStatus.assistantCount, 0,
   "sidebar assistant markers are not active chat messages");
 assert.equal(run("Failed to load this response", false, "chatgpt.com", "alert").visibleError,
   "response_load_failed", "real global error toast remains recognized");
-console.log("LiteResponseSignal: 19 PASS");
+for (const mode of ["hiddenAlert", "ariaHiddenAlert", "parentHiddenAlert",
+  "detachedAlert", "cssHiddenAlert"]) {
+  const state = run("Failed to load this response", false, "chatgpt.com", mode);
+  assert.equal(state.visibleError, null, mode + " is not a visible active failure");
+  assert.equal(state.ignoredHiddenAlerts, 1);
+}
+assert.equal(run("Failed to load this response", false, "chatgpt.com", "alert")
+  .errorSource, "visible_alert");
+assert.equal(run("Failed to load this response", false, "chatgpt.com", "dil")
+  .errorSource, "short_assistant_placeholder");
+console.log("LiteResponseSignal: 26 PASS (hidden/stale alerts excluded)");

@@ -10,6 +10,7 @@ internal sealed partial class ChatGptLiteForm
     private Task<string>? _responseProbeTask;
     private string _lastResponseFailure = "";
     private DateTimeOffset? _responseFailureSinceUtc;
+    private DateTimeOffset _lastFailureObservationUtc;
     private bool _lastGenerationSignal;
 
     private async Task InstallResponseDiagnosticsAsync(CoreWebView2 core)
@@ -60,6 +61,13 @@ internal sealed partial class ChatGptLiteForm
             string failure = root.GetProperty("visibleError").ValueKind == JsonValueKind.String
                 ? root.GetProperty("visibleError").GetString() ?? "" : "";
             bool generating = root.GetProperty("generatingSignal").GetBoolean();
+            string errorSource = root.TryGetProperty("errorSource", out var source)
+                ? source.GetString() ?? "unknown" : "unknown";
+            int ignoredHiddenAlerts = root.TryGetProperty("ignoredHiddenAlerts",
+                out var hidden) && hidden.ValueKind == JsonValueKind.Number
+                    ? hidden.GetInt32() : 0;
+            int activeTurns = root.GetProperty("turnCount").GetInt32();
+            int activeAssistants = root.GetProperty("assistantCount").GetInt32();
             // Quarantine per chat on EVERY observation, not just a failure
             // transition. The same error can be visible in two different chats.
             if ((failure is "delivery_timeout" or "response_load_failed") &&
@@ -97,15 +105,32 @@ internal sealed partial class ChatGptLiteForm
                     serverDeliveryProven = assessment.ServerDeliveryProven,
                     displayDurationSeconds = displayedSeconds,
                     phase = "visible_page_error_only",
-                    turnCount = root.GetProperty("turnCount").GetInt32()
+                    turnCount = activeTurns, assistantCount = activeAssistants,
+                    errorSource, ignoredHiddenAlerts
                 });
                 _lastResponseFailure = failure;
                 _responseFailureSinceUtc = failure.Length > 0 ? nowUtc : null;
+                _lastFailureObservationUtc = nowUtc;
                 UpdateTaskbarTitle(generating, failure);
                 if (failure.Length > 0)
                     _status.Text = "ChatGPT: " + failure + " (dostarczenie niepotwierdzone)";
                 else if (_status.Text.StartsWith("ChatGPT:", StringComparison.Ordinal))
                     _status.Text = "Gotowe";
+            }
+            // The UI may retain a hidden stale error or may truly have a
+            // failed answer despite repeated successful history GETs. Record
+            // bounded DOM evidence, not the private response text or URL.
+            if (failure.Length > 0 &&
+                DateTimeOffset.UtcNow - _lastFailureObservationUtc >
+                    TimeSpan.FromMinutes(2))
+            {
+                _lastFailureObservationUtc = DateTimeOffset.UtcNow;
+                LiteEventLog.Write("response_error_still_visible", new {
+                    state = failure, errorSource, ignoredHiddenAlerts,
+                    turnCount = activeTurns, assistantCount = activeAssistants,
+                    documentReady = root.GetProperty("documentReady").GetString(),
+                    generating, hasComposer = root.GetProperty("hasComposer").GetBoolean()
+                });
             }
             if (generating != _lastGenerationSignal)
             {
