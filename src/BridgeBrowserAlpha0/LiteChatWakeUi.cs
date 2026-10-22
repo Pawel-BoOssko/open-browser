@@ -747,28 +747,45 @@ internal sealed partial class ChatGptLiteForm
             StringComparison.Ordinal);
         due.Enabled = false;
         due.LastState = decision == "WAIT_USER" ? "status_wait_user" : "status_blocked";
-        due.LastInterventionKey = eventKey;
-        LiteChatWakeRegistry.Write(entries);
-        LiteEventLog.Write("multi_wake_model_status", new {
-            status = decision, newEvent, emailSent = false
-        });
+        string projectTitle = LiteProjectRegistry.OpenDefault().Projects
+            .FirstOrDefault(p => p.Chats.Any(c => c.Url == due.Url))?.Title
+            ?? "Projekt";
+        bool queued = false;
         if (newEvent)
         {
             try
             {
-                LiteOwnerInterventions.QueueForOwner(decision, eventKey);
-                _tray?.ShowBalloonTip(12000,
-                    "Open Browser — wymagana interwencja",
-                    decision == "WAIT_USER" ?
-                        "Projekt oczekuje na odpowiedź właściciela. Sprawdź projekty." :
-                        "Projekt jest zablokowany. Sprawdź projekty.",
-                    ToolTipIcon.Warning);
+                // Write the durable event BEFORE advancing the DPAPI dedup key.
+                // The outbox itself deduplicates by eventKey after a crash.
+                queued = LiteOwnerInterventions.QueueForOwner(
+                    decision, eventKey, projectTitle);
             }
             catch (Exception ex)
             {
                 LiteEventLog.Write("owner_intervention_queue_failed", new {
                     errorType = ex.GetType().Name, status = decision
                 });
+            }
+        }
+        due.LastInterventionKey = eventKey;
+        LiteChatWakeRegistry.Write(entries);
+        LiteEventLog.Write("multi_wake_model_status", new {
+            status = decision, newEvent, queued, emailDelivered = false
+        });
+        if (newEvent)
+        {
+            _tray?.ShowBalloonTip(12000,
+                "Open Browser — wymagana interwencja",
+                decision == "WAIT_USER" ?
+                    "Projekt oczekuje na odpowiedź właściciela. Sprawdź projekty." :
+                    "Projekt jest zablokowany. Sprawdź projekty.",
+                ToolTipIcon.Warning);
+            if (queued)
+            {
+                // Outlook receives no untrusted model text or credentials.
+                // Durable delivery_started prevents automated replays.
+                LiteOwnerInterventions.DispatchWithClassicOutlook(
+                    decision, eventKey, projectTitle);
             }
         }
         UpdateMultiWakeStatus();
