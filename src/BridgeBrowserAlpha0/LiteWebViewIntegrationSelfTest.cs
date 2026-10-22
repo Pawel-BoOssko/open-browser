@@ -1037,11 +1037,31 @@ internal static class LiteWebViewIntegrationSelfTest
                     Ensure(await EvaluateAsync(core,
                         "window.__OPENBROWSER_RESUME_SENDER__.hasAck('" + receiptB + "')") ==
                         "false", "delayed React user bubble is not immediate");
-                    Ensure(await ChatGptLiteForm.WaitForWakeReceiptAsync(core, receiptB),
-                        "host bounded receipt wait observes delayed real user bubble");
+                    Ensure(await ChatGptLiteForm.WaitForWakeReceiptAsync(
+                        core, receiptB, otherUrl, () => 71L),
+                        "host bounded receipt wait observes delayed real user bubble in selected chat");
                     Ensure(await EvaluateAsync(core,
                         "window.__OPENBROWSER_RESUME_SENDER__.hasAck('" + receiptB + "')") ==
                         "true", "second chat has a real unique user-bubble receipt");
+                    phase = "receipt_ack_exact_route_and_epoch";
+                    Ensure(!await ChatGptLiteForm.WaitForWakeReceiptAsync(
+                        core, receiptB, chatUrl, () => 71L),
+                        "real user receipt in chat B cannot ACK an attempted send to chat A");
+                    Ensure(!await ChatGptLiteForm.WaitForWakeReceiptAsync(
+                        core, receiptB, otherUrl),
+                        "missing route epoch is rejected instead of bypassing identity guard");
+                    Ensure(ChatGptLiteForm.IsWakeReceiptRouteStable(
+                        otherUrl, otherUrl, 71, 71),
+                        "stable selected URL and epoch permit actual receipt inspection");
+                    Ensure(!ChatGptLiteForm.IsWakeReceiptRouteStable(
+                        otherUrl, chatUrl, 71, 71),
+                        "different conversation cannot confirm selected chat receipt");
+                    Ensure(!ChatGptLiteForm.IsWakeReceiptRouteStable(
+                        otherUrl, otherUrl, 71, 73),
+                        "A-to-B-to-A navigation rejects ACK despite identical final URL");
+                    Ensure(!ChatGptLiteForm.IsWakeReceiptRouteStable(
+                        otherUrl, null, 71, 71),
+                        "missing WebView2 source fails closed for receipt checks");
                     Ensure(await EvaluateAsync(core,
                         "document.querySelectorAll('main [data-user-message-bubble]').length") ==
                         "3", "delayed ACK polling never triggers duplicate submission");
@@ -1111,7 +1131,7 @@ internal static class LiteWebViewIntegrationSelfTest
                         10, 10, new Uri(chatUrl), "about:blank"),
                         "archive rejects non-ChatGPT navigation result");
                     LiteEventLog.Write("webview_integration_selftest", new {
-                        passed = true, checks = 210, offline = true
+                        passed = true, checks = 216, offline = true
                     });
                     code = 0;
                 }

@@ -203,12 +203,25 @@ internal sealed partial class ChatGptLiteForm
     // After a click, React can append the user bubble asynchronously.
     // Probe for a bounded interval without EVER submitting the receipt again.
     // A timed-out renderer gets no subsequent script on this attempt.
+    internal static bool IsWakeReceiptRouteStable(string targetUrl,
+        string? source, long startEpoch, long currentEpoch) =>
+        IsWorkerRouteStable(targetUrl, source, startEpoch, currentEpoch);
+
     internal static async Task<bool> WaitForWakeReceiptAsync(
-        CoreWebView2 core, string receipt)
+        CoreWebView2 core, string receipt, string? targetUrl = null,
+        Func<long>? readEpoch = null)
     {
         const int totalBudgetMs = 4200;
         if (receipt.Length != 32 || !receipt.All(c =>
             c is >= '0' and <= '9' or >= 'a' and <= 'f')) return false;
+        // Callers outside the offline fixture supply BOTH target and route
+        // epoch. An A->B->A during awaited JS must never certify a receipt.
+        if ((targetUrl is null) != (readEpoch is null)) return false;
+        long initialEpoch = readEpoch?.Invoke() ?? 0;
+        bool stable() => targetUrl is null ||
+            IsWakeReceiptRouteStable(targetUrl, core.Source,
+                initialEpoch, readEpoch!());
+        if (!stable()) return false;
         string check = "window.__OPENBROWSER_RESUME_SENDER__?.hasAck(" +
             JsonSerializer.Serialize(receipt) + ") === true";
         var clock = System.Diagnostics.Stopwatch.StartNew();
@@ -216,10 +229,15 @@ internal sealed partial class ChatGptLiteForm
         {
             int left = totalBudgetMs - (int)clock.ElapsedMilliseconds;
             if (left <= 0) break;
+            if (!stable()) return false;
             try
             {
-                if (await ExecuteWorkerScriptAsync(core, check,
-                    Math.Min(1200, left)) == "true") return true;
+                bool acknowledged = await ExecuteWorkerScriptAsync(core, check,
+                    Math.Min(1200, left)) == "true";
+                // Even a true USER bubble from an old SPA document is not
+                // evidence of an ACK in the selected scheduled conversation.
+                if (!stable()) return false;
+                if (acknowledged) return true;
             }
             catch (TimeoutException)
             {
@@ -232,6 +250,7 @@ internal sealed partial class ChatGptLiteForm
                 totalBudgetMs - (int)clock.ElapsedMilliseconds);
             if (pause <= 0) break;
             await Task.Delay(pause);
+            if (!stable()) return false;
         }
         return false;
     }
@@ -975,7 +994,9 @@ internal sealed partial class ChatGptLiteForm
                     // This never clicks Send a second time.
                     bool visible = state == "submission_requested" &&
                         phase is "click_invoked" or "form_submitted" &&
-                        await WaitForWakeReceiptAsync(wakeCore, receipt);
+                        await WaitForWakeReceiptAsync(wakeCore, receipt, due.Url,
+                            () => useForeground ?
+                                _foregroundWakeRouteEpoch : _workerRouteEpoch);
                     if (!visible && IsDefinitelyUnsentWake(state, phase))
                     {
                         entries = LiteChatWakeRegistry.Read();
