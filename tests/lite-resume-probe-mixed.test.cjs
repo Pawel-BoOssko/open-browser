@@ -15,17 +15,27 @@ function node(index, role, modern) {
   };
 }
 function observe(legacy, modern, options = {}) {
+  const active = Array.from(new Set([...legacy, ...modern]))
+    .sort((a, b) => a.index - b.index);
+  const main = {
+    querySelectorAll(selector) {
+      assert.equal(selector,
+        '[data-message-author-role],[data-user-message-bubble],[data-chatgpt-selection-message-id]');
+      return active;
+    }
+  };
   const w = {
     location: { hostname: "chatgpt.com", pathname: "/c/00000000-1111-2222-3333-444444444444" },
     __OPENBROWSER_RESPONSE_SIGNALS__: { read() { return { visibleError: options.responseError ? 'response_load_failed' : null }; } },
     document: {
       querySelectorAll(selector) {
-        if (selector === "[data-message-author-role]") return legacy;
+        if (selector === "[data-message-author-role]") return [...legacy, ...(options.sidebar || [])];
         if (selector === "[data-user-message-bubble],[data-chatgpt-selection-message-id]") return modern;
         if (selector === "button") return [{ innerText: "High" }];
         return [];
       },
       querySelector(selector) {
+        if (selector === 'main,[role="main"]') return options.noMain ? null : main;
         if (selector.includes('button[aria-label="Zatrzymaj"]')) return options.polishStop ? {} : null;
         return selector === '#prompt-textarea' ? {} : null;
       }
@@ -99,4 +109,17 @@ function observe(legacy, modern, options = {}) {
   const s = observe([], [a], { polishStop: true });
   assert.equal(s.generating, true, "Polish Stop button indicates active generation");
 }
-console.log("LiteResumeProbeMixed: 9 PASS");
+{
+  const s = observe([node(1, "user", false)], [],
+    { sidebar: [node(999, "assistant", false)] });
+  assert.equal(s.role, "user",
+    "sidebar assistant preview must not look like the last active answer");
+  assert.equal(s.assistantNodeCount, 0);
+}
+{
+  const s = observe([], [], { sidebar: [node(999, "assistant", false)], noMain: true });
+  assert.equal(s.role, "unknown",
+    "unhydrated main must not fall back to the sidebar");
+  assert.equal(s.turnCount, 0);
+}
+console.log("LiteResumeProbeMixed: 11 PASS");

@@ -22,6 +22,13 @@ function observe({ activeBusy = false, toolRunning = false } = {}) {
       return selector === '[data-testid^="conversation-turn-"]' ? turn : null;
     }
   };
+  const main = {
+    querySelectorAll(selector) {
+      assert.equal(selector,
+        '[data-message-author-role],[data-user-message-bubble],[data-chatgpt-selection-message-id]');
+      return [assistant];
+    }
+  };
   const doc = {
     querySelectorAll(selector) {
       if (selector === "[data-message-author-role]") return [assistant];
@@ -30,6 +37,7 @@ function observe({ activeBusy = false, toolRunning = false } = {}) {
       return [];
     },
     querySelector(selector) {
+      if (selector === 'main,[role="main"]') return main;
       if (selector === "#prompt-textarea") return { innerText: "" };
       if (selector.includes('[aria-busy="true"]'))
         throw new Error("Global aria-busy must not be treated as chat tool activity");

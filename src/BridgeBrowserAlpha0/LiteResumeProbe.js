@@ -19,21 +19,16 @@
 
   function observe() {
     const d = w.document;
-    // ChatGPT's DIL UI (verified 2026-10-18 on the owner's test chat)
-    // uses data-chatgpt-selection-message-id for assistant replies and
-    // data-user-message-bubble for user prompts instead of the old role.
-    const legacy = Array.from(d.querySelectorAll('[data-message-author-role]'));
-    const modern = Array.from(d.querySelectorAll(
-      '[data-user-message-bubble],[data-chatgpt-selection-message-id]'));
-    // A DIL page may contain BOTH selector families. Never let a stray
-    // legacy node hide the actual newest DIL assistant response.
-    const parts = Array.from(new Set([...legacy, ...modern]));
-    parts.sort((a, b) => {
-      if (a === b) return 0;
-      const order = typeof a.compareDocumentPosition === 'function' ?
-        a.compareDocumentPosition(b) : 0;
-      return order & 4 ? -1 : order & 2 ? 1 : 0;
-    });
+    // Only the active conversation's main is trusted. Sidebar previews,
+    // search results or model menus may contain message-like DOM elsewhere.
+    // If ChatGPT has not hydrated main, fail closed (no assistant answer).
+    const main = d.querySelector('main,[role="main"]');
+    // A single selector returns DOM order and deduplicates nodes matching
+    // both old and DIL markers. Avoid repeated whole-document scans and the
+    // O(n log n) compareDocumentPosition sort on very long conversations.
+    const parts = main ? Array.from(main.querySelectorAll(
+      '[data-message-author-role],[data-user-message-bubble],' +
+      '[data-chatgpt-selection-message-id]')) : [];
     const last = parts[parts.length - 1] || null;
     const role = last ? (
       last.getAttribute?.('data-message-author-role') ||

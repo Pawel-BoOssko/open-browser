@@ -29,6 +29,13 @@ function sample(variant, lastRole = "assistant") {
       return null;
     }
   }));
+  const main = {
+    querySelectorAll(sel) {
+      assert.equal(sel,
+        '[data-message-author-role],[data-user-message-bubble],[data-chatgpt-selection-message-id]');
+      return nodes;
+    }
+  };
   const doc = {
     querySelectorAll(sel) {
       if (sel === "[data-message-author-role]")
@@ -39,6 +46,7 @@ function sample(variant, lastRole = "assistant") {
       return [];
     },
     querySelector(sel) {
+      if (sel === 'main,[role="main"]') return main;
       if (sel.includes("contenteditable")) return { value: "", innerText: "" };
       return null;
     }

@@ -12,6 +12,8 @@ function page(overrides = {}) {
   let pending = "";
   const main = {
     querySelectorAll(selector) {
+      if (selector === '[data-message-author-role],[data-user-message-bubble],[data-chatgpt-selection-message-id]')
+        return doc.querySelectorAll('[data-message-author-role]');
       return selector.includes('data-user-message-bubble')
         ? sent.map(value => ({ innerText: value })) : [];
     }

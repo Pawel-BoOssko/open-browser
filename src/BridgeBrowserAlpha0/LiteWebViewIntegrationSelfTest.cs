@@ -365,6 +365,49 @@ internal static class LiteWebViewIntegrationSelfTest
                         "window.__OPENBROWSER_RESUME_PROBE__?.observe()?.text"))
                         .Contains("Czarny kompas"),
                         "read last DIL assistant content");
+                    phase = "active_main_only_preflight_and_linear_dom_order";
+                    await core.ExecuteScriptAsync("""
+                        (() => {
+                          const aside=document.querySelector('aside');
+                          aside.setAttribute('data-chatgpt-selection-message-id','qa-sidebar-answer');
+                          aside.textContent='UNTRUSTED SIDEBAR PREVIEW: do not wake from this';
+                        })()
+                        """);
+                    Ensure(await EvaluateAsync(core,
+                        "window.__OPENBROWSER_RESUME_PROBE__.observe().role") == "assistant",
+                        "sidebar reply marker does not replace main assistant role");
+                    Ensure((await EvaluateAsync(core,
+                        "window.__OPENBROWSER_RESUME_PROBE__.observe().text"))
+                        .Contains("Czarny kompas"),
+                        "sidebar content never replaces final main response");
+                    Ensure(await EvaluateAsync(core,
+                        "window.__OPENBROWSER_RESUME_PROBE__.observe().turnCount") == "4",
+                        "sidebar marker excluded from active conversation turn count");
+                    await core.ExecuteScriptAsync("""
+                        (() => {
+                          const main=document.querySelector('main');
+                          window.__qaMain=main;
+                          window.__qaMainParent=main.parentNode;
+                          window.__qaNext=main.nextSibling;
+                          main.remove();
+                        })()
+                        """);
+                    Ensure(await EvaluateAsync(core,
+                        "window.__OPENBROWSER_RESUME_PROBE__.observe().role") == "unknown",
+                        "no hydrated main means unknown response, never sidebar fallback");
+                    Ensure(await EvaluateAsync(core,
+                        "window.__OPENBROWSER_RESUME_PROBE__.observe().turnCount") == "0",
+                        "no active main produces zero observed turns");
+                    await core.ExecuteScriptAsync("""
+                        (() => {
+                          window.__qaMainParent.insertBefore(window.__qaMain,window.__qaNext);
+                          document.querySelector('aside')
+                            .removeAttribute('data-chatgpt-selection-message-id');
+                          delete window.__qaMain;
+                          delete window.__qaMainParent;
+                          delete window.__qaNext;
+                        })()
+                        """);
                     phase = "worker_reuse_same_chat_isolated";
                     const string chatUrl =
                         "https://chatgpt.com/c/11111111-1111-1111-1111-111111111111";
@@ -733,7 +776,7 @@ internal static class LiteWebViewIntegrationSelfTest
                         10, 10, new Uri(chatUrl), "about:blank"),
                         "archive rejects non-ChatGPT navigation result");
                     LiteEventLog.Write("webview_integration_selftest", new {
-                        passed = true, checks = 136, offline = true
+                        passed = true, checks = 141, offline = true
                     });
                     code = 0;
                 }
