@@ -12,6 +12,9 @@ internal sealed partial class ChatGptLiteForm
     private readonly System.Windows.Forms.Timer _chatWakeTimer = new() { Interval = 20000 };
     private bool _multiWakeEnabled;
     private bool _chatWakeBusy;
+    // One circuit breaker for the ONE shared background WebView2 worker.
+    // Foreground chat waking must never depend on this background cooldown.
+    private readonly LiteRendererBackpressure _workerProbeBackpressure = new();
     // Set only after a full worker navigation and observed chat history.
     // SPA SourceChanged and any full navigation revoke this identity.
     private string? _workerVerifiedChatUrl;
@@ -246,7 +249,8 @@ internal sealed partial class ChatGptLiteForm
         catch (TimeoutException)
         {
             LiteEventLog.Write("multi_wake_worker_reuse_probe_timeout");
-            return false;
+            // Never send a second script to this renderer in the same attempt.
+            throw;
         }
     }
 
@@ -263,11 +267,20 @@ internal sealed partial class ChatGptLiteForm
         var core = _chatWakeWorker.CoreWebView2;
         if (core is null) return false;
         // Reuse this worker only after checking both URL and hydrated history.
-        if (await IsWorkerHydratedForChatAsync(core, url,
-            _workerVerifiedChatUrl))
+        // A timed-out reuse probe MUST NOT trigger another navigation/script.
+        try
         {
-            LiteEventLog.Write("multi_wake_worker_reused_hydrated");
-            return true;
+            if (await IsWorkerHydratedForChatAsync(core, url,
+                _workerVerifiedChatUrl))
+            {
+                LiteEventLog.Write("multi_wake_worker_reused_hydrated");
+                return true;
+            }
+        }
+        catch (TimeoutException)
+        {
+            MarkWorkerProbeFailed("reuse_probe_timeout");
+            return false;
         }
         var completed = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         void OnCompleted(object? sender, CoreWebView2NavigationCompletedEventArgs e) =>
@@ -278,7 +291,11 @@ internal sealed partial class ChatGptLiteForm
             _workerVerifiedChatUrl = null;
             core.Navigate(url);
             var ready = await Task.WhenAny(completed.Task, Task.Delay(45000));
-            if (ready != completed.Task || !await completed.Task) return false;
+            if (ready != completed.Task || !await completed.Task)
+            {
+                MarkWorkerProbeFailed("navigation_not_completed");
+                return false;
+            }
             var hydrationClock = System.Diagnostics.Stopwatch.StartNew();
             int hydrationAttempts = 0;
             while (true)
@@ -303,11 +320,13 @@ internal sealed partial class ChatGptLiteForm
                         elapsedMs = hydrationClock.ElapsedMilliseconds,
                         attempts = hydrationAttempts, waitBudgetMs = 25000
                     });
+                    MarkWorkerProbeFailed("history_probe_timeout");
                     return false; // Do not queue another script on a hung renderer.
                 }
                 if (found == "true")
                 {
                     _workerVerifiedChatUrl = url;
+                    _workerProbeBackpressure.MarkNavigationRecovered();
                     return true;
                 }
                 int pause = Math.Min(700,
@@ -409,6 +428,16 @@ internal sealed partial class ChatGptLiteForm
             reason == "ready" && LiteChatWakePreflight.IsCompletion(answer));
     }
 
+    private void MarkWorkerProbeFailed(string reason)
+    {
+        var cooldown = _workerProbeBackpressure.MarkFailed(DateTimeOffset.UtcNow);
+        _workerVerifiedChatUrl = null;
+        LiteEventLog.Write("multi_wake_worker_backpressure", new {
+            reason, consecutiveFailures = _workerProbeBackpressure.ConsecutiveFailures,
+            cooldownSeconds = (int)cooldown.TotalSeconds
+        });
+    }
+
     private void DeferWakeWithoutSend(string url, DateTimeOffset now,
         string reason, int minutes = 2)
     {
@@ -422,6 +451,12 @@ internal sealed partial class ChatGptLiteForm
             reason, retryMinutes = minutes, definitelyNotSent = true
         });
         UpdateMultiWakeStatus();
+    }
+
+    internal static bool ShouldDeferWorkerProbe(bool useForeground,
+        LiteRendererBackpressure gate, DateTimeOffset now)
+    {
+        return !useForeground && !gate.MayProbe(now);
     }
 
     private async Task PollAllChatWakesAsync()
@@ -450,12 +485,27 @@ internal sealed partial class ChatGptLiteForm
             // Commit only after the target conversation is stable and eligible.
             string state = "unknown";
             bool attemptCommitted = false;
+            bool backgroundAttempt = false;
             try
             {
                 var foreground = _browser.CoreWebView2;
                 bool useForeground = foreground is not null &&
                     LiteDevWakeState.IsChatUrl(foreground.Source) &&
                     LiteDevWakeState.NormalizeUrl(foreground.Source) == due.Url;
+                backgroundAttempt = !useForeground;
+                if (ShouldDeferWorkerProbe(useForeground,
+                    _workerProbeBackpressure, DateTimeOffset.UtcNow))
+                {
+                    LiteEventLog.Write("multi_wake_worker_cooldown", new {
+                        consecutiveFailures = _workerProbeBackpressure.ConsecutiveFailures,
+                        remainingSeconds = Math.Max(0, (int)Math.Ceiling(
+                            (_workerProbeBackpressure.BlockedUntilUtc -
+                             DateTimeOffset.UtcNow).TotalSeconds))
+                    });
+                    DeferWakeWithoutSend(due.Url, DateTimeOffset.UtcNow,
+                        "worker_backpressure");
+                    return;
+                }
                 if (!useForeground)
                 {
                     await EnsureWakeWorkerAsync();
@@ -648,6 +698,11 @@ internal sealed partial class ChatGptLiteForm
             catch (Exception ex)
             {
                 state = "failed_" + ex.GetType().Name;
+                if (backgroundAttempt &&
+                    (ex is TimeoutException ||
+                     ex is System.Runtime.InteropServices.COMException))
+                    MarkWorkerProbeFailed(ex is TimeoutException
+                        ? "worker_script_timeout" : "worker_com_failure");
                 LiteEventLog.Write("multi_wake_failed", new {
                     errorType = ex.GetType().Name,
                     submissionMayBeUncertain = attemptCommitted
