@@ -29,6 +29,8 @@ function observe(legacy, modern, options = {}) {
     __OPENBROWSER_RESPONSE_SIGNALS__: { read() { return { visibleError: options.responseError ? 'response_load_failed' : null }; } },
     document: {
       querySelectorAll(selector) {
+        if (selector.startsWith('[data-testid="stop-button"]'))
+          return options.polishStop ? [{ closest() { return null; } }] : [];
         if (selector === "[data-message-author-role]") return [...legacy, ...(options.sidebar || [])];
         if (selector === "[data-user-message-bubble],[data-chatgpt-selection-message-id]") return modern;
         if (selector === "button") return [{ innerText: "High" }];

@@ -13,6 +13,7 @@ function setup(options = {}) {
   let userBubbles = [];
   let sidebarBubbles = [];
   let unrelatedAriaBusy = false;
+  let sidebarStop = false;
   let voiceClicks = 0;
   const submit = {disabled: !!options.disabledSendButton, click() { clicks++; }};
   const voice = { click() {voiceClicks++;} };
@@ -33,6 +34,11 @@ function setup(options = {}) {
   };
   const doc = {
     querySelectorAll(selector) {
+      if (selector.startsWith('[data-testid="stop-button"]')) {
+        const button = { closest() { return null; } };
+        const sidebar = { closest() { return {}; } };
+        return [...(busy ? [button] : []), ...(sidebarStop ? [sidebar] : [])];
+      }
       if (selector.includes('data-user-message-bubble'))
         return [...userBubbles, ...sidebarBubbles];
       if (selector === '[aria-busy="true"]' && unrelatedAriaBusy) return [{}];
@@ -71,6 +77,7 @@ function setup(options = {}) {
     win, editor, sender, run() { assert.equal(typeof scheduled, "function"); scheduled(); },
     count() { return clicks; }, voiceCount() { return voiceClicks; },
     setBusy(value) { busy = value; },
+    setSidebarStop(value) { sidebarStop = value; },
     showAcknowledgment(text) { userBubbles = [{ innerText: text }]; },
     showSidebarReceipt(text) { sidebarBubbles = [{ innerText: text }]; },
     showUnrelatedBusy(value) { unrelatedAriaBusy = value; },
@@ -145,6 +152,23 @@ function setup(options = {}) {
   p.showAcknowledgment("Unrelated text containing " + id + " without OB wrapper");
   assert.equal(p.sender.hasAck(id), false,
     "bare hexadecimal substring is not a delivery marker");
+}
+{
+  const p = setup();
+  p.setSidebarStop(true);
+  assert.equal(p.sender.diagnose().reason, 'ready',
+    "sidebar Stop button cannot fake generation in active conversation");
+  assert.equal(p.sender.sendDirect(prompt, id, true), 'submission_requested');
+  assert.equal(p.sender.submitDirect(id), 'click_invoked');
+  assert.equal(p.count(), 1, "sidebar Stop must not prevent direct wake");
+}
+{
+  const p = setup();
+  p.setSidebarStop(true);
+  p.setBusy(true);
+  assert.equal(p.sender.sendDirect(prompt, id), 'busy_generating',
+    "active Stop button continues blocking despite unrelated sidebar Stop");
+  assert.equal(p.count(), 0);
 }
 {
   const p = setup();

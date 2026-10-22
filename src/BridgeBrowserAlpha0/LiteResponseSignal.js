@@ -43,7 +43,14 @@
         if (error) break;
       }
     }
-    const stop = !!doc.querySelector('[data-testid="stop-button"],button[aria-label="Stop generating"],button[aria-label="Przerwij generowanie"],button[aria-label="Zatrzymaj"]');
+    const stop = Array.from(doc.querySelectorAll(
+      '[data-testid="stop-button"],button[aria-label="Stop generating"],button[aria-label="Przerwij generowanie"],button[aria-label="Zatrzymaj"]'))
+      .some(button =>
+        !button.closest?.('aside,nav,[role="navigation"],[data-testid="sidebar"]') &&
+        !button.hidden && !button.disabled &&
+        button.getAttribute?.('aria-hidden') !== 'true' &&
+        (typeof button.getClientRects !== 'function' ||
+          button.getClientRects().length !== 0));
     return {
       documentReady: doc.readyState,
       hasComposer: !!doc.querySelector('textarea,[contenteditable="true"]'),

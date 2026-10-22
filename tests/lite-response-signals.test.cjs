@@ -26,6 +26,10 @@ function run(text = "", busy = false, host = "chatgpt.com", speaker = "alert") {
     document: {
       readyState: "complete",
       querySelectorAll(selector) {
+        if (selector.startsWith('[data-testid="stop-button"]'))
+          return [...(busy ? [{ closest() { return null; } }] : []),
+            ...(speaker === "sidebarStop" ?
+              [{ closest() { return {}; } }] : [])];
         if (selector.startsWith('[role="alert"]'))
           return (speaker === "alert" || speaker === "sidebar") && text
             ? [node] : [];
@@ -50,6 +54,10 @@ assert.equal(run("Failed to load this response").visibleError, "response_load_fa
 assert.equal(run("Przekroczono limit czasu dostarczenia wiadomości").visibleError, "delivery_timeout");
 assert.equal(run("Przerwano rozumowanie").visibleError, "reasoning_interrupted");
 assert.equal(run("hello", true).generatingSignal, true);
+assert.equal(run("hello", false, "chatgpt.com", "sidebarStop").generatingSignal,
+  false, "sidebar Stop button is not active response generation");
+assert.equal(run("hello", true, "chatgpt.com", "sidebarStop").generatingSignal,
+  true, "actual active Stop still blocks alongside unrelated sidebar");
 assert.equal(run("hello").visibleError, null);
 assert.equal(run("hello", false, "untrusted.com"), undefined);
 assert.equal(run("Nie udało się wczytać tej odpowiedzi", false,
@@ -68,4 +76,4 @@ assert.equal(sidebarStatus.assistantCount, 0,
   "sidebar assistant markers are not active chat messages");
 assert.equal(run("Failed to load this response", false, "chatgpt.com", "alert").visibleError,
   "response_load_failed", "real global error toast remains recognized");
-console.log("LiteResponseSignal: 13 PASS");
+console.log("LiteResponseSignal: 15 PASS");

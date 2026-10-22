@@ -7,7 +7,7 @@ const script = fs.readFileSync(path.join(__dirname,
   "../src/BridgeBrowserAlpha0/LiteResumeProbe.js"), "utf8");
 
 function observe({ activeBusy = false, toolRunning = false,
-  sidebarToolRunning = false } = {}) {
+  sidebarToolRunning = false, activeStop = false, sidebarStop = false } = {}) {
   const turn = {
     querySelector(selector) {
       return selector === '[aria-busy="true"]' && activeBusy ? {} : null;
@@ -37,6 +37,9 @@ function observe({ activeBusy = false, toolRunning = false,
   };
   const doc = {
     querySelectorAll(selector) {
+      if (selector.startsWith('[data-testid="stop-button"]'))
+        return [...(activeStop ? [{ closest() { return null; } }] : []),
+          ...(sidebarStop ? [{ closest() { return {}; } }] : [])];
       if (selector === "[data-message-author-role]") return [assistant];
       if (selector === '[data-user-message-bubble],[data-chatgpt-selection-message-id]') return [];
       if (selector === "button") return [{ innerText: "High" }];
@@ -65,4 +68,10 @@ assert.equal(observe({ activeBusy: true }).toolBusy, true);
 assert.equal(observe({ toolRunning: true }).toolBusy, true);
 assert.equal(observe({ sidebarToolRunning: true }).toolBusy, false,
   "sidebar running tool must not block active chat");
-console.log("LiteResumeProbeSidebarBusy: 4 PASS");
+assert.equal(observe({ sidebarStop: true }).generating, false,
+  "unrelated sidebar Stop does not block active assistant preflight");
+assert.equal(observe({ activeStop: true }).generating, true,
+  "active conversation Stop must block assistant preflight");
+assert.equal(observe({ activeStop: true, sidebarStop: true }).generating, true,
+  "unrelated sidebar cannot hide a real active Stop");
+console.log("LiteResumeProbeSidebarBusy: 7 PASS");

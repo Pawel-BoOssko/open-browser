@@ -47,8 +47,14 @@
     const userNodeCount = parts.filter(isUser).length;
     const lastAssistant = parts.slice().reverse().find(isAssistant);
     const lastAssistantChars = visibleText(lastAssistant).length;
-    const stop = !!d.querySelector(
-      '[data-testid="stop-button"],button[aria-label*="Stop generating"],button[aria-label*="Przerwij generowanie"],button[aria-label="Zatrzymaj"]');
+    const stop = Array.from(d.querySelectorAll(
+      '[data-testid="stop-button"],button[aria-label*="Stop generating"],button[aria-label*="Przerwij generowanie"],button[aria-label="Zatrzymaj"]'))
+      .some(button =>
+        !button.closest?.('aside,nav,[role="navigation"],[data-testid="sidebar"]') &&
+        !button.hidden && !button.disabled &&
+        button.getAttribute?.('aria-hidden') !== 'true' &&
+        (typeof button.getClientRects !== 'function' ||
+          button.getClientRects().length !== 0));
     // An unrelated busy sidebar must not suppress the current chat.
     const activeTurn = last?.closest?.('[data-testid^="conversation-turn-"]');
     // Only tool state inside this conversation blocks its next wake.

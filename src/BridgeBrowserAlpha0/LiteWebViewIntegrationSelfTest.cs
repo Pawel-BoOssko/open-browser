@@ -632,6 +632,49 @@ internal static class LiteWebViewIntegrationSelfTest
                     Ensure(await EvaluateAsync(core,
                         "window.__OPENBROWSER_RESUME_PROBE__.observe().error") == "false",
                         "scoped response signal does not leak sidebar error to scheduler");
+                    phase = "sidebar_stop_button_isolation";
+                    await core.ExecuteScriptAsync("""
+                        (() => {
+                          const stop=document.createElement('button');
+                          stop.id='qa-sidebar-stop';
+                          stop.dataset.testid='stop-button';
+                          stop.textContent='Stop generating';
+                          document.querySelector('aside').appendChild(stop);
+                        })()
+                        """);
+                    Ensure(await EvaluateAsync(core,
+                        "window.__OPENBROWSER_RESUME_PROBE__.observe().generating") == "false",
+                        "sidebar stop cannot misidentify active chat as generating");
+                    Ensure(await EvaluateAsync(core,
+                        "window.__OPENBROWSER_RESPONSE_SIGNALS__.read().generatingSignal") == "false",
+                        "sidebar stop cannot fake centralized generation status");
+                    Ensure(await EvaluateAsync(core,
+                        "window.__OPENBROWSER_RESUME_SENDER__.diagnose().reason") == "ready",
+                        "sender does not block a wake due to a sidebar Stop button");
+                    await core.ExecuteScriptAsync("""
+                        (() => {
+                          const stop=document.createElement('button');
+                          stop.id='qa-main-stop';
+                          stop.dataset.testid='stop-button';
+                          stop.textContent='Stop generating';
+                          document.querySelector('main').appendChild(stop);
+                        })()
+                        """);
+                    Ensure(await EvaluateAsync(core,
+                        "window.__OPENBROWSER_RESUME_PROBE__.observe().generating") == "true",
+                        "active chat Stop still blocks preflight while sidebar Stop exists");
+                    Ensure(await EvaluateAsync(core,
+                        "window.__OPENBROWSER_RESPONSE_SIGNALS__.read().generatingSignal") == "true",
+                        "active Stop is reported in centralized response status");
+                    Ensure(await EvaluateAsync(core,
+                        "window.__OPENBROWSER_RESUME_SENDER__.diagnose().reason") == "generating",
+                        "sender refuses to interrupt actual active generation");
+                    await core.ExecuteScriptAsync("""
+                        (() => {
+                          document.querySelector('#qa-main-stop').remove();
+                          document.querySelector('#qa-sidebar-stop').remove();
+                        })()
+                        """);
                     await core.ExecuteScriptAsync("""
                         (() => {
                           document.querySelector('aside').removeAttribute('role');
@@ -1068,7 +1111,7 @@ internal static class LiteWebViewIntegrationSelfTest
                         10, 10, new Uri(chatUrl), "about:blank"),
                         "archive rejects non-ChatGPT navigation result");
                     LiteEventLog.Write("webview_integration_selftest", new {
-                        passed = true, checks = 204, offline = true
+                        passed = true, checks = 210, offline = true
                     });
                     code = 0;
                 }

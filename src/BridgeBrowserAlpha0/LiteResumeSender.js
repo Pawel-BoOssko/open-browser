@@ -46,13 +46,16 @@
   function stopVisible() {
     // Match the probe's supported Stop controls, including ChatGPT variants
     // that expose only an accessible label and no data-testid.
-    const button = w.document.querySelector(
+    const buttons = w.document.querySelectorAll(
       '[data-testid="stop-button"],button[aria-label*="Stop generating"],button[aria-label*="Przerwij generowanie"],button[aria-label="Zatrzymaj"]');
-    if (!button || button.disabled || button.hidden ||
-        button.getAttribute?.('aria-hidden') === 'true') return false;
-    if (typeof button.getClientRects === 'function' &&
-        button.getClientRects().length === 0) return false;
-    return true;
+    // Sidebar/chat previews may have a Stop button unrelated to the active
+    // conversation. Allow genuine main controls and top-level portals.
+    return Array.from(buttons).some(button =>
+      !button.closest?.('aside,nav,[role="navigation"],[data-testid="sidebar"]') &&
+      !button.disabled && !button.hidden &&
+      button.getAttribute?.('aria-hidden') !== 'true' &&
+      (typeof button.getClientRects !== 'function' ||
+        button.getClientRects().length !== 0));
   }
   // Aria-busy on an unrelated sidebar or hidden streaming placeholder is
   // not evidence that the current composer cannot submit a new message.

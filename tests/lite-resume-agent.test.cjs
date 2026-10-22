@@ -20,6 +20,10 @@ function page(overrides = {}) {
   };
   const doc = {
     querySelectorAll(selector) {
+      if (selector.startsWith('[data-testid="stop-button"]'))
+        return [...(overrides.busy ? [{ closest() { return null; } }] : []),
+          ...(overrides.sidebarStop ? [{ closest() { return {}; } }] : [])];
+      if (selector === '[aria-busy="true"]') return [];
       if (selector === 'button') return [{ innerText: overrides.effort || 'High' }];
       if (selector === '[role="alert"],[data-testid*="error"],[data-testid*="toast"]') return [];
       if (selector === '[data-user-message-bubble],[data-chatgpt-selection-message-id]')
@@ -136,4 +140,16 @@ function page(overrides = {}) {
     "0123456789abcdef0123456789abcdef"), "busy_missing_composer");
   assert.equal(p.sent.length, 0);
 }
-console.log("LiteResumeAgent: 10 PASS");
+{
+  const p = page({ sidebarStop: true });
+  assert.equal(p.w.__OPENBROWSER_RESUME_PROBE__.observe().generating, false,
+    "sidebar Stop is not the current chat's generation");
+  assert.equal(p.w.__OPENBROWSER_RESUME_SENDER__.diagnose().reason, 'ready');
+}
+{
+  const p = page({ busy: true, sidebarStop: true });
+  assert.equal(p.w.__OPENBROWSER_RESUME_PROBE__.observe().generating, true,
+    "real active Stop still blocks even with sidebar Stop");
+  assert.equal(p.w.__OPENBROWSER_RESUME_SENDER__.diagnose().reason, 'generating');
+}
+console.log("LiteResumeAgent: 12 PASS");
