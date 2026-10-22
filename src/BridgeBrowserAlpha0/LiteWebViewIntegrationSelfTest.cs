@@ -158,6 +158,56 @@ internal static class LiteWebViewIntegrationSelfTest
                     workerGate.MarkNavigationRecovered();
                     Ensure(!ChatGptLiteForm.ShouldDeferWorkerProbe(false, workerGate,
                         now.AddSeconds(41)), "verified worker recovery clears cooldown");
+                    phase = "multi_chat_fair_due_selection";
+                    var fairnessNow = DateTimeOffset.UtcNow;
+                    string fairFg = "https://chatgpt.com/c/11111111-1111-1111-1111-111111111111";
+                    var fairChats = Enumerable.Range(1, 5).Select(i =>
+                        new LiteChatWakeRegistry.Chat {
+                            Url = i == 1 ? fairFg :
+                                "https://chatgpt.com/c/" + i.ToString().PadLeft(8, '0') +
+                                "-2222-2222-2222-222222222222",
+                            Enabled = true,
+                            DueUtc = fairnessNow.AddMinutes(i == 1 ? -1 : i - 11)
+                        }).ToArray();
+                    // Five independent schedules: oldest background must win
+                    // when foreground is blocked for many wake ticks.
+                    Ensure(ChatGptLiteForm.SelectDueChat(fairChats, fairnessNow,
+                        fairFg) == fairChats[1],
+                        "oldest background wake cannot starve under due foreground");
+                    Ensure(ChatGptLiteForm.SelectDueChat(fairChats, fairnessNow,
+                        null) == fairChats[1], "no visible chat selects oldest due");
+                    Ensure(ChatGptLiteForm.SelectDueChat(fairChats, fairnessNow,
+                        "https://chatgpt.com/") == fairChats[1],
+                        "application home route selects oldest due");
+                    fairChats[0].DueUtc = fairChats[1].DueUtc.AddSeconds(59);
+                    Ensure(ChatGptLiteForm.SelectDueChat(fairChats, fairnessNow,
+                        fairFg) == fairChats[0],
+                        "foreground gets priority for nearly equal due times");
+                    fairChats[0].DueUtc = fairChats[1].DueUtc.AddMinutes(1);
+                    Ensure(ChatGptLiteForm.SelectDueChat(fairChats, fairnessNow,
+                        fairFg) == fairChats[0],
+                        "foreground preference ends after one-minute tolerance");
+                    fairChats[0].DueUtc = fairChats[1].DueUtc.AddSeconds(61);
+                    Ensure(ChatGptLiteForm.SelectDueChat(fairChats, fairnessNow,
+                        fairFg) == fairChats[1],
+                        "more overdue background still wins outside tolerance");
+                    fairChats[0].DueUtc = fairnessNow.AddMinutes(-1);
+                    fairChats[1].Enabled = false;
+                    Ensure(ChatGptLiteForm.SelectDueChat(fairChats, fairnessNow,
+                        fairFg) == fairChats[2],
+                        "paused old background chat is never selected");
+                    fairChats[2].DueUtc = fairnessNow.AddMinutes(2);
+                    Ensure(ChatGptLiteForm.SelectDueChat(fairChats, fairnessNow,
+                        fairFg) == fairChats[3],
+                        "not-yet-due background chat cannot preempt older due");
+                    fairChats[3].Enabled = false;
+                    fairChats[4].Enabled = false;
+                    Ensure(ChatGptLiteForm.SelectDueChat(fairChats, fairnessNow,
+                        fairFg) == fairChats[0],
+                        "foreground wakes normally without overdue background");
+                    fairChats[0].DueUtc = fairnessNow.AddMinutes(20);
+                    Ensure(ChatGptLiteForm.SelectDueChat(fairChats, fairnessNow,
+                        fairFg) is null, "no eligible due chat remains after reschedule");
                     phase = "check_hydrated_worker";
                     Ensure(await EvaluateAsync(core,
                         ChatGptLiteForm.WakeWorkerHydratedScript) == "true",

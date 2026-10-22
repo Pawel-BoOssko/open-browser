@@ -506,6 +506,24 @@ internal sealed partial class ChatGptLiteForm
                  phase.StartsWith("blocked_", StringComparison.Ordinal)));
     }
 
+    internal static LiteChatWakeRegistry.Chat? SelectDueChat(
+        IEnumerable<LiteChatWakeRegistry.Chat> entries, DateTimeOffset now,
+        string? foregroundSource)
+    {
+        // A foreground preference must not starve much older background wakes
+        // while the foreground chat is generating or waiting for a new answer.
+        var due = entries.Where(x => x.Enabled && x.DueUtc <= now)
+            .OrderBy(x => x.DueUtc).ThenBy(x => x.Url, StringComparer.Ordinal)
+            .ToArray();
+        if (due.Length == 0) return null;
+        if (!LiteDevWakeState.IsChatUrl(foregroundSource)) return due[0];
+        string fg = LiteDevWakeState.NormalizeUrl(foregroundSource!);
+        var foreground = due.FirstOrDefault(x => x.Url == fg);
+        return foreground is not null &&
+            foreground.DueUtc <= due[0].DueUtc.AddMinutes(1)
+                ? foreground : due[0];
+    }
+
     private async Task PollAllChatWakesAsync()
     {
         if (!_multiWakeEnabled || !_ownsMultiWakeMutex ||
@@ -516,12 +534,7 @@ internal sealed partial class ChatGptLiteForm
             var entries = LiteChatWakeRegistry.Read();
             var now = DateTimeOffset.UtcNow;
             var foregroundUrl = _browser.CoreWebView2?.Source;
-            var dueChats = entries.Where(x => x.Enabled && x.DueUtc <= now)
-                .OrderBy(x => x.DueUtc).ToArray();
-            var due = dueChats.FirstOrDefault(x => foregroundUrl is not null &&
-                LiteDevWakeState.IsChatUrl(foregroundUrl) &&
-                LiteDevWakeState.NormalizeUrl(foregroundUrl) == x.Url)
-                ?? dueChats.FirstOrDefault();
+            var due = SelectDueChat(entries, now, foregroundUrl);
             if (due is null) { UpdateMultiWakeStatus(); return; }
             if (!FlushNotes())
             {
