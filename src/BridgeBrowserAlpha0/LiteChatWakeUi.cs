@@ -338,6 +338,17 @@ internal sealed partial class ChatGptLiteForm
         return (int)Math.Min(6500L, 25000L - elapsedMs);
     }
 
+    // NavigationCompleted is not necessarily for our latest Navigate(url):
+    // WebView2 can deliver a delayed completion from a previous document.
+    // Only a completion with the ID of THIS NavigationStarting is trusted.
+    internal static bool MatchesWorkerNavigationCompletion(
+        ulong? requestedNavigationId, ulong completedNavigationId,
+        bool isSuccess)
+    {
+        return requestedNavigationId.HasValue &&
+            requestedNavigationId.Value == completedNavigationId && isSuccess;
+    }
+
     private async Task<bool> NavigateWorkerAsync(string url)
     {
         var core = _chatWakeWorker.CoreWebView2;
@@ -360,8 +371,21 @@ internal sealed partial class ChatGptLiteForm
             return false;
         }
         var completed = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-        void OnCompleted(object? sender, CoreWebView2NavigationCompletedEventArgs e) =>
-            completed.TrySetResult(e.IsSuccess);
+        ulong? requestedNavigationId = null;
+        void OnStarting(object? sender, CoreWebView2NavigationStartingEventArgs e)
+        {
+            // Subscribe immediately before Navigate. Ignore unrelated prior
+            // completions; do not let a later redirect rebind the request.
+            requestedNavigationId ??= e.NavigationId;
+        }
+        void OnCompleted(object? sender, CoreWebView2NavigationCompletedEventArgs e)
+        {
+            if (requestedNavigationId is not { } expected ||
+                expected != e.NavigationId) return;
+            completed.TrySetResult(MatchesWorkerNavigationCompletion(
+                requestedNavigationId, e.NavigationId, e.IsSuccess));
+        }
+        core.NavigationStarting += OnStarting;
         core.NavigationCompleted += OnCompleted;
         try
         {
@@ -481,7 +505,11 @@ internal sealed partial class ChatGptLiteForm
             MarkWorkerProbeFailed("history_not_ready");
             return false;
         }
-        finally { core.NavigationCompleted -= OnCompleted; }
+        finally
+        {
+            core.NavigationStarting -= OnStarting;
+            core.NavigationCompleted -= OnCompleted;
+        }
     }
 
     private async Task<LiteChatWakePreflight.Observation?> ReadWorkerObservationAsync(

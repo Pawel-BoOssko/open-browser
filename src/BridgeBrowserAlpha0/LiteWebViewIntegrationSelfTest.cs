@@ -76,16 +76,43 @@ internal static class LiteWebViewIntegrationSelfTest
                     }
                     var navigation = new TaskCompletionSource<bool>(
                         TaskCreationOptions.RunContinuationsAsynchronously);
+                    ulong? startedNavigationId = null;
+                    ulong? completedNavigationId = null;
+                    void onStarting(object? sender, CoreWebView2NavigationStartingEventArgs e)
+                    {
+                        startedNavigationId ??= e.NavigationId;
+                    }
                     void onNavigated(object? sender, CoreWebView2NavigationCompletedEventArgs e) {
+                        completedNavigationId = e.NavigationId;
                         navigation.TrySetResult(e.IsSuccess);
                     }
+                    core.NavigationStarting += onStarting;
                     core.NavigationCompleted += onNavigated;
                     phase = "navigate_virtual_host";
                     core.Navigate("https://chatgpt.com/c/test/index.html");
                     bool success = await navigation.Task.WaitAsync(
                         TimeSpan.FromSeconds(18));
+                    core.NavigationStarting -= onStarting;
                     core.NavigationCompleted -= onNavigated;
                     Ensure(success, "local virtual host navigation");
+                    phase = "correlated_worker_navigation_completion";
+                    Ensure(startedNavigationId.HasValue && completedNavigationId.HasValue,
+                        "actual WebView2 navigation provides starting and completed IDs");
+                    Ensure(ChatGptLiteForm.MatchesWorkerNavigationCompletion(
+                        startedNavigationId, completedNavigationId!.Value, true),
+                        "real matching WebView2 navigation ID can certify completion");
+                    Ensure(!ChatGptLiteForm.MatchesWorkerNavigationCompletion(
+                        null, completedNavigationId.Value, true),
+                        "completion before target navigation starts must be ignored");
+                    Ensure(!ChatGptLiteForm.MatchesWorkerNavigationCompletion(
+                        startedNavigationId, completedNavigationId.Value + 1, true),
+                        "late completion from a different navigation cannot unblock target");
+                    Ensure(!ChatGptLiteForm.MatchesWorkerNavigationCompletion(
+                        startedNavigationId, completedNavigationId.Value, false),
+                        "failed target navigation cannot certify usable history");
+                    Ensure(ChatGptLiteForm.MatchesWorkerNavigationCompletion(
+                        startedNavigationId, completedNavigationId.Value, true),
+                        "matched successful navigation still allows hydration attempt");
                     phase = "hard_dom_idle_timer_lifecycle";
                     Ensure(!ChatGptLiteForm.ShouldPollHardPrune(false),
                         "WinForms hard-prune report timer stays stopped while OFF");
@@ -1019,7 +1046,7 @@ internal static class LiteWebViewIntegrationSelfTest
                         10, 10, new Uri(chatUrl), "about:blank"),
                         "archive rejects non-ChatGPT navigation result");
                     LiteEventLog.Write("webview_integration_selftest", new {
-                        passed = true, checks = 192, offline = true
+                        passed = true, checks = 197, offline = true
                     });
                     code = 0;
                 }
