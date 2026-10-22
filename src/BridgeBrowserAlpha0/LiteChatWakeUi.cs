@@ -714,6 +714,7 @@ internal sealed partial class ChatGptLiteForm
         // ambiguity marker durable through every unrelated deferral.
         entry.LastState = NextStateAfterWakeDeferral(entry.LastState, reason);
         LiteChatWakeRegistry.Write(registered);
+        LiteWakeJournal.Write("deferred", entry.WakeSequence + 1, result: reason);
         LiteEventLog.Write("multi_wake_preflight_skipped", new {
             reason, retryMinutes = minutes, definitelyNotSent = true
         });
@@ -768,8 +769,11 @@ internal sealed partial class ChatGptLiteForm
             var foregroundUrl = _browser.CoreWebView2?.Source;
             var due = SelectDueChat(entries, now, foregroundUrl);
             if (due is null) { UpdateMultiWakeStatus(); return; }
+            LiteWakeJournal.Write("due", due.WakeSequence + 1);
             if (!FlushNotes())
             {
+                LiteWakeJournal.Write("deferred", due.WakeSequence + 1,
+                    result: "notes_save_failed");
                 LiteEventLog.Write("multi_wake_deferred", new { reason = "notes_save_failed" });
                 return;
             }
@@ -832,6 +836,7 @@ internal sealed partial class ChatGptLiteForm
                         due.Enabled = false;
                         due.LastState = "complete";
                         LiteChatWakeRegistry.Write(entries);
+                        LiteWakeJournal.Write("schedule_completed", due.WakeSequence);
                         LiteEventLog.Write("multi_wake_completed");
                         UpdateMultiWakeStatus();
                         return;
@@ -843,6 +848,8 @@ internal sealed partial class ChatGptLiteForm
                         // Any ordinary reply must prove a NEW stable answer.
                         due.DueUtc = DateTimeOffset.UtcNow.AddMinutes(5);
                         LiteChatWakeRegistry.Write(entries);
+                        LiteWakeJournal.Write("deferred", due.WakeSequence + 1,
+                            result: "unconfirmed_recovery");
                         LiteEventLog.Write("multi_wake_own_draft_unconfirmed_held",
                             new { retryMinutes = 5, clickMayHaveOccurred = true });
                         UpdateMultiWakeStatus();
@@ -895,6 +902,8 @@ internal sealed partial class ChatGptLiteForm
                                     receiptVisible ? active.EffectiveMinutes : 2);
                                 LiteChatWakeRegistry.Write(entries);
                             }
+                            LiteWakeJournal.Write("recovery", due.WakeSequence,
+                                result: receiptVisible ? "visible_ack" : "unconfirmed");
                             LiteEventLog.Write("multi_wake_own_draft_recovery",
                                 new { result = recovery, receiptConfirmed = receiptVisible });
                             UpdateMultiWakeStatus();
@@ -919,6 +928,7 @@ internal sealed partial class ChatGptLiteForm
                     attemptCommitted = true;
                     var key = LiteChatNotes.NormalizeKey(due.Url);
                     string receipt = Guid.NewGuid().ToString("N");
+                    LiteWakeJournal.Write("attempt_reserved", due.WakeSequence, receipt);
                     string payload = LiteChatWakeRegistry.NumberedMessage(
                         due, _noteStore.Load(key), receipt);
                     // Bind target identity inside the *same* script invocation
@@ -943,6 +953,8 @@ internal sealed partial class ChatGptLiteForm
                             unsent.LastState = "waiting_" + state;
                             LiteChatWakeRegistry.Write(entries);
                         }
+                        LiteWakeJournal.Write("definitely_unsent",
+                            due.WakeSequence, receipt, "not_submitted");
                         LiteEventLog.Write("multi_wake_definitely_unsent",
                             new { reason = state });
                         return;
@@ -993,6 +1005,9 @@ internal sealed partial class ChatGptLiteForm
                         // Do not synthesize Enter or submit an unhydrated form.
                         // The unique receipt was NOT confirmed as submitted.
                     }
+                    if (phase is "click_invoked" or "form_submitted")
+                        LiteWakeJournal.Write("submission_attempted",
+                            due.WakeSequence, receipt, phase);
                     // Only after a successful submit click: wait briefly
                     // for React's real USER bubble in this exact chat.
                     // This never clicks Send a second time.
@@ -1013,6 +1028,8 @@ internal sealed partial class ChatGptLiteForm
                             unsent.LastState = "waiting_" + phase;
                             LiteChatWakeRegistry.Write(entries);
                         }
+                        LiteWakeJournal.Write("definitely_unsent",
+                            due.WakeSequence, receipt, phase);
                         LiteEventLog.Write("multi_wake_definitely_unsent", new {
                             reason = phase, definitelyNotSent = true,
                             retryMinutes = 2
@@ -1020,6 +1037,9 @@ internal sealed partial class ChatGptLiteForm
                         UpdateMultiWakeStatus();
                         return;
                     }
+                    LiteWakeJournal.Write(visible ? "receipt_confirmed" :
+                        "receipt_uncertain", due.WakeSequence, receipt,
+                        visible ? "visible_ack" : phase);
                     LiteEventLog.Write("multi_wake_send", new {
                         wakeSequence = due.WakeSequence,
                         state, phase, visibleUserBubble = visible,
@@ -1038,6 +1058,9 @@ internal sealed partial class ChatGptLiteForm
                      ex is System.Runtime.InteropServices.COMException))
                     MarkWorkerProbeFailed(ex is TimeoutException
                         ? "worker_script_timeout" : "worker_com_failure");
+                LiteWakeJournal.Write("engine_failure",
+                    attemptCommitted ? due.WakeSequence : due.WakeSequence + 1,
+                    result: "exception");
                 LiteEventLog.Write("multi_wake_failed", new {
                     errorType = ex.GetType().Name,
                     submissionMayBeUncertain = attemptCommitted

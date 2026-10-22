@@ -162,6 +162,19 @@ internal static class LiteChatWakeRegistry
                 "zmiany, wyniki testów, przeszkody oraz następny krok; " +
                 "5-10 krótkich linii wystarczy. Dzięki temu kolejny czat " +
                 "ma odzyskać pracę nawet po awarii interfejsu. " +
+                "DODATKOWO prowadź wspólny dziennik z silnikiem na PBOX1: " +
+                @"%LOCALAPPDATA%\OpenBrowser\ChatGPT-Lite\diagnostics\wake-lifecycle.jsonl" +
+                ". Na POCZĄTKU dopisz jedną linię JSONL z polami schema=1, " +
+                "utc (ISO UTC), actor=chat, stage=chat_started, wakeSequence=" +
+                entry.WakeSequence + ", receipt=" + receipt +
+                ". Przed końcem dopisz drugą linię z actor=chat, " +
+                "stage=chat_finished albo chat_blocked, tym samym numerem " +
+                "i receipt, oraz krótkim result bez tajnych danych. " +
+                "Możesz dodać stage=chat_checkpoint w czasie pracy. " +
+                "To jest TEN SAM PLIK co wpisy silnika due/attempt/ACK. " +
+                "Nie dopisuj fałszywego ACK ani nie uznawaj próby za wysłaną. " +
+                "Jeśli zapis do PBOX1 się nie uda, wskaż to w checkpointcie " +
+                "na SatanAMD, nie udawaj sukcesu. " +
                 "Nie używaj ChatGPT Tasks ani wewnętrznych automatyzacji.";
         return marker + "\n" + body;
     }
@@ -205,8 +218,13 @@ internal static class LiteChatWakeRegistry
             list[1].WakeSequence = 2;
             if (NumberedMessage(list[1], "", "0123456789abcdef0123456789abcdef")
                 .Contains("OBOWIĄZKOWY CHECKPOINT")) return 10;
+            if (!numbered.Contains("wake-lifecycle.jsonl") ||
+                !numbered.Contains("chat_started") ||
+                !numbered.Contains("chat_finished")) return 12;
+            int wakeJournal = LiteWakeJournal.SelfTest();
+            if (wakeJournal != 0) return 20 + wakeJournal;
             int preflight = LiteChatWakePreflight.SelfTest();
-            return preflight == 0 ? 0 : 10 + preflight;
+            return preflight == 0 ? 0 : 40 + preflight;
         }
         catch { return 7; }
     }
