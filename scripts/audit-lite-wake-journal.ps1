@@ -13,6 +13,7 @@ $rows = [System.Collections.Generic.Dictionary[string,object]]::new(
     [StringComparer]::Ordinal)
 $invalid = 0
 $unpairedDue = 0
+$engineFailuresWithoutReceipt = 0
 $readCount = 0
 foreach ($line in [System.IO.File]::ReadLines($Path, [Text.Encoding]::UTF8)) {
     if ([string]::IsNullOrWhiteSpace($line)) { continue }
@@ -25,7 +26,12 @@ foreach ($line in [System.IO.File]::ReadLines($Path, [Text.Encoding]::UTF8)) {
     }
     $id = [string]$entry.receipt
     if ($id -notmatch '^[0-9a-f]{32}$') {
-        if ($entry.stage -eq 'due' -or $entry.stage -eq 'deferred' -or
+        if ($entry.actor -eq 'engine' -and $entry.stage -eq 'engine_failure') {
+            # No attempt/receipt exists when worker fails before reservation.
+            # This is an operational failure, not malformed JSONL.
+            $engineFailuresWithoutReceipt++
+        }
+        elseif ($entry.stage -eq 'due' -or $entry.stage -eq 'deferred' -or
             $entry.stage -eq 'schedule_completed') { $unpairedDue++ }
         else { $invalid++ }
         continue
@@ -85,6 +91,7 @@ Write-Output ("WAKE_AUDIT entries={0} receipts={1} due_without_receipt={2} bad_r
     $readCount,$all.Count,$unpairedDue,$invalid)
 Write-Output ("ACKED={0} CHAT_STARTED={1} CHAT_FINISHED={2} CHAT_BLOCKED={3}" -f
     $ack,$started,$done,$blocked)
+Write-Output ("ENGINE_FAILURES_NO_RECEIPT={0}" -f $engineFailuresWithoutReceipt)
 $summaryFormat = "ACK_NO_CHAT_START={0} CHAT_STARTED_NOT_FINISHED={1} UNCERTAIN_RECEIPTS={2} " +
     "ATTEMPT_WITHOUT_ACK={3} SEQUENCE_MISMATCHES={4}"
 Write-Output ($summaryFormat -f $waiting,$open,$uncertain,$ambiguous,$disagree)
