@@ -721,6 +721,18 @@ internal sealed partial class ChatGptLiteForm
         UpdateMultiWakeStatus();
     }
 
+    // Called before navigation, after navigation and after preflight:
+    // a 429 can arrive while WebView2 is hydrating the selected chat.
+    private bool HoldWakeOnBackendRead429(LiteChatWakeRegistry.Chat due)
+    {
+        var now = DateTimeOffset.UtcNow;
+        TimeSpan remaining = _wakeRead429Throttle.Remaining(now);
+        if (remaining <= TimeSpan.Zero) return false;
+        int retryMinutes = Math.Clamp((int)Math.Ceiling(remaining.TotalMinutes), 1, 5);
+        DeferWakeWithoutSend(due.Url, now, "backend_http_429", retryMinutes);
+        return true;
+    }
+
     internal static bool ShouldDeferWorkerProbe(bool useForeground,
         LiteRendererBackpressure gate, DateTimeOffset now)
     {
@@ -770,6 +782,9 @@ internal sealed partial class ChatGptLiteForm
             var due = SelectDueChat(entries, now, foregroundUrl);
             if (due is null) { UpdateMultiWakeStatus(); return; }
             LiteWakeJournal.Write("due", due.WakeSequence + 1);
+            // The read-only API cooldown applies to automated probes only.
+            // Post submission and user-initiated foreground browsing are not retried.
+            if (HoldWakeOnBackendRead429(due)) return;
             if (!FlushNotes())
             {
                 LiteWakeJournal.Write("deferred", due.WakeSequence + 1,
@@ -816,6 +831,8 @@ internal sealed partial class ChatGptLiteForm
                 }
                 else
                 {
+                    // Navigation can receive HTTP 429 after the first gate.
+                    if (HoldWakeOnBackendRead429(due)) return;
                     LiteEventLog.Write("multi_wake_target_selected", new { foreground = useForeground });
                     // Re-read the settings in case the operator paused the chat
                     // while the worker was navigating.
@@ -828,6 +845,9 @@ internal sealed partial class ChatGptLiteForm
                     var preflight = await CheckWorkerPreflightAsync(
                         wakeCore, due.Url,
                         due.LastAnswerFingerprint);
+                    // A blocked history request during preflight must not be
+                    // misinterpreted as a hydrated, eligible conversation.
+                    if (HoldWakeOnBackendRead429(due)) return;
                     var gate = ChooseWakePreflightGate(
                         preflight.Complete, due.LastState,
                         due.LastAnswerFingerprint, preflight.Reason, preflight.Hash);

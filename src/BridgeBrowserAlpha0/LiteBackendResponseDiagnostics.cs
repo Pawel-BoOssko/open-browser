@@ -4,6 +4,8 @@ namespace BridgeBrowserAlpha0;
 
 internal sealed partial class ChatGptLiteForm
 {
+    private readonly LiteHttpReadThrottle _wakeRead429Throttle = new();
+
     // Pure request classification: never log user IDs, chat IDs, URL query,
     // request/response bodies, headers, tokens or cookies.
     internal static (string Endpoint, string PathKind, string HttpMethod)
@@ -32,7 +34,7 @@ internal sealed partial class ChatGptLiteForm
             ? "conversation" : "other_backend", kind, method);
     }
 
-    private static void LogBackendResponseMetadata(
+    private void LogBackendResponseMetadata(
         CoreWebView2WebResourceResponseReceivedEventArgs e, string webviewRole)
     {
         try
@@ -40,6 +42,16 @@ internal sealed partial class ChatGptLiteForm
             var info = DescribeBackendRequest(e.Request.Uri, e.Request.Method);
             if (info.Endpoint == "ignore") return;
             int status = e.Response.StatusCode;
+            if (LiteHttpReadThrottle.IsAutomatedRead429(status, info.HttpMethod,
+                    info.Endpoint, info.PathKind))
+            {
+                var blockedUntil = _wakeRead429Throttle.Record429(DateTimeOffset.UtcNow);
+                LiteEventLog.Write("multi_wake_http_read_429_cooldown", new {
+                    source = webviewRole,
+                    durationSeconds = (int)LiteHttpReadThrottle.Cooldown.TotalSeconds,
+                    untilUtc = blockedUntil.ToString("O")
+                });
+            }
             if (status < 400 && info.Endpoint != "conversation") return;
             LiteEventLog.Write("web_backend_response", new
             {

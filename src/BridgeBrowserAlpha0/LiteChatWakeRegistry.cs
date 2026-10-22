@@ -230,6 +230,8 @@ internal static class LiteChatWakeRegistry
                 !numbered.Contains("chat_finished")) return 12;
             int wakeJournal = LiteWakeJournal.SelfTest();
             if (wakeJournal != 0) return 20 + wakeJournal;
+            int throttle = LiteHttpReadThrottle.SelfTest();
+            if (throttle != 0) return 80 + throttle;
             int preflight = LiteChatWakePreflight.SelfTest();
             return preflight == 0 ? 0 : 40 + preflight;
         }
