@@ -3,11 +3,12 @@ param(
         'OpenBrowser\ChatGPT-Lite\diagnostics\resources-' +
         [DateTime]::UtcNow.ToString('yyyy-MM-dd') + '.jsonl')),
     [string]$OutputPath = (Join-Path $env:LOCALAPPDATA 'OpenBrowser\ChatGPT-Lite\diagnostics\resources-dashboard.html'),
-    [string]$EventPath = (Join-Path $env:LOCALAPPDATA ('OpenBrowser\ChatGPT-Lite\diagnostics\lite-events-' + [DateTime]::UtcNow.ToString('yyyy-MM-dd') + '.jsonl'))
+    [string]$EventPath = (Join-Path $env:LOCALAPPDATA ('OpenBrowser\ChatGPT-Lite\diagnostics\lite-events-' + [DateTime]::UtcNow.ToString('yyyy-MM-dd') + '.jsonl')),
+    [string[]]$AdditionalInputPaths = @()
 )
 $ErrorActionPreference = 'Stop'
 $analyzer = Join-Path $PSScriptRoot 'analyze-lite-resource-trends.ps1'
-$report = (& $analyzer -Path $InputPath -MaxSamples 1000) | ConvertFrom-Json
+$report = (& $analyzer -Path $InputPath -AdditionalPaths $AdditionalInputPaths -MaxSamples 1000) | ConvertFrom-Json
 function Safe($s) { [System.Net.WebUtility]::HtmlEncode([string]$s) }
 function NumberOrEmpty($v, $unit) {
     if ($null -eq $v) { return 'brak danych' }

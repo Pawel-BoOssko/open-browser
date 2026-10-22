@@ -2,27 +2,36 @@ param(
     [string]$Path = (Join-Path $env:LOCALAPPDATA (
         'OpenBrowser\ChatGPT-Lite\diagnostics\resources-' +
         [DateTime]::UtcNow.ToString('yyyy-MM-dd') + '.jsonl')),
-    [ValidateRange(2, 1000)][int]$MaxSamples = 120
+    [ValidateRange(2, 1000)][int]$MaxSamples = 120,
+    [string[]]$AdditionalPaths = @()
 )
 # Read-only analysis of a bounded resource history. No chat text or process arguments.
+# UTC file rotation must not truncate a 24-hour analysis at midnight.
 $ErrorActionPreference = 'Stop'
-if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
-    throw "No resource samples at the requested path"
+$sourcePaths = @($Path) + @($AdditionalPaths)
+foreach ($sourcePath in $sourcePaths) {
+    if (-not (Test-Path -LiteralPath $sourcePath -PathType Leaf)) {
+        throw "No resource samples at the requested path"
+    }
 }
-$rows = @(
-    Get-Content -LiteralPath $Path -Tail $MaxSamples -Encoding UTF8 |
-        ForEach-Object {
-            try {
-                $r = $_ | ConvertFrom-Json -ErrorAction Stop
-                if ($r.type -eq 'lite_process_resources' -and
-                    $null -ne $r.freeMemoryMiB -and
-                    $null -ne $r.pagefileUsedMiB) {
-                    $r
-                }
-            } catch { }
-        } |
-        Sort-Object { [datetime]$_.utc }
+$allRows = @(
+    foreach ($sourcePath in @($sourcePaths | Select-Object -Unique)) {
+        Get-Content -LiteralPath $sourcePath -Tail $MaxSamples -Encoding UTF8 |
+            ForEach-Object {
+                try {
+                    $r = $_ | ConvertFrom-Json -ErrorAction Stop
+                    if ($r.type -eq 'lite_process_resources' -and
+                        $null -ne $r.freeMemoryMiB -and
+                        $null -ne $r.pagefileUsedMiB) {
+                        $r
+                    }
+                } catch { }
+            }
+    }
 )
+# Limit after merging, not separately per day; keep correct chronology.
+$rows = @($allRows | Sort-Object { [DateTimeOffset]::Parse([string]$_.utc) } |
+    Select-Object -Last $MaxSamples)
 if ($rows.Count -lt 2) { throw 'Need at least two valid samples' }
 $first = $rows[0]
 $last = $rows[-1]
