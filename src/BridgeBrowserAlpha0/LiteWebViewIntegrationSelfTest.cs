@@ -376,7 +376,7 @@ internal static class LiteWebViewIntegrationSelfTest
                         10, 10, new Uri(chatUrl), "about:blank"),
                         "archive rejects non-ChatGPT navigation result");
                     LiteEventLog.Write("webview_integration_selftest", new {
-                        passed = true, checks = 56, offline = true
+                        passed = true, checks = 66, offline = true
                     });
                     code = 0;
                 }
