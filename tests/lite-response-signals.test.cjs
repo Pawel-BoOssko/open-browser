@@ -118,4 +118,4 @@ assert.equal(run("Failed to load this response", false, "chatgpt.com", "olderErr
   .visibleError, null, "previous failed assistant turn must not block a newer reply");
 assert.equal(run("Failed to load this response", false, "chatgpt.com", "latestError")
   .visibleError, "response_load_failed", "latest visible assistant error must still block");
-console.log("LiteResponseSignal: 26 PASS (hidden/stale alerts excluded)");
+console.log("LiteResponseSignal: hidden alerts and latest-reply checks PASS");
