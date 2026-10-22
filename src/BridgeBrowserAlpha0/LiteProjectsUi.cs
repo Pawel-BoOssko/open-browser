@@ -89,6 +89,14 @@ internal sealed partial class ChatGptLiteForm
     private void RenderProjects()
     {
         if (_projects is null) return;
+        // External pilot registration may change projects.json while the UI
+        // is open. Refresh before each render, without navigating WebView2.
+        try { _projects = LiteProjectRegistry.OpenDefault(); }
+        catch (Exception ex) {
+            LiteEventLog.Write("projects_refresh_failed",
+                new { errorType = ex.GetType().Name });
+            return;
+        }
         _projectList.SuspendLayout();
         try
         {
@@ -99,6 +107,9 @@ internal sealed partial class ChatGptLiteForm
                 control.Dispose();
             }
 
+            List<LiteChatWakeRegistry.Chat> schedules;
+            try { schedules = LiteChatWakeRegistry.Read(); }
+            catch { schedules = new List<LiteChatWakeRegistry.Chat>(); }
             foreach (var project in _projects.Projects)
             {
                 bool selected = project.Id == _selectedProjectId;
@@ -121,12 +132,12 @@ internal sealed partial class ChatGptLiteForm
 
                 foreach (var chat in project.Chats)
                 {
-                    var row = new Panel { Width = 238, Height = 31 };
+                    var row = new Panel { Width = 238, Height = 54 };
                     var link = new Button
                     {
                         Width = 179, Height = 29, Left = 8, Top = 0,
                         TextAlign = ContentAlignment.MiddleLeft, AutoEllipsis = true,
-                        Text = (chat.Role == "lead" ? "★ " : "  ") + chat.Title
+                        Text = (chat.Role == "lead" ? "★ " : "Archiwum: ") + chat.Title
                     };
                     string url = chat.Url;
                     link.Click += async (_, _) =>
@@ -144,6 +155,22 @@ internal sealed partial class ChatGptLiteForm
                     {
                         try
                         {
+                            // Old lead cannot continue waking after a new
+                            // executor is selected for the same project.
+                            var currentProject = _projects.Projects.First(p =>
+                                p.Id == projectId);
+                            var plans = LiteChatWakeRegistry.Read();
+                            foreach (var old in currentProject.Chats.Where(c =>
+                                c.Id != chatId))
+                            {
+                                var wake = plans.FirstOrDefault(w => w.Url == old.Url);
+                                if (wake?.Enabled == true)
+                                {
+                                    wake.Enabled = false;
+                                    wake.LastState = "paused_new_project_lead";
+                                }
+                            }
+                            LiteChatWakeRegistry.Write(plans);
                             _projects.PromoteLead(projectId, chatId);
                             LiteEventLog.Write("project_lead_changed");
                             RenderProjects();
@@ -153,8 +180,30 @@ internal sealed partial class ChatGptLiteForm
                             MessageBox.Show(this, ex.Message, "Open Browser — projekty");
                         }
                     };
+                    var wake = schedules.FirstOrDefault(x => x.Url == chat.Url);
+                    var info = new Label
+                    {
+                        Left = 9, Top = 32, Width = 173, Height = 20,
+                        AutoEllipsis = true,
+                        Text = chat.Role != "lead" ? "Archiwum — bez autopracy" :
+                            wake?.Enabled == true
+                              ? "WŁ. " + wake.EffectiveMinutes + "m | " +
+                                wake.LastState + " | " +
+                                wake.DueUtc.ToLocalTime().ToString("HH:mm")
+                              : "WYŁ. | bez harmonogramu"
+                    };
+                    var toggle = new Button
+                    {
+                        Left = 189, Top = 30, Width = 47, Height = 23,
+                        Text = wake?.Enabled == true ? "WYŁ." : "WŁ.",
+                        Enabled = chat.Role == "lead"
+                    };
+                    toggle.Click += (_, _) =>
+                        ToggleProjectLeadWake(projectId, chatId);
                     row.Controls.Add(link);
                     row.Controls.Add(makeLead);
+                    row.Controls.Add(info);
+                    row.Controls.Add(toggle);
                     _projectList.Controls.Add(row);
                 }
             }
@@ -162,6 +211,58 @@ internal sealed partial class ChatGptLiteForm
         finally
         {
             _projectList.ResumeLayout();
+        }
+    }
+
+    private void ToggleProjectLeadWake(string projectId, string chatId)
+    {
+        try
+        {
+            _projects = LiteProjectRegistry.OpenDefault();
+            var project = _projects.Projects.FirstOrDefault(p => p.Id == projectId)
+                ?? throw new InvalidOperationException("Projekt nie istnieje");
+            var chat = project.Chats.FirstOrDefault(c => c.Id == chatId &&
+                c.Role == "lead")
+                ?? throw new InvalidOperationException(
+                    "Autopraca może działać wyłącznie w czacie głównym projektu");
+            var schedules = LiteChatWakeRegistry.Read();
+            var existing = schedules.FirstOrDefault(w => w.Url == chat.Url);
+            if (existing is null)
+            {
+                string prompt = "Kontynuuj projekt " + project.Title +
+                    " w tym jednym czacie wykonawczym. Zapoznaj się z ostatnim " +
+                    "checkpointem i bieżącym kodem, wykonaj kolejny etap, " +
+                    "uruchom testy i zapisz krótki checkpoint w dokumentacji " +
+                    "projektu. Nie korzystaj z ChatGPT Tasks, nie wykonuj " +
+                    "ręcznych Git commit/push, nie ponawiaj niepewnych wysyłek.";
+                LiteChatWakeRegistry.Configure(schedules, chat.Url, 25,
+                    prompt, DateTimeOffset.UtcNow);
+            }
+            else
+            {
+                existing.Enabled = !existing.Enabled;
+                existing.LastState = existing.Enabled ? "armed" : "paused";
+                if (existing.Enabled)
+                    existing.DueUtc = DateTimeOffset.UtcNow.AddMinutes(
+                        existing.EffectiveMinutes);
+            }
+            if (!LiteProjectRegistry.CanScheduleProjectLeads(
+                _projects.Projects, schedules))
+                throw new InvalidOperationException(
+                    "Nie wolno włączyć dwóch wykonawców w jednym projekcie");
+            LiteChatWakeRegistry.Write(schedules);
+            LiteEventLog.Write("project_lead_wake_toggled", new {
+                enabled = schedules.First(w => w.Url == chat.Url).Enabled,
+                projectChatCount = project.Chats.Count
+            });
+            RenderProjects();
+            UpdateMultiWakeStatus();
+        }
+        catch (Exception ex)
+        {
+            LiteEventLog.Write("project_lead_wake_toggle_failed",
+                new { errorType = ex.GetType().Name });
+            MessageBox.Show(this, ex.Message, "Wybudzenia projektu");
         }
     }
 

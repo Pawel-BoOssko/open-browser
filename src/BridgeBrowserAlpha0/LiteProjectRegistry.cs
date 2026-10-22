@@ -108,8 +108,10 @@ internal sealed class LiteProjectRegistry
               uri.AbsolutePath.StartsWith("/g/", StringComparison.OrdinalIgnoreCase)))
             throw new ArgumentException("Expected ChatGPT conversation URL");
         var project = _store.Projects.First(p => p.Id == projectId);
-        if (project.Chats.Any(c => c.Url == uri.GetLeftPart(UriPartial.Path)))
-            throw new InvalidOperationException("Conversation already assigned to this project");
+        if (_store.Projects.Any(p => p.Chats.Any(c =>
+            c.Url == uri.GetLeftPart(UriPartial.Path))))
+            throw new InvalidOperationException(
+                "Conversation already assigned to a project");
         var chat = new Chat
         {
             Url = uri.GetLeftPart(UriPartial.Path),

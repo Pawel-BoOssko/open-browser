@@ -78,6 +78,10 @@ internal static class LiteChatWakeRegistry
                       !c.LastAnswerFingerprint.All(Uri.IsHexDigit))))
                     throw new InvalidDataException("Invalid scheduled chat");
             }
+            if (!LiteProjectRegistry.CanScheduleProjectLeads(
+                LiteProjectRegistry.OpenDefault().Projects, store.Chats))
+                throw new InvalidDataException(
+                    "Multiple project executors or archive wake detected");
             return store.Chats;
         }
         finally { CryptographicOperations.ZeroMemory(clear); }
@@ -85,6 +89,12 @@ internal static class LiteChatWakeRegistry
 
     internal static void Write(List<Chat> chats)
     {
+        // A project's single lead is the only chat allowed to wake; a pinned
+        // archival chat must never be silently promoted by a schedule edit.
+        if (!LiteProjectRegistry.CanScheduleProjectLeads(
+            LiteProjectRegistry.OpenDefault().Projects, chats))
+            throw new InvalidOperationException(
+                "One enabled lead chat per project is required");
         if (chats.Count > 48 || chats.Any(c =>
             !LiteDevWakeState.IsChatUrl(c.Url) || c.Minutes is < 20 or > 1440 ||
             (c.FastMinutes != 0 && c.FastMinutes is < 15 or >= 20) ||
