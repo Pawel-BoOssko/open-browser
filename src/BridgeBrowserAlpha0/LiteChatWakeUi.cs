@@ -12,6 +12,9 @@ internal sealed partial class ChatGptLiteForm
     private readonly System.Windows.Forms.Timer _chatWakeTimer = new() { Interval = 20000 };
     private bool _multiWakeEnabled;
     private bool _chatWakeBusy;
+    // Set only after a full worker navigation and observed chat history.
+    // SPA SourceChanged and any full navigation revoke this identity.
+    private string? _workerVerifiedChatUrl;
     private System.Threading.Mutex? _multiWakeMutex;
     private bool _ownsMultiWakeMutex;
     private readonly WebView2 _chatWakeWorker = new()
@@ -204,6 +207,15 @@ internal sealed partial class ChatGptLiteForm
             ?? throw new InvalidOperationException("Background WebView2 not initialized");
         await core.AddScriptToExecuteOnDocumentCreatedAsync(script);
         await core.AddScriptToExecuteOnDocumentCreatedAsync(probeScript);
+        core.NavigationStarting += (_, _) => _workerVerifiedChatUrl = null;
+        core.SourceChanged += (_, _) =>
+        {
+            if (_workerVerifiedChatUrl is not null &&
+                (!LiteDevWakeState.IsChatUrl(core.Source) ||
+                 LiteDevWakeState.NormalizeUrl(core.Source) != _workerVerifiedChatUrl))
+                _workerVerifiedChatUrl = null;
+        };
+        core.ProcessFailed += (_, _) => _workerVerifiedChatUrl = null;
         core.Settings.AreDevToolsEnabled = false;
         // Keep worker responsive while loading a real conversation. Switch to
         // Low only once the wake attempt ends and the worker is idle.
@@ -212,12 +224,21 @@ internal sealed partial class ChatGptLiteForm
             new { memoryTarget = "normal_active" });
     }
 
-    internal static async Task<bool> IsWorkerHydratedForChatAsync(
-        CoreWebView2 core, string url)
+    internal static bool VerifiedWorkerMatches(string? verifiedUrl,
+        string? currentSource, string targetUrl)
     {
-        // The caller may reuse only a hydrated view of this exact chat.
-        if (!LiteDevWakeState.IsChatUrl(core.Source) ||
-            LiteDevWakeState.NormalizeUrl(core.Source) != url) return false;
+        return !string.IsNullOrEmpty(verifiedUrl) &&
+            string.Equals(verifiedUrl, targetUrl, StringComparison.Ordinal) &&
+            LiteDevWakeState.IsChatUrl(currentSource) &&
+            LiteDevWakeState.NormalizeUrl(currentSource!) == targetUrl;
+    }
+
+    internal static async Task<bool> IsWorkerHydratedForChatAsync(
+        CoreWebView2 core, string url, string? verifiedUrl)
+    {
+        // The current DOM may be from chat A during an SPA route change to B.
+        // A matching address/composer/history alone is NOT proof of identity.
+        if (!VerifiedWorkerMatches(verifiedUrl, core.Source, url)) return false;
         try
         {
             return await ExecuteWorkerScriptAsync(core, WakeWorkerHydratedScript) == "true";
@@ -242,7 +263,8 @@ internal sealed partial class ChatGptLiteForm
         var core = _chatWakeWorker.CoreWebView2;
         if (core is null) return false;
         // Reuse this worker only after checking both URL and hydrated history.
-        if (await IsWorkerHydratedForChatAsync(core, url))
+        if (await IsWorkerHydratedForChatAsync(core, url,
+            _workerVerifiedChatUrl))
         {
             LiteEventLog.Write("multi_wake_worker_reused_hydrated");
             return true;
@@ -253,6 +275,7 @@ internal sealed partial class ChatGptLiteForm
         core.NavigationCompleted += OnCompleted;
         try
         {
+            _workerVerifiedChatUrl = null;
             core.Navigate(url);
             var ready = await Task.WhenAny(completed.Task, Task.Delay(45000));
             if (ready != completed.Task || !await completed.Task) return false;
@@ -282,7 +305,11 @@ internal sealed partial class ChatGptLiteForm
                     });
                     return false; // Do not queue another script on a hung renderer.
                 }
-                if (found == "true") return true;
+                if (found == "true")
+                {
+                    _workerVerifiedChatUrl = url;
+                    return true;
+                }
                 int pause = Math.Min(700,
                     WorkerHistoryProbeBudgetMs(hydrationClock.ElapsedMilliseconds));
                 if (pause > 0) await Task.Delay(pause);
