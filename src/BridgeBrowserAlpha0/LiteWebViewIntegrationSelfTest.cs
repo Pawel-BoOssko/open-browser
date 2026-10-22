@@ -161,6 +161,33 @@ internal static class LiteWebViewIntegrationSelfTest
                     workerGate.MarkNavigationRecovered();
                     Ensure(!ChatGptLiteForm.ShouldDeferWorkerProbe(false, workerGate,
                         now.AddSeconds(41)), "verified worker recovery clears cooldown");
+                    phase = "unhydrated_worker_shell_backpressure";
+                    var shellGate = new LiteRendererBackpressure();
+                    Ensure(ChatGptLiteForm.RecordWorkerProbeFailure(
+                        shellGate, now) == TimeSpan.FromSeconds(30),
+                        "first unhydrated ChatGPT shell applies backpressure");
+                    Ensure(ChatGptLiteForm.RecordWorkerProbeFailure(
+                        shellGate, now.AddSeconds(35)) == TimeSpan.FromSeconds(60),
+                        "second unhydrated shell cannot immediately retry");
+                    Ensure(ChatGptLiteForm.RecordWorkerProbeFailure(
+                        shellGate, now.AddSeconds(100)) == TimeSpan.FromSeconds(120),
+                        "third missing-history attempt doubles cooldown");
+                    Ensure(ChatGptLiteForm.RecordWorkerProbeFailure(
+                        shellGate, now.AddSeconds(225)) == TimeSpan.FromSeconds(240),
+                        "fourth missing-history attempt increases cooldown");
+                    Ensure(ChatGptLiteForm.RecordWorkerProbeFailure(
+                        shellGate, now.AddSeconds(470)) == TimeSpan.FromSeconds(300),
+                        "continued shell hydration failure is capped at five minutes");
+                    Ensure(ChatGptLiteForm.ShouldDeferWorkerProbe(false, shellGate,
+                        now.AddSeconds(700)),
+                        "shared worker defers while missing-history cooldown is active");
+                    Ensure(!ChatGptLiteForm.ShouldDeferWorkerProbe(true, shellGate,
+                        now.AddSeconds(700)),
+                        "foreground remains independent of missing-history failures");
+                    shellGate.MarkNavigationRecovered();
+                    Ensure(!ChatGptLiteForm.ShouldDeferWorkerProbe(false, shellGate,
+                        now.AddSeconds(701)),
+                        "verified background history restores normal scheduler");
                     phase = "multi_chat_fair_due_selection";
                     var fairnessNow = DateTimeOffset.UtcNow;
                     string fairFg = "https://chatgpt.com/c/11111111-1111-1111-1111-111111111111";
@@ -629,7 +656,7 @@ internal static class LiteWebViewIntegrationSelfTest
                         10, 10, new Uri(chatUrl), "about:blank"),
                         "archive rejects non-ChatGPT navigation result");
                     LiteEventLog.Write("webview_integration_selftest", new {
-                        passed = true, checks = 119, offline = true
+                        passed = true, checks = 127, offline = true
                     });
                     code = 0;
                 }

@@ -430,7 +430,9 @@ internal sealed partial class ChatGptLiteForm
                     logInLinks:document.querySelectorAll('a[href*=""/auth/login""]').length,
                     ready:document.readyState
                 })";
-                var encoded = await ExecuteWorkerScriptAsync(core, countJs);
+                // A renderer that could not hydrate in 25s must not incur
+                // another full 6.5s diagnostic timeout on the same attempt.
+                var encoded = await ExecuteWorkerScriptAsync(core, countJs, 1500);
                 var metadata = JsonSerializer.Deserialize<string>(encoded);
                 if (!string.IsNullOrEmpty(metadata))
                 {
@@ -451,6 +453,17 @@ internal sealed partial class ChatGptLiteForm
                     });
                 }
             }
+            catch (TimeoutException)
+            {
+                LiteEventLog.Write("multi_wake_history_not_ready", new {
+                    domWaitSeconds = 25,
+                    hydrationAttempts,
+                    diagnosticError = "diagnostic_timeout"
+                });
+                // Do not enqueue more JavaScript on a renderer that timed out.
+                MarkWorkerProbeFailed("history_metadata_timeout");
+                return false;
+            }
             catch (Exception ex)
             {
                 LiteEventLog.Write("multi_wake_history_not_ready", new {
@@ -460,6 +473,10 @@ internal sealed partial class ChatGptLiteForm
                     diagnosticError = ex.GetType().Name
                 });
             }
+            // Successful NavigationCompleted is NOT a successful history
+            // hydration. Apply escalating cooldown to avoid repeatedly
+            // paying 25s for the same unhydrated ChatGPT application shell.
+            MarkWorkerProbeFailed("history_not_ready");
             return false;
         }
         finally { core.NavigationCompleted -= OnCompleted; }
@@ -512,9 +529,16 @@ internal sealed partial class ChatGptLiteForm
             reason == "ready" && LiteChatWakePreflight.IsCompletion(answer));
     }
 
+    internal static TimeSpan RecordWorkerProbeFailure(
+        LiteRendererBackpressure gate, DateTimeOffset now)
+    {
+        return gate.MarkFailed(now);
+    }
+
     private void MarkWorkerProbeFailed(string reason)
     {
-        var cooldown = _workerProbeBackpressure.MarkFailed(DateTimeOffset.UtcNow);
+        var cooldown = RecordWorkerProbeFailure(
+            _workerProbeBackpressure, DateTimeOffset.UtcNow);
         _workerVerifiedChatUrl = null;
         LiteEventLog.Write("multi_wake_worker_backpressure", new {
             reason, consecutiveFailures = _workerProbeBackpressure.ConsecutiveFailures,
