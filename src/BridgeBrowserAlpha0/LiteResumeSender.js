@@ -180,7 +180,12 @@
   }
   // Bring back the pre-Lite direct editor injection path. Delivery auditing is
   // intentionally not a prerequisite for trying the Send action.
-  function sendDirect(text, receiptId, hostManaged = false) {
+  function sendDirect(text, receiptId, hostManaged = false, expectedPath = null) {
+    // A host-selected chat URL is a security boundary, not a suggestion.
+    // SPA navigation after host preflight must never inject into another chat.
+    if (expectedPath !== null &&
+        (typeof expectedPath !== "string" || w.location.pathname !== expectedPath))
+      return "blocked_navigation";
     if (!/^\/c\/(?:[a-z0-9-]|%3[Aa]){30,80}$/.test(w.location.pathname) ||
         !/^[a-f0-9]{32}$/.test(receiptId) ||
         typeof text !== "string" || text.length < 16 || text.length > 45000)
