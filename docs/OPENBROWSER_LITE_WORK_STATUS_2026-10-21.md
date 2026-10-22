@@ -686,3 +686,14 @@
 - Odróżnić jednorazowy termin testowy (DueUtc=now+3min) od docelowego produkcyjnego okresu 15 minut. Po teście przywrócić regularny rytm 15 minut, nie pozostawiać agresywnego interwału w produkcji.
 - Nadal obowiązują warunki bezpiecznej wysyłki: brak duplikatów, brak ponawiania niepewnych wysyłek, zachowanie LastAnswerFingerprint i stanu, sprawdzenie hydratacji oraz zapis checkpointu. Nie używać wewnętrznych automatyzacji ChatGPT.
 - To zadanie jest TYLKO ZAPISANIEM ZASADY na przyszłe testy. W tym wywołaniu NIE przełączać produkcyjnego harmonogramu ani nie uruchamiać testowego wybudzenia.
+
+## 2026-10-22 17:55 CEST [OB-WAKE-000001] START CHECKPOINT
+- Trigger: [OB-90a9204afe8e4140aced20c0c037dfc3], 1. NATURALNY TEST v1.72.63. PBOX1 diagnostics/wake-lifecycle.jsonl: due 15:53:40Z, attempt_reserved 15:53:42Z, submission_attempted click_invoked 15:53:43Z, receipt_confirmed visible_ack 15:53:44Z, chat_started 15:53:57Z, wszystkie stage=1/receipt=90a9204afe8e4140aced20c0c037dfc3. Fakt domowego ACK nie jest jeszcze dowodem serverDeliveryProven, ale czat realnie został uruchomiony i zapisał wpis.
+- LIVE PBOX1 v1.72.63 PID19784 Responding=True, phase trial badPolls0, fallback 1.72.59; SOURCE v1.72.63 repo dirty, nie ruszać unrelated files. Mechanizm 15m, tylko 1 aktywny chat. Chat_started zapisany przez narzędzie bezpośrednio na PBOX1, NIE przez engine.
+- Następne: wybrać kolejne P0 na podstawie realnego HTTP 429/404 i statusów preflight, testować, checkpoint po każdej zmianie; bez ChatGPT Tasks, ręcznych commit/push, niepewnych retransmisji.
+
+## 2026-10-22 18:01 CEST [OB-WAKE-000001] CHECKPOINT B
+- Pierwsze realne wybudzenie w 1.72.63 potwierdzone: engine due 17:53:40, attempt_reserved 17:53:42, click 17:53:43, DOM receipt_confirmed 17:53:44, chat_started 17:53:57; seq1, receipt 90a9204afe8e4140aced20c0c037dfc3. Wspólny dziennik działa w obu kierunkach, końcowy chat_finished jeszcze nie zapisany.
+- PBOX1 LIVE1.72.63 PID19784 trial/badPolls0/fallback1.72.59. Bieżąca wersja wykonała 19 backend requests HTTP 200, 0 odpowiedzi 429/404 w badanej próbce; nie dowodzi to trwałego rozwiązania dawnych incydentów.
+- SOURCE v1.72.63: dodano read-only scripts/audit-lite-wake-journal.ps1 sumujący receipts, ACK, chat_started/finished, niepewne wysyłki i mismatch sekwencji; bez restartu/wysyłki. Test syntetycznego JSONL na SatanAMD: 2 receipts, 1 chat running/unconfirmed finish, 1 uncertain send, bad_rows0, exit0. Wykryty i poprawiony błąd formatowania PowerShell w pierwszej wersji, test powtórzony PASS.
+- NEXT: przenieść audyt na PBOX1 jako plik diagnostyczny, uruchomić na realnym wake-lifecycle.jsonl, zapisać finalny checkpoint. Nie włączać ChatGPT Tasks, nie robić Git commit/push, nie ponawiać niepewnych wysyłek.
