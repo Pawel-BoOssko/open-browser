@@ -30,7 +30,7 @@ internal static class LiteDeliveryEvidence
             return new("backend_http_error_observed", "high_http", saved, false,
                 "Correlate endpoint metadata and request timing");
         if (o.VisibleError is "response_load_failed" or "delivery_timeout" or
-            "reasoning_interrupted")
+            "reasoning_interrupted" or "conversation_load_failed")
             return new("ui_failure_reported", "high_ui", saved, false,
                 "Correlate UI error with transport and renderer signals");
         if (saved && o.AnswerVisible == true)

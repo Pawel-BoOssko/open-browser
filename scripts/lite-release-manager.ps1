@@ -91,7 +91,16 @@ try{
  }
  if($Mode -eq 'Promote'){
   $s=Load
-  if($s -and $s.phase -in @('promoting','trial','rolling_back')){throw 'Previous release transition is unresolved'}
+  if($s -and $s.phase -in @('promoting','rolling_back')){throw 'Previous release transition is unresolved'}
+  # A healthy trial may become the rollback target of the next verified build.
+  # Keep its state snapshot before replacing the current release transaction.
+  if($s -and $s.phase -eq 'trial'){
+   $prevProc=@(Get-CimInstance Win32_Process -Filter "name='BridgeBrowserAlpha0.exe'"|Where-Object {$_.ExecutablePath -eq $s.candidateExe})
+   if($prevProc.Count -ne 1 -or -not (Get-Process -Id $prevProc[0].ProcessId -ErrorAction SilentlyContinue).Responding){throw 'Active trial is not healthy'}
+   $archive=Join-Path $root ('lite-release-prior-'+(Get-Date -Format 'yyyyMMdd-HHmmss')+'.json')
+   [IO.File]::Copy($stateFile,$archive,$false)
+   Log ('PRIOR_TRIAL_SAVED='+$archive)
+  }
   if(-not(Test-Path $staged)){throw 'Staged executable missing'}
   $hash=[BitConverter]::ToString([Security.Cryptography.SHA256]::Create().ComputeHash([IO.File]::ReadAllBytes($staged))).Replace('-','').ToLowerInvariant()
   if($hash -ne $expectedSha){throw 'Candidate SHA-256 mismatch'}

@@ -12,11 +12,12 @@ function run(text = "", busy = false, host = "chatgpt.com", speaker = "alert") {
     }
   };
   const main = {
+    textContent: speaker === "shellError" ? text : "",
     querySelectorAll(selector) {
       if (selector.startsWith('[data-testid^="conversation-turn-"]'))
-        return [node];
+        return speaker === "shellError" ? [] : [node];
       if (selector.startsWith('[data-message-author-role'))
-        return speaker === "user" || speaker === "sidebar" ? [] : [node];
+        return speaker === "user" || speaker === "sidebar" || speaker === "shellError" ? [] : [node];
       throw new Error("Unknown main selector: " + selector);
     }
   };
@@ -59,6 +60,14 @@ assert.equal(run("hello", false, "chatgpt.com", "sidebarStop").generatingSignal,
 assert.equal(run("hello", true, "chatgpt.com", "sidebarStop").generatingSignal,
   true, "actual active Stop still blocks alongside unrelated sidebar");
 assert.equal(run("hello").visibleError, null);
+assert.equal(run("Nie udało się wczytać tej rozmowy ChatGPT", false, "chatgpt.com", "shellError").visibleError,
+  "conversation_load_failed", "failed Polish conversation shell is not healthy hydration");
+assert.equal(run("Couldn't load this conversation", false, "chatgpt.com", "shellError").visibleError,
+  "conversation_load_failed", "English conversation load failure is recognized");
+assert.equal(run("Nie udało się wczytać tej rozmowy ChatGPT", false, "chatgpt.com", "user").visibleError,
+  null, "user quote in a real turn must not trigger shell failure");
+assert.equal(run(("Failed to load conversation; ").repeat(18), false, "chatgpt.com", "shellError").visibleError,
+  null, "long main content must not be classified as a short error shell");
 assert.equal(run("hello", false, "untrusted.com"), undefined);
 assert.equal(run("Nie udało się wczytać tej odpowiedzi", false,
   "chatgpt.com", "dil").visibleError, "response_load_failed",
@@ -76,4 +85,4 @@ assert.equal(sidebarStatus.assistantCount, 0,
   "sidebar assistant markers are not active chat messages");
 assert.equal(run("Failed to load this response", false, "chatgpt.com", "alert").visibleError,
   "response_load_failed", "real global error toast remains recognized");
-console.log("LiteResponseSignal: 15 PASS");
+console.log("LiteResponseSignal: 19 PASS");

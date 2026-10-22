@@ -44,6 +44,8 @@ internal static class LiteDeliveryEvidenceSelfTest
                 "insufficient_evidence", "HTTP 200 not proof of answer");
             Check(LiteDeliveryEvidence.Classify(O(error: "delivery_timeout")).Code ==
                 "ui_failure_reported", "visible delivery error");
+            Check(LiteDeliveryEvidence.Classify(O(error: "conversation_load_failed")).Code ==
+                "ui_failure_reported", "conversation shell loading error is not successful delivery");
             Check(LiteDeliveryEvidence.Classify(O(visible: true, saved: false)).Code ==
                 "visible_not_archived", "missing local backup");
             Check(LiteDeliveryEvidence.Classify(O(visible: true)).Code ==

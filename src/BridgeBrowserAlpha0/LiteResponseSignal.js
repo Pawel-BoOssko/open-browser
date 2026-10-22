@@ -33,6 +33,15 @@
       error = inspectNode(node);
       if (error) break;
     }
+    if (!error && main && turns.length === 0) {
+      // A failed conversation fetch often leaves only a short shell in MAIN.
+      // This is not the same as an assistant response failure, and cannot
+      // safely be inferred from user quotes or sidebar previews.
+      const shell = String(main.textContent || "").trim();
+      if (shell.length > 0 && shell.length < 350 &&
+          /nie udało się wczytać tej rozmowy(?: chatgpt)?|couldn.t load (this |the )?conversation|failed to load (this |the )?conversation|unable to load conversation/i.test(shell))
+        error = "conversation_load_failed";
+    }
     if (!error) {
       // Never interpret a user's quote of an error as a browser failure.
       // Inline assistant failure placeholders are short; long assistant text
