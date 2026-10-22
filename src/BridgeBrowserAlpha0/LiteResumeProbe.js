@@ -51,7 +51,9 @@
       '[data-testid="stop-button"],button[aria-label*="Stop generating"],button[aria-label*="Przerwij generowanie"],button[aria-label="Zatrzymaj"]');
     // An unrelated busy sidebar must not suppress the current chat.
     const activeTurn = last?.closest?.('[data-testid^="conversation-turn-"]');
-    const toolBusy = !!d.querySelector(
+    // Only tool state inside this conversation blocks its next wake.
+    // A sidebar may animate a different chat's tool or a global widget.
+    const toolBusy = !!main?.querySelector(
       '[data-testid*="tool-running"],[data-state="running"]') ||
       !!activeTurn?.querySelector?.('[aria-busy="true"]');
     // Use the same composer priority as LiteResumeSender: a hidden textarea

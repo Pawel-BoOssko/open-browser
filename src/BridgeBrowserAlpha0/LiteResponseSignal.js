@@ -17,12 +17,19 @@
   function read() {
     const t0 = global.performance.now();
     const doc = global.document;
-    const turns = doc.querySelectorAll('[data-testid^="conversation-turn-"]');
-    const assistants = doc.querySelectorAll(
-      '[data-message-author-role="assistant"],[data-chatgpt-selection-message-id]');
+    // A sidebar preview can resemble an assistant error. Only message
+    // placeholders in the active conversation are authoritative.
+    const main = doc.querySelector('main,[role="main"]');
+    const turns = main?.querySelectorAll('[data-testid^="conversation-turn-"]') || [];
+    const assistants = main?.querySelectorAll(
+      '[data-message-author-role="assistant"],[data-chatgpt-selection-message-id]') || [];
     let error = null;
-    const alerts = doc.querySelectorAll('[role="alert"],[data-testid*="error"],[data-testid*="toast"]');
-    for (const node of Array.from(alerts).slice(-35)) {
+    // Keep global error toasts, but ignore alerts inside sidebar/navigation.
+    const alerts = Array.from(doc.querySelectorAll(
+      '[role="alert"],[data-testid*="error"],[data-testid*="toast"]'))
+      .filter(node => !node.closest?.(
+        'aside,nav,[role="navigation"],[data-testid="sidebar"]'));
+    for (const node of alerts.slice(-35)) {
       error = inspectNode(node);
       if (error) break;
     }
