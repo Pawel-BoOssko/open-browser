@@ -53,15 +53,31 @@
     };
   }
 
-  function enable(value) { config.enabled = value === true; return status(); }
-  global.__OPENBROWSER_HARD_PRUNE__ = { prune, status, enable };
+  // No periodic work, timeout, or DOM traversal while hard pruning is OFF.
+  // Arm only after an explicit owner opt-in; stop both timers on opt-out.
   let timer = null;
-  function start() {
-    if (timer) return;
-    timer = global.setInterval(prune, config.intervalMs);
-    global.setTimeout(prune, 45000);
+  let initial = null;
+  function stop() {
+    if (timer !== null) global.clearInterval(timer);
+    if (initial !== null) global.clearTimeout(initial);
+    timer = null;
+    initial = null;
   }
-  if (global.document.readyState === "loading")
-    global.document.addEventListener("DOMContentLoaded", start, { once: true });
-  else start();
+  function start() {
+    if (!config.enabled || timer !== null) return;
+    timer = global.setInterval(() => {
+      if (config.enabled) prune();
+    }, config.intervalMs);
+    initial = global.setTimeout(() => {
+      initial = null;
+      if (config.enabled) prune();
+    }, 45000);
+  }
+  function enable(value) {
+    config.enabled = value === true;
+    if (config.enabled) start();
+    else stop();
+    return status();
+  }
+  global.__OPENBROWSER_HARD_PRUNE__ = { prune, status, enable };
 })(window);

@@ -28,8 +28,11 @@ function setup(count, settings = {}) {
   };
   const win = {
     document: doc, location: { hostname: settings.host || "chatgpt.com" },
-    setInterval(fn) { this.interval = fn; return 1; },
-    setTimeout(fn) { this.initial = fn; return 1; },
+    intervalArms: 0, initialArms: 0, intervalClears: 0, initialClears: 0,
+    setInterval(fn) { this.intervalArms++; this.interval = fn; return this.intervalArms; },
+    clearInterval() { this.intervalClears++; this.interval = undefined; },
+    setTimeout(fn) { this.initialArms++; this.initial = fn; return this.initialArms; },
+    clearTimeout() { this.initialClears++; this.initial = undefined; },
     getSelection() { return settings.selection || ""; }
   };
   vm.runInNewContext(script, { window: win, Date });
@@ -40,11 +43,20 @@ function setup(count, settings = {}) {
 {
   const t = setup(100, { optIn: false });
   assert.equal(t.api.status().enabled, false);
-  t.win.initial();
+  assert.equal(t.win.intervalArms, 0,
+    "hard DOM default OFF never installs a periodic JS timer");
+  assert.equal(t.win.initialArms, 0,
+    "hard DOM default OFF never schedules its first DOM traversal");
   assert.equal(t.list.length, 100);
 }
 {
   const t = setup(89);
+  assert.equal(t.win.intervalArms, 1,
+    "explicit opt-in schedules exactly one recurring prune timer");
+  assert.equal(t.win.initialArms, 1,
+    "explicit opt-in schedules exactly one initial delayed prune");
+  t.api.enable(true);
+  assert.equal(t.win.intervalArms, 1, "repeated enable is idempotent");
   t.api.prune();
   assert.equal(t.list.length, 89);
 }
@@ -73,9 +85,26 @@ function setup(count, settings = {}) {
 }
 {
   const t = setup(100);
+  const staleInitial = t.win.initial;
+  const staleInterval = t.win.interval;
   t.api.enable(false);
-  t.api.prune();
+  assert.equal(t.win.intervalClears, 1,
+    "opt-out clears recurring timer, not just a boolean");
+  assert.equal(t.win.initialClears, 1,
+    "opt-out cancels delayed initial prune");
+  // Even a stale callback that has already reached the event queue must
+  // never delete DOM after the owner disables pruning.
+  staleInitial();
+  staleInterval();
   assert.equal(t.list.length, 100);
+  assert.equal(t.api.prune().skipped, "disabled");
+  t.api.enable(true);
+  assert.equal(t.win.intervalArms, 2,
+    "re-enable starts one new timer only");
+  assert.equal(t.win.initialArms, 2);
+  t.api.enable(false);
+  assert.equal(t.win.intervalClears, 2);
+  assert.equal(t.win.initialClears, 2);
 }
 {
   const t = setup(100, { host: "example.com" });
@@ -97,4 +126,4 @@ function setup(count, settings = {}) {
   assert.equal(t.list[0].id, 9976, "newest turns retained in correct order");
   assert.equal(t.api.prune().lastRemoved, 0, "repeated cleanup is idempotent");
 }
-console.log("LiteDomHardPrune: 10 PASS");
+console.log("LiteDomHardPrune: 10 PASS; timer lifecycle and OFF-idle guards");
