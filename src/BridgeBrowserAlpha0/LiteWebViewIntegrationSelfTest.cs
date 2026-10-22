@@ -173,6 +173,33 @@ internal static class LiteWebViewIntegrationSelfTest
                     Ensure(await EvaluateAsync(core,
                         "window.__OPENBROWSER_LITE_DOM__?.getStatus()?.domVariant") == "dil_observe_only",
                         "DIL DOM is observed without aggressive mutation");
+                    phase = "single_host_dom_poll_updates_state";
+                    await core.ExecuteScriptAsync("""
+                        (() => {
+                          const extra = document.createElement('div');
+                          extra.id='qa-new-turn';
+                          extra.setAttribute('data-chatgpt-selection-message-id','qa-new-turn');
+                          extra.textContent='Historical assistant turn added after document load';
+                          document.querySelector('main').appendChild(extra);
+                        })()
+                        """);
+                    Ensure(await EvaluateAsync(core,
+                        "window.__OPENBROWSER_LITE_DOM__.getStatus().turnCount") == "4",
+                        "read-only status remains stale until host checks");
+                    Ensure(await EvaluateAsync(core,
+                        "window.__OPENBROWSER_LITE_DOM__.check().turnCount") == "5",
+                        "host-driven check sees new DIL assistant without a JS timer");
+                    Ensure(await EvaluateAsync(core,
+                        "window.__OPENBROWSER_LITE_DOM__.getStatus().optimized") == "0",
+                        "host-driven check does not mutate DIL by default");
+                    await core.ExecuteScriptAsync(
+                        "document.querySelector('#qa-new-turn').remove()");
+                    Ensure(await EvaluateAsync(core,
+                        "window.__OPENBROWSER_LITE_DOM__.check().turnCount") == "4",
+                        "host-driven check reflects removed temporary turn");
+                    Ensure(await EvaluateAsync(core,
+                        "window.__OPENBROWSER_LITE_DOM__.getStatus().domVariant") == "dil_observe_only",
+                        "single host poll preserves conservative modern DOM behavior");
                     phase = "check_last_role";
                     Ensure(await EvaluateAsync(core,
                         "window.__OPENBROWSER_RESUME_PROBE__?.observe()?.role") == "assistant",
@@ -462,7 +489,7 @@ internal static class LiteWebViewIntegrationSelfTest
                         10, 10, new Uri(chatUrl), "about:blank"),
                         "archive rejects non-ChatGPT navigation result");
                     LiteEventLog.Write("webview_integration_selftest", new {
-                        passed = true, checks = 87, offline = true
+                        passed = true, checks = 92, offline = true
                     });
                     code = 0;
                 }

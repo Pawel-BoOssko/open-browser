@@ -73,6 +73,27 @@ function createTest(turnCount, options = {}) {
   assert.equal(t.nodes.length, 65, "optimizer never removes any turn");
 }
 {
+  const t = createTest(65);
+  assert.equal(t.api.getStatus().turnCount, 65);
+  t.nodes.pop();
+  assert.equal(t.api.getStatus().turnCount, 65,
+    "status getter is read-only and has no extra DOM scan");
+  assert.equal(t.api.check().turnCount, 64,
+    "single foreground host probe updates status after DOM changes");
+  assert.equal(t.window.intervalArms, 0,
+    "host drives refresh; no duplicate JS polling timer");
+}
+{
+  const host = fs.readFileSync(path.join(__dirname,
+    "../src/BridgeBrowserAlpha0/ChatGptLiteForm.cs"), "utf8");
+  assert.match(host, /_domMonitor\s*=\s*new\(\)\s*\{\s*Interval\s*=\s*30000\s*\}/,
+    "WinForms retains its single 30-second DOM monitoring cadence");
+  assert.match(host, /JSON\.stringify\(window\.__OPENBROWSER_LITE_DOM__\.check\(\)\)/,
+    "host actively refreshes DOM state when reporting it");
+  assert.doesNotMatch(script, /setInterval\s*\(/,
+    "optimizer must not register another independent JavaScript monitor");
+}
+{
   const t = createTest(100, { busy: true });
   assert.equal(t.api.getStatus().optimized, 0);
   assert.equal(t.api.getStatus().skippedBusy, true);
@@ -97,4 +118,4 @@ function createTest(turnCount, options = {}) {
     "legacy optimization flags must be cleared after DIL migration");
   assert.equal(t.nodes.length, 65, "no nodes may be removed");
 }
-console.log("LiteDomOptimizer: 6 PASS");
+console.log("LiteDomOptimizer: 8 PASS (single host DOM monitor)");
