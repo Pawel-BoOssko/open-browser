@@ -586,6 +586,19 @@ internal static class LiteWebViewIntegrationSelfTest
                         "window.__OPENBROWSER_RESUME_PROBE__?.observe()?.text"))
                         .Contains("Czarny kompas"),
                         "read last DIL assistant content");
+                    phase = "single_pass_resume_history_metadata";
+                    Ensure(await EvaluateAsync(core,
+                        "window.__OPENBROWSER_RESUME_PROBE__.observe().assistantNodeCount === " +
+                        "document.querySelectorAll('main [data-chatgpt-selection-message-id]').length") == "true",
+                        "single metadata pass preserves true DIL assistant count");
+                    Ensure(await EvaluateAsync(core,
+                        "window.__OPENBROWSER_RESUME_PROBE__.observe().userNodeCount === " +
+                        "document.querySelectorAll('main [data-user-message-bubble]').length") == "true",
+                        "single metadata pass preserves true DIL user count");
+                    Ensure(await EvaluateAsync(core,
+                        "window.__OPENBROWSER_RESUME_PROBE__.observe().lastAssistantChars === " +
+                        "window.__OPENBROWSER_RESUME_PROBE__.observe().text.length") == "true",
+                        "newest DIL assistant char count matches the visible completed answer");
                     phase = "active_main_only_preflight_and_linear_dom_order";
                     await core.ExecuteScriptAsync("""
                         (() => {
@@ -1140,7 +1153,7 @@ internal static class LiteWebViewIntegrationSelfTest
                         10, 10, new Uri(chatUrl), "about:blank"),
                         "archive rejects non-ChatGPT navigation result");
                     LiteEventLog.Write("webview_integration_selftest", new {
-                        passed = true, checks = 219, offline = true
+                        passed = true, checks = 222, offline = true
                     });
                     code = 0;
                 }
