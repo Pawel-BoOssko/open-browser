@@ -208,7 +208,14 @@ internal sealed partial class ChatGptLiteForm : Form
                 // previous document left an unresolved ExecuteScriptAsync.
                 _domProbeTask = null;
                 _pruneProbeTask = null;
+                // Full document replacement permits a new response probe;
+                // old callbacks are ignored by generation and route guards.
+                _responseProbeGeneration++;
+                _responseProbePending = false;
                 _responseProbeTask = null;
+                _lastGenerationSignal = false;
+                _lastResponseFailure = "";
+                _responseFailureSinceUtc = null;
                 ResetCaptureForNewLocation();
                 _status.Text = "Ładowanie...";
                 LiteEventLog.Write("navigation_start", new { host = LiteEventLog.HostOnly(e.Uri) });

@@ -20,13 +20,18 @@ function run(text = "", busy = false, host = "chatgpt.com", speaker = "alert") {
       return null;
     }
   };
+  const assistantNodes = speaker === "olderError"
+    ? [node, { ...node, textContent: "Now a complete newer assistant response" }]
+    : speaker === "latestError"
+      ? [{ ...node, textContent: "Earlier successful response" }, node]
+      : [node];
   const main = {
     textContent: speaker === "shellError" ? text : "",
     querySelectorAll(selector) {
       if (selector.startsWith('[data-testid^="conversation-turn-"]'))
         return speaker === "shellError" ? [] : [node];
       if (selector.startsWith('[data-message-author-role'))
-        return speaker === "user" || speaker === "sidebar" || speaker === "shellError" ? [] : [node];
+        return speaker === "user" || speaker === "sidebar" || speaker === "shellError" ? [] : assistantNodes;
       throw new Error("Unknown main selector: " + selector);
     }
   };
@@ -50,7 +55,7 @@ function run(text = "", busy = false, host = "chatgpt.com", speaker = "alert") {
             ? [node] : [];
         if (selector.startsWith('[data-testid^="conversation-turn-"]')) return [node];
         if (selector.startsWith('[data-message-author-role'))
-          return speaker === "user" ? [] : [node];
+          return speaker === "user" ? [] : assistantNodes;
         throw new Error("Unknown selector: " + selector);
       },
       querySelector(selector) {
@@ -109,4 +114,8 @@ assert.equal(run("Failed to load this response", false, "chatgpt.com", "alert")
   .errorSource, "visible_alert");
 assert.equal(run("Failed to load this response", false, "chatgpt.com", "dil")
   .errorSource, "short_assistant_placeholder");
+assert.equal(run("Failed to load this response", false, "chatgpt.com", "olderError")
+  .visibleError, null, "previous failed assistant turn must not block a newer reply");
+assert.equal(run("Failed to load this response", false, "chatgpt.com", "latestError")
+  .visibleError, "response_load_failed", "latest visible assistant error must still block");
 console.log("LiteResponseSignal: 26 PASS (hidden/stale alerts excluded)");

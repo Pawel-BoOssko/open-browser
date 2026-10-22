@@ -67,11 +67,16 @@
       // Never interpret a user's quote of an error as a browser failure.
       // Inline assistant failure placeholders are short; long assistant text
       // discussing an error is not evidence that the UI itself failed.
-      for (const node of Array.from(assistants).slice(-3)) {
-        if (String(node.textContent || "").trim().length > 180) continue;
-        if (!isVisible(node)) continue;
-        error = inspectNode(node);
-        if (error) { errorSource = 'short_assistant_placeholder'; break; }
+      // Only the newest visible assistant reply can block the next action.
+      // A failed earlier reply can remain in the React tree while a newer
+      // answer is already being generated or has completed. Checking the
+      // last three produced a false permanent response_load_failed.
+      const newestAssistant = Array.from(assistants).reverse()
+        .find(node => isVisible(node));
+      if (newestAssistant &&
+          String(newestAssistant.textContent || "").trim().length <= 180) {
+        error = inspectNode(newestAssistant);
+        if (error) errorSource = 'short_assistant_placeholder';
       }
     }
     const stop = Array.from(doc.querySelectorAll(

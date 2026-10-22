@@ -8,6 +8,9 @@ internal sealed partial class ChatGptLiteForm
     private readonly System.Windows.Forms.Timer _responseTimer = new() { Interval = 20000 };
     private bool _responseProbePending;
     private Task<string>? _responseProbeTask;
+    // Navigation invalidates old in-flight probes without letting their
+    // finally blocks disturb a newer document's probe.
+    private long _responseProbeGeneration;
     private string _lastResponseFailure = "";
     private DateTimeOffset? _responseFailureSinceUtc;
     private DateTimeOffset _lastFailureObservationUtc;
@@ -40,6 +43,9 @@ internal sealed partial class ChatGptLiteForm
         if (!Uri.TryCreate(core.Source, UriKind.Absolute, out var uri) ||
             uri.Host != "chatgpt.com") return;
         _responseProbePending = true;
+        long probeGeneration = ++_responseProbeGeneration;
+        long routeEpoch = _foregroundWakeRouteEpoch;
+        string routeSource = core.Source;
         try
         {
             var query = core.ExecuteScriptAsync(
@@ -54,6 +60,17 @@ internal sealed partial class ChatGptLiteForm
                 return;
             }
             var raw = await query;
+            // SPA history can switch A->B->A while an old script is in
+            // flight. Never apply an obsolete failure or generation signal
+            // to the newly selected conversation.
+            if (probeGeneration != _responseProbeGeneration ||
+                routeEpoch != _foregroundWakeRouteEpoch ||
+                !string.Equals(routeSource, core.Source, StringComparison.Ordinal))
+            {
+                LiteEventLog.Write("response_probe_route_changed",
+                    new { ignoredStaleResult = true });
+                return;
+            }
             string? inner = JsonSerializer.Deserialize<string>(raw);
             if (string.IsNullOrEmpty(inner)) return;
             using var json = JsonDocument.Parse(inner);
@@ -148,9 +165,12 @@ internal sealed partial class ChatGptLiteForm
         }
         finally
         {
-            _responseProbePending = false;
-            if (_responseProbeTask is { IsCompleted: true })
-                _responseProbeTask = null;
+            if (probeGeneration == _responseProbeGeneration)
+            {
+                _responseProbePending = false;
+                if (_responseProbeTask is { IsCompleted: true })
+                    _responseProbeTask = null;
+            }
         }
     }
 }
