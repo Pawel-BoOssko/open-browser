@@ -194,6 +194,9 @@ internal sealed partial class ChatGptLiteForm : Form
             LiteEventLog.Write("dom_observer_installed");
             await InstallCaptureScriptAsync(core);
             await InstallResponseDiagnosticsAsync(core);
+            await core.AddScriptToExecuteOnDocumentCreatedAsync(
+                await File.ReadAllTextAsync(Path.Combine(
+                    AppContext.BaseDirectory, "LiteTabSwitchSafety.js")));
             await InstallHardPruneScriptAsync(core);
             await InstallResumeScriptsAsync(core);
             await InstallHighScriptAsync(core);

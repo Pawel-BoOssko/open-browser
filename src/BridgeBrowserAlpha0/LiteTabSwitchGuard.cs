@@ -29,27 +29,14 @@ internal sealed partial class ChatGptLiteForm
                 "Open Browser — ochrona notatek");
             return;
         }
-        if (_lastGenerationSignal)
-        {
-            MessageBox.Show(this,
-                "ChatGPT nadal sygnalizuje generowanie odpowiedzi. " +
-                "Zaczekaj na zakończenie przed zmianą rozmowy.",
-                "Open Browser — aktywna odpowiedź");
-            LiteEventLog.Write("tab_switch_blocked", new { reason = "generation_signal" });
-            return;
-        }
-
+        // _lastGenerationSignal is a 20-second polling cache and may describe
+        // another route. Only the current page's fresh DOM probe may veto.
         _tabSwitchProbePending = true;
         bool timedOut = false;
         try
         {
-            const string script = @"(() => {
-                const draft = document.querySelector('textarea,[contenteditable=""true""]');
-                const text = draft ? (draft.value || draft.innerText || '') : '';
-                const busy = !!document.querySelector(
-                    '[data-testid=""stop-button""],[aria-busy=""true""]');
-                return JSON.stringify({busy, draft: text.trim().length > 0});
-            })()";
+            const string script = "window.__OPENBROWSER_TAB_SWITCH_SAFETY__ ? " +
+                "JSON.stringify(window.__OPENBROWSER_TAB_SWITCH_SAFETY__.read()) : null";
             var task = core.ExecuteScriptAsync(script);
             if (await Task.WhenAny(task, Task.Delay(5000)) != task)
             {
@@ -90,7 +77,13 @@ internal sealed partial class ChatGptLiteForm
                     "Open Browser — ochrona rozmowy");
                 return;
             }
-            LiteEventLog.Write("tab_switch_accepted");
+            LiteEventLog.Write("tab_switch_accepted", new {
+                staleGenerationSignal = _lastGenerationSignal
+            });
+            // Do not carry a previous route's polled state into the next chat.
+            _lastGenerationSignal = false;
+            _lastResponseFailure = "";
+            UpdateTaskbarTitle(false, "");
             core.Navigate(url);
         }
         catch (Exception ex)

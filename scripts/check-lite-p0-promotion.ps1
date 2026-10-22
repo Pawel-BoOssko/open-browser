@@ -10,6 +10,7 @@ $checks = @(
     'lite-high-slider.test.cjs',
     'lite-resume-dil-dom.test.cjs',
     'lite-response-signals.test.cjs',
+    'lite-tab-switch-safety.test.cjs',
     'lite-dom-default-contract.test.cjs',
     'lite-dom-dil-count.test.cjs',
     'lite-dom-hard-prune.test.cjs'
