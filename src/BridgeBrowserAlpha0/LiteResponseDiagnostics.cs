@@ -85,6 +85,8 @@ internal sealed partial class ChatGptLiteForm
                     ? hidden.GetInt32() : 0;
             int activeTurns = root.GetProperty("turnCount").GetInt32();
             int activeAssistants = root.GetProperty("assistantCount").GetInt32();
+            string domVariant = root.TryGetProperty("domVariant", out var variant)
+                ? variant.GetString() ?? "unknown" : "unknown";
             // Quarantine per chat on EVERY observation, not just a failure
             // transition. The same error can be visible in two different chats.
             if ((failure is "delivery_timeout" or "response_load_failed") &&
@@ -123,7 +125,7 @@ internal sealed partial class ChatGptLiteForm
                     displayDurationSeconds = displayedSeconds,
                     phase = "visible_page_error_only",
                     turnCount = activeTurns, assistantCount = activeAssistants,
-                    errorSource, ignoredHiddenAlerts
+                    domVariant, errorSource, ignoredHiddenAlerts
                 });
                 _lastResponseFailure = failure;
                 _responseFailureSinceUtc = failure.Length > 0 ? nowUtc : null;
@@ -145,7 +147,7 @@ internal sealed partial class ChatGptLiteForm
                 LiteEventLog.Write("response_error_still_visible", new {
                     state = failure, errorSource, ignoredHiddenAlerts,
                     turnCount = activeTurns, assistantCount = activeAssistants,
-                    documentReady = root.GetProperty("documentReady").GetString(),
+                    domVariant, documentReady = root.GetProperty("documentReady").GetString(),
                     generating, hasComposer = root.GetProperty("hasComposer").GetBoolean()
                 });
             }

@@ -31,7 +31,11 @@
     // A sidebar preview can resemble an assistant error. Only message
     // placeholders in the active conversation are authoritative.
     const main = doc.querySelector('main,[role="main"]');
-    const turns = main?.querySelectorAll('[data-testid^="conversation-turn-"]') || [];
+    const legacyTurns = main?.querySelectorAll('[data-testid^="conversation-turn-"]') || [];
+    const dilTurns = main?.querySelectorAll(
+      '[data-user-message-bubble],[data-chatgpt-selection-message-id]') || [];
+    const modern = dilTurns.length > 0;
+    const turnCount = modern ? dilTurns.length : legacyTurns.length;
     const assistants = main?.querySelectorAll(
       '[data-message-author-role="assistant"],[data-chatgpt-selection-message-id]') || [];
     let error = null;
@@ -51,7 +55,7 @@
       error = inspectNode(node);
       if (error) { errorSource = 'visible_alert'; break; }
     }
-    if (!error && main && turns.length === 0) {
+    if (!error && main && turnCount === 0) {
       // A failed conversation fetch often leaves only a short shell in MAIN.
       // This is not the same as an assistant response failure, and cannot
       // safely be inferred from user quotes or sidebar previews.
@@ -90,7 +94,8 @@
     return {
       documentReady: doc.readyState,
       hasComposer: !!doc.querySelector('textarea,[contenteditable="true"]'),
-      turnCount: turns.length,
+      turnCount,
+      domVariant: modern ? 'dil' : (legacyTurns.length ? 'legacy' : 'unhydrated'),
       assistantCount: assistants.length,
       generatingSignal: stop,
       visibleError: error,

@@ -26,10 +26,14 @@ function run(text = "", busy = false, host = "chatgpt.com", speaker = "alert") {
       ? [{ ...node, textContent: "Earlier successful response" }, node]
       : [node];
   const main = {
-    textContent: speaker === "shellError" ? text : "",
+    textContent: speaker === "shellError" || speaker === "dilOnlyShellQuote" ? text : "",
     querySelectorAll(selector) {
       if (selector.startsWith('[data-testid^="conversation-turn-"]'))
-        return speaker === "shellError" ? [] : [node];
+        return ["shellError","dilOnlyShellQuote","modernConversation"].includes(speaker)
+          ? [] : [node];
+      if (selector.startsWith('[data-user-message-bubble]'))
+        return ["dilOnlyShellQuote","modernConversation"].includes(speaker)
+          ? [node, { ...node, textContent: "Another hydrated turn" }] : [];
       if (selector.startsWith('[data-message-author-role'))
         return speaker === "user" || speaker === "sidebar" || speaker === "shellError" ? [] : assistantNodes;
       throw new Error("Unknown main selector: " + selector);
@@ -118,4 +122,13 @@ assert.equal(run("Failed to load this response", false, "chatgpt.com", "olderErr
   .visibleError, null, "previous failed assistant turn must not block a newer reply");
 assert.equal(run("Failed to load this response", false, "chatgpt.com", "latestError")
   .visibleError, "response_load_failed", "latest visible assistant error must still block");
+const modern = run("Complete assistant message", false, "chatgpt.com", "modernConversation");
+assert.equal(modern.domVariant, "dil", "Modern hydrated DOM is recognized without legacy wrappers");
+assert.equal(modern.turnCount, 2, "Modern turn count reflects DIL and not zero legacy turns");
+const quotedShell = run("Couldn't load this conversation", false, "chatgpt.com", "dilOnlyShellQuote");
+assert.equal(quotedShell.turnCount, 2);
+assert.equal(quotedShell.visibleError, null,
+  "modern hydrated turns prevent a false empty-shell conversation failure");
+assert.equal(run("Couldn't load this conversation", false,
+  "chatgpt.com", "shellError").domVariant, "unhydrated");
 console.log("LiteResponseSignal: hidden alerts and latest-reply checks PASS");
