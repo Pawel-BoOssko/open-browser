@@ -680,3 +680,9 @@
 - Zewnętrzny harmonogram DPAPI na PBOX1 po wdrożeniu zmieniony 20m -> 15m bez resetowania fingerprint/state: exact current chat enabled true, legacy Minutes=20, FastMinutes=15, WakeSequence=0, LastState=visible_ack, DueUtc=2026-10-22T15:53:25.0809278Z. Pozostałe 4 harmonogramy wyłączone; PBOX1 readback potwierdził dokładnie jedną aktywną rozmowę. Zgodność rollbacku: starsza v1.72.59 po przywróceniu zignoruje FastMinutes i użyje legacy Minutes20.
 - Zewnętrzny Keepalive działa, ostatni scheduler result0 (17:38 CEST). Interfejs PBOX1 pokazuje Generowanie, lecz samo Responding=True nie potwierdza poprawnego E2E ChatGPT ani zakończonej odpowiedzi.
 - NEXT: po naturalnym pierwszym wybudzeniu v1.72.63 sprawdzić realne mechaniczne wpisy, wspólny receipt z modelem, potwierdzenie ACK bez dubli, a potem P0: realna hydratacja historii, HTTP 429/404 GET vs POST oraz 5-10 background chats/8h soak. Bez wewnętrznych automatyzacji ChatGPT.
+
+## 2026-10-22 — decyzja właściciela: krótkie testy wybudzania
+- Przy testowaniu mechanizmu zewnętrznego wybudzania NIE czekać pełnego regularnego interwału 15 minut. Ustawiać najbliższe TESTOWE wybudzenie na około 3 minuty od teraz, aby szybko sprawdzić rzeczywisty send / ACK / engine journal / chat_started.
+- Odróżnić jednorazowy termin testowy (DueUtc=now+3min) od docelowego produkcyjnego okresu 15 minut. Po teście przywrócić regularny rytm 15 minut, nie pozostawiać agresywnego interwału w produkcji.
+- Nadal obowiązują warunki bezpiecznej wysyłki: brak duplikatów, brak ponawiania niepewnych wysyłek, zachowanie LastAnswerFingerprint i stanu, sprawdzenie hydratacji oraz zapis checkpointu. Nie używać wewnętrznych automatyzacji ChatGPT.
+- To zadanie jest TYLKO ZAPISANIEM ZASADY na przyszłe testy. W tym wywołaniu NIE przełączać produkcyjnego harmonogramu ani nie uruchamiać testowego wybudzenia.
