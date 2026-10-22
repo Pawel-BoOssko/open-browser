@@ -11,6 +11,7 @@ function setup(options = {}) {
   let clicks = 0;
   let busy = false;
   let userBubbles = [];
+  let sidebarBubbles = [];
   let unrelatedAriaBusy = false;
   let voiceClicks = 0;
   const submit = {disabled: !!options.disabledSendButton, click() { clicks++; }};
@@ -25,13 +26,20 @@ function setup(options = {}) {
   const editor = { innerText: "", focus() {},
     closest(selector) { return options.formButton && selector === 'form' ? form : null; } };
   let activeEditor = editor;
+  const main = {
+    querySelectorAll(selector) {
+      return selector.includes('data-user-message-bubble') ? userBubbles : [];
+    }
+  };
   const doc = {
     querySelectorAll(selector) {
-      if (selector.includes('data-user-message-bubble')) return userBubbles;
+      if (selector.includes('data-user-message-bubble'))
+        return [...userBubbles, ...sidebarBubbles];
       if (selector === '[aria-busy="true"]' && unrelatedAriaBusy) return [{}];
       return [];
     },
     querySelector(selector) {
+      if (selector === 'main,[role="main"]') return options.noMain ? null : main;
       if (selector.startsWith("#prompt-textarea")) return activeEditor;
       if (selector === '[data-testid="send-button"]')
         return options.missingSendButton || options.formButton ? null : submit;
@@ -64,6 +72,7 @@ function setup(options = {}) {
     count() { return clicks; }, voiceCount() { return voiceClicks; },
     setBusy(value) { busy = value; },
     showAcknowledgment(text) { userBubbles = [{ innerText: text }]; },
+    showSidebarReceipt(text) { sidebarBubbles = [{ innerText: text }]; },
     showUnrelatedBusy(value) { unrelatedAriaBusy = value; },
     replaceComposer() { activeEditor = { innerText: "", focus() {} }; }
   };
@@ -116,6 +125,26 @@ function setup(options = {}) {
   const p = setup();
   p.showAcknowledgment("Different message without the receipt");
   assert.equal(p.sender.hasAck(id), false);
+}
+{
+  const p = setup();
+  p.showSidebarReceipt("[OB-" + id + "]\\nSidebar preview only");
+  assert.equal(p.sender.hasAck(id), false,
+    "sidebar receipt must NOT acknowledge delivery in active chat");
+  assert.equal(p.sender.send(prompt, id), "submission_requested",
+    "sidebar-only receipt must not suppress the actual wake");
+}
+{
+  const p = setup({ noMain: true });
+  p.showSidebarReceipt("[OB-" + id + "]\\nPreview, no loaded conversation");
+  assert.equal(p.sender.hasAck(id), false,
+    "application shell without main cannot confirm receipt");
+}
+{
+  const p = setup();
+  p.showAcknowledgment("Unrelated text containing " + id + " without OB wrapper");
+  assert.equal(p.sender.hasAck(id), false,
+    "bare hexadecimal substring is not a delivery marker");
 }
 {
   const p = setup();

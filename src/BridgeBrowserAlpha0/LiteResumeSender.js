@@ -108,11 +108,16 @@
     return !form || form.contains?.(legacy) ? legacy : null;
   }
   function hasAck(receiptId) {
-    // ChatGPT DIL renderer uses data-user-message-bubble (verified 2026-10-18).
-    // The legacy selector is kept for older or alternate UI variants.
-    return Array.from(w.document.querySelectorAll(
+    // Only the current conversation's MAIN user bubbles prove delivery.
+    // Sidebar previews or assistant text quoting a receipt are not an ACK.
+    // Never fall back to document-wide search on a shell without main.
+    if (!/^[a-f0-9]{32}$/.test(receiptId)) return false;
+    const main = w.document.querySelector('main,[role="main"]');
+    if (!main) return false;
+    const marker = "[OB-" + receiptId + "]";
+    return Array.from(main.querySelectorAll(
       '[data-message-author-role="user"],[data-user-message-bubble]'))
-      .slice(-8).some(n => String(n.innerText || n.textContent || "").includes(receiptId));
+      .slice(-8).some(n => String(n.innerText || n.textContent || "").includes(marker));
   }
   function send(text, receiptId) {
     if (!/^\/c\//.test(w.location.pathname) ||

@@ -10,6 +10,12 @@ function page(overrides = {}) {
   const hiddenTextarea = { value: "" };
   const sent = [];
   let pending = "";
+  const main = {
+    querySelectorAll(selector) {
+      return selector.includes('data-user-message-bubble')
+        ? sent.map(value => ({ innerText: value })) : [];
+    }
+  };
   const doc = {
     querySelectorAll(selector) {
       if (selector === 'button') return [{ innerText: overrides.effort || 'High' }];
@@ -29,6 +35,7 @@ function page(overrides = {}) {
       throw new Error("Unknown selector " + selector);
     },
     querySelector(selector) {
+      if (selector === 'main,[role="main"]') return main;
       if (selector === '#prompt-textarea')
         return overrides.onlyContenteditable || overrides.noComposer ? null : editor;
       if (selector === '[data-testid="composer-text-input"]') return null;
