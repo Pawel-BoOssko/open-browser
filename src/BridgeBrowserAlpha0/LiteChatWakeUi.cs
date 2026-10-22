@@ -591,7 +591,8 @@ internal sealed partial class ChatGptLiteForm
         return stable() ? (first, second, true) : (null, null, false);
     }
 
-    private async Task<(string Reason, string Hash, bool Complete)>
+    private async Task<(string Reason, string Hash, bool Complete,
+        LiteModelStatus.Parsed? Status)>
         CheckWorkerPreflightAsync(CoreWebView2 core, string url, string previousHash)
     {
         bool foreground = ReferenceEquals(core, _browser.CoreWebView2);
@@ -604,7 +605,7 @@ internal sealed partial class ChatGptLiteForm
         {
             LiteEventLog.Write("multi_wake_preflight_navigation_changed",
                 new { foreground, definitelyNotSent = true });
-            return ("navigation_changed", "", false);
+            return ("navigation_changed", "", false, null);
         }
         var (first, second, _) = result;
         string expectedPath = new Uri(url).AbsolutePath;
@@ -635,8 +636,10 @@ internal sealed partial class ChatGptLiteForm
         string hash = reason is "ready" or "draft_present" ?
             LiteChatWakePreflight.StableAssistantFingerprint(
                 first, second, expectedPath) : "";
+        var status = reason == "ready" ? LiteModelStatus.Parse(answer) : null;
         return (reason, hash,
-            reason == "ready" && LiteChatWakePreflight.IsCompletion(answer));
+            reason == "ready" && LiteChatWakePreflight.IsCompletion(answer),
+            status);
     }
 
     internal static TimeSpan RecordWorkerProbeFailure(
@@ -701,6 +704,76 @@ internal sealed partial class ChatGptLiteForm
     internal static string NextStateAfterWakeDeferral(string priorState,
         string reason) =>
         IsUnconfirmedRecoveredDraftState(priorState) ? priorState : "waiting_" + reason;
+
+    // Explicit model status is advisory: only a stable, fully hydrated
+    // two-snapshot preflight in the EXACT expected chat can apply it.
+    // The ordinary wake path remains unchanged with no/invalid status.
+    private bool HandleVerifiedModelStatus(LiteChatWakeRegistry.Chat due,
+        List<LiteChatWakeRegistry.Chat> entries,
+        LiteModelStatus.Parsed? parsed, string reason, string answerHash)
+    {
+        var now = DateTimeOffset.UtcNow;
+        string? decision = LiteModelStatus.ApplyDecision(parsed, now, reason);
+        if (decision is null or "CONTINUE") return false;
+        if (answerHash.Length != 64) return false;
+        if (decision == "WAIT_UNTIL")
+        {
+            due.DueUtc = parsed!.UntilUtc!.Value;
+            due.LastState = "status_wait_until";
+            LiteChatWakeRegistry.Write(entries);
+            LiteWakeJournal.Write("deferred", due.WakeSequence + 1,
+                result: "model_wait_until");
+            LiteEventLog.Write("multi_wake_model_status", new {
+                status = decision, untilUtc = due.DueUtc.ToString("O")
+            });
+            UpdateMultiWakeStatus();
+            return true;
+        }
+        if (decision == "DONE")
+        {
+            due.Enabled = false;
+            due.LastState = "status_done";
+            LiteChatWakeRegistry.Write(entries);
+            LiteWakeJournal.Write("schedule_completed", due.WakeSequence,
+                result: "model_done");
+            LiteEventLog.Write("multi_wake_model_status", new { status = decision });
+            UpdateMultiWakeStatus();
+            return true;
+        }
+        if (!LiteOwnerInterventions.IsIntervention(decision)) return false;
+        string eventKey = LiteOwnerInterventions.EventKey(
+            due.Url, decision, answerHash);
+        bool newEvent = !string.Equals(due.LastInterventionKey, eventKey,
+            StringComparison.Ordinal);
+        due.Enabled = false;
+        due.LastState = decision == "WAIT_USER" ? "status_wait_user" : "status_blocked";
+        due.LastInterventionKey = eventKey;
+        LiteChatWakeRegistry.Write(entries);
+        LiteEventLog.Write("multi_wake_model_status", new {
+            status = decision, newEvent, emailSent = false
+        });
+        if (newEvent)
+        {
+            try
+            {
+                LiteOwnerInterventions.QueueForOwner(decision, eventKey);
+                _tray?.ShowBalloonTip(12000,
+                    "Open Browser — wymagana interwencja",
+                    decision == "WAIT_USER" ?
+                        "Projekt oczekuje na odpowiedź właściciela. Sprawdź projekty." :
+                        "Projekt jest zablokowany. Sprawdź projekty.",
+                    ToolTipIcon.Warning);
+            }
+            catch (Exception ex)
+            {
+                LiteEventLog.Write("owner_intervention_queue_failed", new {
+                    errorType = ex.GetType().Name, status = decision
+                });
+            }
+        }
+        UpdateMultiWakeStatus();
+        return true;
+    }
 
     private void DeferWakeWithoutSend(string url, DateTimeOffset now,
         string reason, int minutes = 2)
@@ -875,6 +948,9 @@ internal sealed partial class ChatGptLiteForm
                         UpdateMultiWakeStatus();
                         return;
                     }
+                    if (HandleVerifiedModelStatus(due, entries,
+                        preflight.Status, preflight.Reason, preflight.Hash))
+                        return;
                     if (preflight.Reason == "draft_present")
                     {
                         // A previous attempt may have left OUR unique OB wake

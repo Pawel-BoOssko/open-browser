@@ -25,6 +25,9 @@ internal static class LiteChatWakeRegistry
         public DateTimeOffset LastAttemptUtc { get; set; }
         public string LastState { get; set; } = "armed";
         public string LastAnswerFingerprint { get; set; } = "";
+        // Durable dedup for each NEW model-confirmed owner intervention.
+        // Never implies an email was actually delivered.
+        public string LastInterventionKey { get; set; } = "";
         public string Prompt { get; set; } = "";
     }
 
@@ -190,6 +193,17 @@ internal static class LiteChatWakeRegistry
                 "Jeśli zapis do PBOX1 się nie uda, wskaż to w checkpointcie " +
                 "na SatanAMD, nie udawaj sukcesu. " +
                 "Nie używaj ChatGPT Tasks ani wewnętrznych automatyzacji.";
+        // Advisory protocol for the two verified project executors.
+        // Older, unrelated schedules keep their exact previous payload.
+        if (project || entry.Prompt.Contains("Networking Radar",
+            StringComparison.OrdinalIgnoreCase))
+            body += "\n\nOpcjonalnie zakończ ostatnią odpowiedź JEDNYM " +
+                "samodzielnym wierszem: [OB-STATUS: CONTINUE], " +
+                "[OB-STATUS: WAIT_USER], [OB-STATUS: BLOCKED], " +
+                "[OB-STATUS: DONE] albo [OB-STATUS: WAIT_UNTIL " +
+                "2026-10-23T12:00:00Z] (z rzeczywistą datą ISO UTC). " +
+                "Nie wymyślaj blokad ani terminu; brak znacznika jest dozwolony. " +
+                "Status nie zastępuje checkpointu projektu.";
         return marker + "\n" + body;
     }
 
@@ -238,6 +252,10 @@ internal static class LiteChatWakeRegistry
             if (!numbered.Contains("wake-lifecycle.jsonl") ||
                 !numbered.Contains("chat_started") ||
                 !numbered.Contains("chat_finished")) return 12;
+            int modelStatus = LiteModelStatus.SelfTest();
+            if (modelStatus != 0) return 110 + modelStatus;
+            int ownerQueue = LiteOwnerInterventions.SelfTest();
+            if (ownerQueue != 0) return 120 + ownerQueue;
             int projectPolicy = LiteProjectRegistry.WakePolicySelfTest();
             if (projectPolicy != 0) return 100 + projectPolicy;
             int wakeJournal = LiteWakeJournal.SelfTest();
