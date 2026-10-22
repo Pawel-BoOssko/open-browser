@@ -68,7 +68,7 @@ internal static class LiteWebViewIntegrationSelfTest
                     foreach (string name in new[] {
                         "LiteHighGuard.js", "LiteResponseSignal.js",
                         "LiteResumeProbe.js", "LiteResumeSender.js",
-                        "LiteDomOptimizer.js"
+                        "LiteDomOptimizer.js", "LiteDomHardPrune.js"
                     }) {
                         string script = File.ReadAllText(Path.Combine(
                             AppContext.BaseDirectory, name));
@@ -86,6 +86,22 @@ internal static class LiteWebViewIntegrationSelfTest
                         TimeSpan.FromSeconds(18));
                     core.NavigationCompleted -= onNavigated;
                     Ensure(success, "local virtual host navigation");
+                    phase = "hard_dom_idle_timer_lifecycle";
+                    Ensure(await EvaluateAsync(core,
+                        "window.__OPENBROWSER_HARD_PRUNE__?.status().enabled") ==
+                        "false", "hard DOM pruning defaults OFF in real WebView2");
+                    Ensure(await EvaluateAsync(core,
+                        "window.__OPENBROWSER_HARD_PRUNE__?.status().lastCheckedAt === null") ==
+                        "true", "disabled hard DOM script never performs startup pruning");
+                    Ensure(await EvaluateAsync(core,
+                        "window.__OPENBROWSER_HARD_PRUNE__.enable(true).enabled") ==
+                        "true", "hard prune can still be deliberately enabled");
+                    Ensure(await EvaluateAsync(core,
+                        "window.__OPENBROWSER_HARD_PRUNE__.enable(false).enabled") ==
+                        "false", "owner can turn hard prune back OFF");
+                    Ensure(await EvaluateAsync(core,
+                        "document.querySelectorAll('main [data-user-message-bubble],main [data-chatgpt-selection-message-id]').length") ==
+                        "4", "short chat is preserved across OFF/ON/OFF cycle");
                     phase = "worker_hydration_total_deadline";
                     Ensure(ChatGptLiteForm.WorkerHistoryProbeBudgetMs(0) == 6500,
                         "first hydration probe has at most 6.5s budget");
@@ -434,7 +450,7 @@ internal static class LiteWebViewIntegrationSelfTest
                         10, 10, new Uri(chatUrl), "about:blank"),
                         "archive rejects non-ChatGPT navigation result");
                     LiteEventLog.Write("webview_integration_selftest", new {
-                        passed = true, checks = 78, offline = true
+                        passed = true, checks = 83, offline = true
                     });
                     code = 0;
                 }
