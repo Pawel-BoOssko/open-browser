@@ -131,20 +131,41 @@ internal static class LiteWebViewIntegrationSelfTest
                         "history.replaceState({},'', '/c/11111111-1111-1111-1111-111111111111')");
                     Ensure(LiteDevWakeState.NormalizeUrl(core.Source) == chatUrl,
                         "offline fixture now has a valid normalized chat URL");
-                    Ensure(await ChatGptLiteForm.IsWorkerHydratedForChatAsync(core, chatUrl),
+                    Ensure(await ChatGptLiteForm.IsWorkerHydratedForChatAsync(core, chatUrl, chatUrl),
                         "hydrated background chat may be reused without reload");
-                    Ensure(!await ChatGptLiteForm.IsWorkerHydratedForChatAsync(core, otherUrl),
+                    Ensure(!await ChatGptLiteForm.IsWorkerHydratedForChatAsync(core, chatUrl, null),
+                        "newly selected URL without verified history cannot reuse worker");
+                    Ensure(!ChatGptLiteForm.VerifiedWorkerMatches(
+                        chatUrl, otherUrl, chatUrl),
+                        "verified worker identity is revoked by a different source");
+                    Ensure(!await ChatGptLiteForm.IsWorkerHydratedForChatAsync(core, otherUrl, otherUrl),
                         "a different background chat may never reuse the current DOM");
                     await core.ExecuteScriptAsync("""
                         window.__qaSavedTurns = Array.from(document.querySelector('main').children);
                         document.querySelector('main').replaceChildren();
                         """);
-                    Ensure(!await ChatGptLiteForm.IsWorkerHydratedForChatAsync(core, chatUrl),
+                    Ensure(!await ChatGptLiteForm.IsWorkerHydratedForChatAsync(core, chatUrl, chatUrl),
                         "composer-only application shell cannot be reused");
                     await core.ExecuteScriptAsync(
+                        "document.querySelector('aside').setAttribute('data-user-message-bubble','')");
+                    Ensure(!await ChatGptLiteForm.IsWorkerHydratedForChatAsync(core, chatUrl, chatUrl),
+                        "messages in sidebar are not accepted as chat history");
+                    await core.ExecuteScriptAsync(
+                        "document.querySelector('aside').removeAttribute('data-user-message-bubble')");
+                    await core.ExecuteScriptAsync(
                         "document.querySelector('main').replaceChildren(...window.__qaSavedTurns)");
-                    Ensure(await ChatGptLiteForm.IsWorkerHydratedForChatAsync(core, chatUrl),
+                    Ensure(await ChatGptLiteForm.IsWorkerHydratedForChatAsync(core, chatUrl, chatUrl),
                         "background chat becomes reusable when history returns");
+                    await core.ExecuteScriptAsync(
+                        "history.replaceState({},'', '/c/22222222-2222-2222-2222-222222222222')");
+                    Ensure(!await ChatGptLiteForm.IsWorkerHydratedForChatAsync(
+                        core, otherUrl, chatUrl),
+                        "SPA route change cannot reuse previous chat's history");
+                    await core.ExecuteScriptAsync(
+                        "history.replaceState({},'', '/c/11111111-1111-1111-1111-111111111111')");
+                    Ensure(!await ChatGptLiteForm.IsWorkerHydratedForChatAsync(
+                        core, chatUrl, null),
+                        "return after SPA route change needs fresh verified navigation");
                     const string receipt = "1234567890abcdef1234567890abcdef";
                     var js = "window.__OPENBROWSER_RESUME_SENDER__?.send(" +
                         JsonSerializer.Serialize("Napisz ósmy rozdział tej testowej książki.") +
@@ -246,9 +267,9 @@ internal static class LiteWebViewIntegrationSelfTest
                         "history.replaceState({}, '', '/c/" + secondChatId + "')");
                     Ensure(LiteDevWakeState.NormalizeUrl(core.Source) == otherUrl,
                         "second chat has its own exact UUID URL");
-                    Ensure(!await ChatGptLiteForm.IsWorkerHydratedForChatAsync(core, chatUrl),
+                    Ensure(!await ChatGptLiteForm.IsWorkerHydratedForChatAsync(core, chatUrl, chatUrl),
                         "first chat cannot use second chat's hydrated DOM");
-                    Ensure(await ChatGptLiteForm.IsWorkerHydratedForChatAsync(core, otherUrl),
+                    Ensure(await ChatGptLiteForm.IsWorkerHydratedForChatAsync(core, otherUrl, otherUrl),
                         "second chat can reuse its own loaded history");
                     Ensure((await EvaluateAsync(core,
                         "window.__OPENBROWSER_RESUME_PROBE__?.observe()?.text"))
@@ -265,9 +286,9 @@ internal static class LiteWebViewIntegrationSelfTest
                     core.NavigationCompleted -= firstCompleted;
                     await core.ExecuteScriptAsync(
                         "history.replaceState({}, '', '/c/" + firstChatId + "')");
-                    Ensure(!await ChatGptLiteForm.IsWorkerHydratedForChatAsync(core, otherUrl),
+                    Ensure(!await ChatGptLiteForm.IsWorkerHydratedForChatAsync(core, otherUrl, otherUrl),
                         "second chat cannot use reloaded first chat DOM");
-                    Ensure(await ChatGptLiteForm.IsWorkerHydratedForChatAsync(core, chatUrl),
+                    Ensure(await ChatGptLiteForm.IsWorkerHydratedForChatAsync(core, chatUrl, chatUrl),
                         "first chat hydrates again after switching back");
                     Ensure((await EvaluateAsync(core,
                         "window.__OPENBROWSER_RESUME_PROBE__?.observe()?.text"))
@@ -288,7 +309,7 @@ internal static class LiteWebViewIntegrationSelfTest
                         10, 10, new Uri(chatUrl), "about:blank"),
                         "archive rejects non-ChatGPT navigation result");
                     LiteEventLog.Write("webview_integration_selftest", new {
-                        passed = true, checks = 44, offline = true
+                        passed = true, checks = 49, offline = true
                     });
                     code = 0;
                 }

@@ -8,7 +8,7 @@ internal sealed partial class ChatGptLiteForm
 {
     internal const string WakeWorkerHydratedScript =
         "!!document.querySelector('#prompt-textarea,[data-testid=composer-text-input],textarea,[contenteditable=true]') " +
-        "&& !!document.querySelector('[data-user-message-bubble],[data-message-author-role],[data-chatgpt-selection-message-id]')";
+        "&& !!document.querySelector('main [data-user-message-bubble],main [data-message-author-role],main [data-chatgpt-selection-message-id]')";
     private readonly System.Windows.Forms.Timer _chatWakeTimer = new() { Interval = 20000 };
     private bool _multiWakeEnabled;
     private bool _chatWakeBusy;

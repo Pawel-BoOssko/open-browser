@@ -36,3 +36,9 @@
 - Testy: 7 scenariuszy DIL soft pilot (w tym limit próbkowania i brak census podczas Stop), 20/20 plików Node test PASS, Release .NET 0 errors, izolowany WebView2 21 checks PASS. To testy źródeł, nie produkcyjny trend DOM.
 - SOURCE v1.72.26 zwiększa możliwość reużycia zhydratowanego worker WebView2, zamiast wymuszać reload przy tym samym due URL. Konkretny wpływ RAM/CPU i poprawność wieloczatowa wymagają dopiero LIVE E2E.
 - Cel: po dozwolonej publikacji v1.72.26 korelować dom_status.totalDomElements z privateMiB renderera i cpuMachinePercent w godzinowych oknach oraz 8h soak; rozróżniać stały wzrost liczby elementów i wzrost pamięci przy stałym DOM. Do prawdziwego DIL QA nie uruchamiać domyślnie CSS pilota ani hard prune.
+
+## 2026-10-22 02:34 CEST: stan produkcji v1.72.21 (przed zmianą 1.72.30)
+
+- PBOX1 56 próbek ze stałego PID8216 v1.72.21 z 00:43:01 do 02:33:01 CEST, okno 1.83h, 7 własnych procesów WebView2: suma private min561.9, max882.3, średnia784.7 MiB, pierwszy561.9, ostatni858.0 MiB; największy renderer max687.6MiB. Nie kwalifikuje to 8h soak ani dowodu wycieku. W długiej rozmowie zmian generowania i wielkości DOM nie można jeszcze jednoznacznie skorelować.
+- SOURCE/TEST 1.72.30 SATANAMD: per-worker _workerVerifiedChatUrl ustawia się dopiero po własnej poprawnej nawigacji i obecnej historii (scoped main), unieważniany na SPA SourceChanged na inny URL, NavigationStarting, ProcessFailed. Pozwala uniknąć kosztownego lub błędnego reuse po przełączaniu czatów; wpływ CPU/RAM nie był testowany na produkcyjnym PBOX1.
+- Full DOM census co >=120s (poza generowaniem) nadal tylko w źródłach, real-page DIL soft CSS pilot pozostaje OFF, hard prune OFF. Realny multi-chat E2E i po-deploy RAM/DOM A/B oraz 8h+ soak nadal otwarte.
