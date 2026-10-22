@@ -99,6 +99,24 @@ internal static class LiteWebViewIntegrationSelfTest
                         "total hydration deadline stops further probe attempts");
                     Ensure(ChatGptLiteForm.WorkerHistoryProbeBudgetMs(32000) == 0,
                         "already expired hydration never schedules another script");
+                    phase = "background_worker_circuit_breaker";
+                    var workerGate = new LiteRendererBackpressure();
+                    var now = DateTimeOffset.UtcNow;
+                    Ensure(!ChatGptLiteForm.ShouldDeferWorkerProbe(false, workerGate, now),
+                        "healthy background worker remains eligible");
+                    Ensure(workerGate.MarkFailed(now) == TimeSpan.FromSeconds(30),
+                        "initial background script timeout gets 30s cooldown");
+                    Ensure(ChatGptLiteForm.ShouldDeferWorkerProbe(false, workerGate,
+                        now.AddSeconds(29)), "background wake defers within cooldown");
+                    Ensure(!ChatGptLiteForm.ShouldDeferWorkerProbe(true, workerGate,
+                        now.AddSeconds(1)), "foreground chat never inherits worker cooldown");
+                    Ensure(!ChatGptLiteForm.ShouldDeferWorkerProbe(false, workerGate,
+                        now.AddSeconds(30)), "background wake retries after cooldown");
+                    Ensure(workerGate.MarkFailed(now.AddSeconds(40)) ==
+                        TimeSpan.FromSeconds(60), "repeated failure increases cooldown");
+                    workerGate.MarkNavigationRecovered();
+                    Ensure(!ChatGptLiteForm.ShouldDeferWorkerProbe(false, workerGate,
+                        now.AddSeconds(41)), "verified worker recovery clears cooldown");
                     phase = "check_hydrated_worker";
                     Ensure(await EvaluateAsync(core,
                         ChatGptLiteForm.WakeWorkerHydratedScript) == "true",
@@ -309,7 +327,7 @@ internal static class LiteWebViewIntegrationSelfTest
                         10, 10, new Uri(chatUrl), "about:blank"),
                         "archive rejects non-ChatGPT navigation result");
                     LiteEventLog.Write("webview_integration_selftest", new {
-                        passed = true, checks = 49, offline = true
+                        passed = true, checks = 56, offline = true
                     });
                     code = 0;
                 }
