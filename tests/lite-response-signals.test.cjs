@@ -5,7 +5,21 @@ const path = require("node:path");
 const vm = require("node:vm");
 const script = fs.readFileSync(path.join(__dirname, "../src/BridgeBrowserAlpha0/LiteResponseSignal.js"), "utf8");
 function run(text = "", busy = false, host = "chatgpt.com", speaker = "alert") {
-  const node = { textContent: text };
+  const node = {
+    textContent: text,
+    closest(selector) {
+      return speaker === "sidebar" && selector.includes("aside") ? {} : null;
+    }
+  };
+  const main = {
+    querySelectorAll(selector) {
+      if (selector.startsWith('[data-testid^="conversation-turn-"]'))
+        return [node];
+      if (selector.startsWith('[data-message-author-role'))
+        return speaker === "user" || speaker === "sidebar" ? [] : [node];
+      throw new Error("Unknown main selector: " + selector);
+    }
+  };
   const window = {
     performance: { now: () => 100 },
     location: { hostname: host },
@@ -13,13 +27,15 @@ function run(text = "", busy = false, host = "chatgpt.com", speaker = "alert") {
       readyState: "complete",
       querySelectorAll(selector) {
         if (selector.startsWith('[role="alert"]'))
-          return speaker === "alert" && text ? [node] : [];
+          return (speaker === "alert" || speaker === "sidebar") && text
+            ? [node] : [];
         if (selector.startsWith('[data-testid^="conversation-turn-"]')) return [node];
         if (selector.startsWith('[data-message-author-role'))
           return speaker === "user" ? [] : [node];
         throw new Error("Unknown selector: " + selector);
       },
       querySelector(selector) {
+        if (selector === 'main,[role="main"]') return main;
         if (selector.startsWith('[data-testid="stop-button"]')) return busy ? {} : null;
         if (selector.startsWith('textarea,')) return {};
         return null;
@@ -45,4 +61,11 @@ assert.equal(run("Przekroczono limit czasu dostarczenia wiadomości", false,
 assert.equal(run("Przekroczono limit czasu dostarczenia wiadomości ".repeat(8),
   false, "chatgpt.com", "assistant").visibleError, null,
   "long assistant text discussing an error is not an error placeholder");
-console.log("LiteResponseSignal: 10 PASS");
+assert.equal(run("Failed to load this response", false, "chatgpt.com", "sidebar").visibleError,
+  null, "sidebar alert quoting response failure must not block active chat");
+const sidebarStatus = run("Failed to load this response", false, "chatgpt.com", "sidebar");
+assert.equal(sidebarStatus.assistantCount, 0,
+  "sidebar assistant markers are not active chat messages");
+assert.equal(run("Failed to load this response", false, "chatgpt.com", "alert").visibleError,
+  "response_load_failed", "real global error toast remains recognized");
+console.log("LiteResponseSignal: 13 PASS");

@@ -383,6 +383,42 @@ internal static class LiteWebViewIntegrationSelfTest
                     Ensure(await EvaluateAsync(core,
                         "window.__OPENBROWSER_RESUME_PROBE__.observe().turnCount") == "4",
                         "sidebar marker excluded from active conversation turn count");
+                    phase = "sidebar_tool_and_error_fail_closed";
+                    await core.ExecuteScriptAsync("""
+                        (() => {
+                          const sidebar=document.querySelector('aside');
+                          sidebar.setAttribute('data-testid','tool-running');
+                          sidebar.setAttribute('role','alert');
+                          sidebar.textContent='Failed to load this response';
+                        })()
+                        """);
+                    Ensure(await EvaluateAsync(core,
+                        "window.__OPENBROWSER_RESUME_PROBE__.observe().toolBusy") == "false",
+                        "sidebar tool-running status cannot delay current chat");
+                    Ensure(await EvaluateAsync(core,
+                        "window.__OPENBROWSER_RESPONSE_SIGNALS__.read().visibleError === null") == "true",
+                        "sidebar false error alert cannot block current chat");
+                    Ensure(await EvaluateAsync(core,
+                        "window.__OPENBROWSER_RESUME_PROBE__.observe().error") == "false",
+                        "scoped response signal does not leak sidebar error to scheduler");
+                    await core.ExecuteScriptAsync("""
+                        (() => {
+                          document.querySelector('aside').removeAttribute('role');
+                          document.querySelector('aside').removeAttribute('data-testid');
+                          const marker=document.createElement('span');
+                          marker.id='qa-current-tool-running';
+                          marker.dataset.testid='tool-running';
+                          document.querySelector('main').appendChild(marker);
+                        })()
+                        """);
+                    Ensure(await EvaluateAsync(core,
+                        "window.__OPENBROWSER_RESUME_PROBE__.observe().toolBusy") == "true",
+                        "active chat tool-running must still block auto-wake");
+                    await core.ExecuteScriptAsync(
+                        "document.querySelector('#qa-current-tool-running').remove()");
+                    Ensure(await EvaluateAsync(core,
+                        "window.__OPENBROWSER_RESUME_PROBE__.observe().toolBusy") == "false",
+                        "active chat tool finishing lifts busy flag");
                     await core.ExecuteScriptAsync("""
                         (() => {
                           const main=document.querySelector('main');
@@ -776,7 +812,7 @@ internal static class LiteWebViewIntegrationSelfTest
                         10, 10, new Uri(chatUrl), "about:blank"),
                         "archive rejects non-ChatGPT navigation result");
                     LiteEventLog.Write("webview_integration_selftest", new {
-                        passed = true, checks = 141, offline = true
+                        passed = true, checks = 146, offline = true
                     });
                     code = 0;
                 }

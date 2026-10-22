@@ -6,7 +6,8 @@ const vm = require("node:vm");
 const script = fs.readFileSync(path.join(__dirname,
   "../src/BridgeBrowserAlpha0/LiteResumeProbe.js"), "utf8");
 
-function observe({ activeBusy = false, toolRunning = false } = {}) {
+function observe({ activeBusy = false, toolRunning = false,
+  sidebarToolRunning = false } = {}) {
   const turn = {
     querySelector(selector) {
       return selector === '[aria-busy="true"]' && activeBusy ? {} : null;
@@ -23,6 +24,11 @@ function observe({ activeBusy = false, toolRunning = false } = {}) {
     }
   };
   const main = {
+    querySelector(selector) {
+      if (selector.includes('[data-testid*="tool-running"]'))
+        return toolRunning ? {} : null;
+      return null;
+    },
     querySelectorAll(selector) {
       assert.equal(selector,
         '[data-message-author-role],[data-user-message-bubble],[data-chatgpt-selection-message-id]');
@@ -42,7 +48,7 @@ function observe({ activeBusy = false, toolRunning = false } = {}) {
       if (selector.includes('[aria-busy="true"]'))
         throw new Error("Global aria-busy must not be treated as chat tool activity");
       if (selector.includes('[data-testid*="tool-running"]'))
-        return toolRunning ? {} : null;
+        return sidebarToolRunning ? {} : null;
       return null;
     }
   };
@@ -57,4 +63,6 @@ function observe({ activeBusy = false, toolRunning = false } = {}) {
 assert.equal(observe().toolBusy, false);
 assert.equal(observe({ activeBusy: true }).toolBusy, true);
 assert.equal(observe({ toolRunning: true }).toolBusy, true);
-console.log("LiteResumeProbeSidebarBusy: 3 PASS");
+assert.equal(observe({ sidebarToolRunning: true }).toolBusy, false,
+  "sidebar running tool must not block active chat");
+console.log("LiteResumeProbeSidebarBusy: 4 PASS");

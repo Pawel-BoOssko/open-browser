@@ -53,7 +53,7 @@
     const activeTurn = last?.closest?.('[data-testid^="conversation-turn-"]');
     // Only tool state inside this conversation blocks its next wake.
     // A sidebar may animate a different chat's tool or a global widget.
-    const toolBusy = !!main?.querySelector(
+    const toolBusy = !!main?.querySelector?.(
       '[data-testid*="tool-running"],[data-state="running"]') ||
       !!activeTurn?.querySelector?.('[aria-busy="true"]');
     // Use the same composer priority as LiteResumeSender: a hidden textarea
@@ -63,7 +63,12 @@
       d.querySelector('textarea') ||
       d.querySelector('[contenteditable="true"]');
     const draft = editor && String(editor.value || editor.innerText || "").trim().length > 0;
-    const errorText = d.querySelector('[role="alert"],[data-testid*="error"]');
+    // Hidden/sidebar alerts belong to other conversations. Preserve real
+    // top-level toasts and active-chat alerts while rejecting nav previews.
+    const errorText = Array.from(d.querySelectorAll(
+      '[role="alert"],[data-testid*="error"],[data-testid*="toast"]'))
+      .slice(-35).find(n => !n.closest?.(
+        'aside,nav,[role="navigation"],[data-testid="sidebar"]'));
     const alertError = !!errorText &&
       /nie udało się wczytać|failed to load|przerwano|interrupted|przekroczono limit|timed out/i.test(
         String(errorText.textContent || "").slice(-400));
