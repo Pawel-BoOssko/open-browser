@@ -95,7 +95,7 @@ internal sealed partial class ChatGptLiteForm
             var entry = entries.FirstOrDefault(x => x.Url == LiteDevWakeState.NormalizeUrl(url!));
             if (entry is null) { ConfigureCurrentChatWake(); return; }
             entry.Enabled = !entry.Enabled;
-            if (entry.Enabled) entry.DueUtc = DateTimeOffset.UtcNow.AddMinutes(entry.Minutes);
+            if (entry.Enabled) entry.DueUtc = DateTimeOffset.UtcNow.AddMinutes(entry.EffectiveMinutes);
             entry.LastState = entry.Enabled ? "armed" : "paused";
             LiteChatWakeRegistry.Write(entries);
             UpdateMultiWakeStatus();
@@ -132,7 +132,7 @@ internal sealed partial class ChatGptLiteForm
         var intervalLabel = new Label { Text = "Odstęp (15–1440 min):", Left = 15, Top = 60, Width = 180 };
         var interval = new NumericUpDown
         {
-            Minimum = 15, Maximum = 1440, Value = existing?.Minutes ?? 15,
+            Minimum = 15, Maximum = 1440, Value = existing?.EffectiveMinutes ?? 15,
             Left = 205, Top = 58, Width = 90
         };
         var messageLabel = new Label { Text = "Polecenie wysyłane przy wznowieniu:", Left = 15, Top = 98, Width = 450 };
@@ -181,7 +181,7 @@ internal sealed partial class ChatGptLiteForm
                 ? entries.FirstOrDefault(x => x.Url == LiteDevWakeState.NormalizeUrl(url!))
                 : null;
             _devWakeToggle.Text = entry?.Enabled == true
-                ? "Autopraca: WŁ. " + entry.Minutes + "m" : "Autopraca: WYŁ.";
+                ? "Autopraca: WŁ. " + entry.EffectiveMinutes + "m" : "Autopraca: WYŁ.";
             _devWakeStatus.Text = entry is null
                 ? "Bieżący czat: bez wybudzenia | Inne aktywne: " + entries.Count(x => x.Enabled)
                 : (entry.Enabled ? "Następne: " + entry.DueUtc.ToLocalTime().ToString("HH:mm") : "Pauza") +
@@ -892,7 +892,7 @@ internal sealed partial class ChatGptLiteForm
                                     ? "own_draft_visible_ack"
                                     : "own_draft_clicked_unconfirmed";
                                 active.DueUtc = DateTimeOffset.UtcNow.AddMinutes(
-                                    receiptVisible ? active.Minutes : 2);
+                                    receiptVisible ? active.EffectiveMinutes : 2);
                                 LiteChatWakeRegistry.Write(entries);
                             }
                             LiteEventLog.Write("multi_wake_own_draft_recovery",
@@ -905,14 +905,14 @@ internal sealed partial class ChatGptLiteForm
                     {
                         DeferWakeWithoutSend(due.Url, now, preflight.Reason,
                             preflight.Reason == "same_answer_already_woken"
-                                ? due.Minutes : 2);
+                                ? due.EffectiveMinutes : 2);
                         return;
                     }
                     // Durable fingerprint fences uncertain sends: never resend
                     // for an unchanged assistant answer after a crash/restart.
                     due.LastAnswerFingerprint = preflight.Hash;
                     due.LastAttemptUtc = now;
-                    due.DueUtc = now.AddMinutes(due.Minutes);
+                    due.DueUtc = now.AddMinutes(due.EffectiveMinutes);
                     due.LastState = "attempting";
                     due.WakeSequence = checked(due.WakeSequence + 1);
                     LiteChatWakeRegistry.Write(entries);
@@ -1025,7 +1025,7 @@ internal sealed partial class ChatGptLiteForm
                         state, phase, visibleUserBubble = visible,
                         receiptConfirmed = visible, // unique receipt; never match older messages
                         includesNotes = !string.IsNullOrWhiteSpace(_noteStore.Load(key)),
-                        intervalMinutes = due.Minutes
+                        intervalMinutes = due.EffectiveMinutes
                     });
                     state = visible ? "visible_ack" : phase;
                 }

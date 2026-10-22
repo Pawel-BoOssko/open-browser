@@ -33,6 +33,7 @@ Update rule:
 Update this file when the owner/architect accepts, rejects, changes, or clarifies an architecture or project-governance decision.
 
 Latest:
+- 2026-10-22 17:13 CEST: External ChatGPT wake config backward compatibility. Historical builds <=1.72.59 reject Minutes<20 in chat-wakes.dpapi. For newer <=15-minute schedule store legacy `Minutes=Math.Max(20,requested)` and optional `FastMinutes` in 15..19; new versions use `EffectiveMinutes`, old releases ignore FastMinutes and fall back to 20m. Persist sequential wake IDs before interacting with editor and require brief checkpoint to work-status file at every project wake. Do not use ChatGPT built-in scheduling.
 - Source migration from docs/development/decisions.md, journal.md, rules.md is reflected here.
 - This file stores accepted decisions, not discussion transcripts.
 - Newest decisions stay near the top.

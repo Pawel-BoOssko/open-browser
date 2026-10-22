@@ -11,7 +11,14 @@ internal static class LiteChatWakeRegistry
     {
         public string Url { get; set; } = "";
         public bool Enabled { get; set; }
+        // Legacy field: always >=20 so any rollback to v1.72.59 can parse it.
         public int Minutes { get; set; } = 25;
+        // Optional short interval, understood by newer clients only (15..19).
+        // Old clients ignore it and continue with the safe legacy 20m value.
+        public int FastMinutes { get; set; }
+        [System.Text.Json.Serialization.JsonIgnore]
+        public int EffectiveMinutes => FastMinutes is >= 15 and < 20
+            ? FastMinutes : Minutes;
         // Durable per-conversation wake attempt ID. Incremented before sending.
         public long WakeSequence { get; set; }
         public DateTimeOffset DueUtc { get; set; }
@@ -63,7 +70,9 @@ internal static class LiteChatWakeRegistry
             foreach (var c in store.Chats)
             {
                 if (!LiteDevWakeState.IsChatUrl(c.Url) || !urls.Add(c.Url) ||
-                    c.Minutes is < 15 or > 1440 || c.Prompt.Length > 16000 || c.WakeSequence < 0 ||
+                    c.Minutes is < 20 or > 1440 ||
+                    (c.FastMinutes != 0 && c.FastMinutes is < 15 or >= 20) ||
+                    c.Prompt.Length > 16000 || c.WakeSequence < 0 ||
                     (c.LastAnswerFingerprint.Length != 0 &&
                      (c.LastAnswerFingerprint.Length != 64 ||
                       !c.LastAnswerFingerprint.All(Uri.IsHexDigit))))
@@ -77,7 +86,8 @@ internal static class LiteChatWakeRegistry
     internal static void Write(List<Chat> chats)
     {
         if (chats.Count > 48 || chats.Any(c =>
-            !LiteDevWakeState.IsChatUrl(c.Url) || c.Minutes is < 15 or > 1440 ||
+            !LiteDevWakeState.IsChatUrl(c.Url) || c.Minutes is < 20 or > 1440 ||
+            (c.FastMinutes != 0 && c.FastMinutes is < 15 or >= 20) ||
             c.Prompt.Length > 16000 || c.WakeSequence < 0 ||
             (c.LastAnswerFingerprint.Length != 0 &&
              (c.LastAnswerFingerprint.Length != 64 ||
@@ -108,7 +118,8 @@ internal static class LiteChatWakeRegistry
         var entry = chats.FirstOrDefault(c => c.Url == url);
         if (entry is null) { entry = new Chat { Url = url }; chats.Add(entry); }
         entry.Enabled = true;
-        entry.Minutes = minutes;
+        entry.Minutes = Math.Max(20, minutes);
+        entry.FastMinutes = minutes < 20 ? minutes : 0;
         entry.Prompt = prompt;
         entry.DueUtc = now.AddMinutes(minutes);
         entry.LastAnswerFingerprint = ""; // explicit reconfiguration permits one fresh wake
@@ -177,8 +188,13 @@ internal static class LiteChatWakeRegistry
             Configure(list, a, 25, "Renewed project work", now);
             if (list[0].LastAnswerFingerprint != "") return 7;
             Configure(list, a, 15, "Kontynuuj Open Browser Lite", now);
-            if (list[0].Minutes != 15 ||
+            if (list[0].Minutes != 20 || list[0].FastMinutes != 15 ||
+                list[0].EffectiveMinutes != 15 ||
                 list[0].DueUtc != now.AddMinutes(15)) return 8;
+            string wire = JsonSerializer.Serialize(list[0]);
+            if (!wire.Contains("\"Minutes\":20") ||
+                !wire.Contains("\"FastMinutes\":15") ||
+                wire.Contains("EffectiveMinutes")) return 11;
             list[0].WakeSequence = 27;
             string numbered = NumberedMessage(list[0], "",
                 "0123456789abcdef0123456789abcdef");

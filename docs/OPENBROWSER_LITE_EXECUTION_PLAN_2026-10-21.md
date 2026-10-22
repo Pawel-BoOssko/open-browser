@@ -51,3 +51,7 @@ Nie dodawać niepotrzebnych szczegółów do samej wiadomości. Powyższy tekst 
 
 Każdy checkpoint: data/godzina Warszawa, zadanie, aktualne SOURCE/TEST/STAGED/LIVE, wykonana czynność, wynik/test, blokada i precyzyjny next step. W razie przerwania nie twierdzić, że implementacja lub wysyłka się udała. Pojedynczym źródłem statusu jest `docs/OPENBROWSER_LITE_WORK_STATUS_2026-10-21.md`. Wersje i Git tylko przez Autosync.  
 **Ukończenie:** co najmniej dwa naturalne udane wznowienia + jeden stabilny, efektywny mechanizm odchudzania DOM, zaakceptowany UI i test resource soak.
+## 2026-10-22 17:15 CEST: aktualizacja [OB-00034378...]
+- Źródła v1.72.62: 15-min wybudzanie, OB-WAKE-ID, obowiązkowy krótki checkpoint; dodatkowa kompatybilność rollbacku do v1.72.59 poprzez legacy Minutes>=20 i opcjonalny FastMinutes15..19.
+- Testy SatanAMD: 23/23 JS, publish Release PASS (MSB3277), 8/8 EXE, manifest SHA 1db799974e5f37f3999678ffaae17b9fef5d13ff3d395578f03caab2a2b28bf2. LIVE PBOX1 nadal v1.72.59 PID15588, 17:14 Responding=True, proces pokazuje Generowanie.
+- Produkcyjne 15 minut i numery OB-WAKE pozostają NIEWŁĄCZONE do chwili legalnej promocji nowej wersji. Nie próbować obejść wcześniejszej blokady transferu; nie używać ChatGPT Tasks. Najbliższe zadanie: transfer, autoryzowany deploy z rollbackiem, aktualizacja DPAPI, walidacja 1. rzeczywistego budzenia i zapis checkpointu.
