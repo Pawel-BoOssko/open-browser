@@ -96,7 +96,7 @@ internal sealed partial class ChatGptLiteForm : Form
 
         _back.Enabled = false;
         _forward.Enabled = false;
-        _reload.Click += (_, _) => _browser.CoreWebView2?.Reload();
+        _reload.Click += async (_, _) => await ReloadCurrentChatSafelyAsync();
         _home.Click += (_, _) => _browser.CoreWebView2?.Navigate(HomeUrl);
         _openArchive.Click += (_, _) => new LiteArchiveViewer().Show(this);
         _back.Click += (_, _) =>

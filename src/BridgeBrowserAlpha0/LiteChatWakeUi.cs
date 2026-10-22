@@ -792,9 +792,17 @@ internal sealed partial class ChatGptLiteForm
         return true;
     }
 
+    // A persistent visible ChatGPT response error cannot be repaired by
+    // probing the same failed history every two minutes. Preserve the
+    // external scheduler and defer at least one normal 15-minute cycle;
+    // never turn a UI failure into an attempted message resend.
+    internal static int WakeDeferralMinutes(string reason, int requested) =>
+        reason == "response_error" ? Math.Max(requested, 15) : requested;
+
     private void DeferWakeWithoutSend(string url, DateTimeOffset now,
         string reason, int minutes = 2)
     {
+        minutes = WakeDeferralMinutes(reason, minutes);
         var registered = LiteChatWakeRegistry.Read();
         var entry = registered.FirstOrDefault(c => c.Url == url && c.Enabled);
         if (entry is null) return;

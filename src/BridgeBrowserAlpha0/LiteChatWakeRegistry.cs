@@ -252,6 +252,11 @@ internal static class LiteChatWakeRegistry
             if (!numbered.Contains("wake-lifecycle.jsonl") ||
                 !numbered.Contains("chat_started") ||
                 !numbered.Contains("chat_finished")) return 12;
+            if (ChatGptLiteForm.WakeDeferralMinutes("response_error", 2) != 15 ||
+                ChatGptLiteForm.WakeDeferralMinutes("response_error", 20) != 20 ||
+                ChatGptLiteForm.WakeDeferralMinutes("generating", 2) != 2 ||
+                ChatGptLiteForm.WakeDeferralMinutes("backend_http_429", 3) != 3)
+                return 130;
             int modelStatus = LiteModelStatus.SelfTest();
             if (modelStatus != 0) return 110 + modelStatus;
             int ownerQueue = LiteOwnerInterventions.SelfTest();
