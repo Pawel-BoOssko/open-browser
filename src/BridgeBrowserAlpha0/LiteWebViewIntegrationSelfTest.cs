@@ -77,10 +77,12 @@ internal static class LiteWebViewIntegrationSelfTest
                     var navigation = new TaskCompletionSource<bool>(
                         TaskCreationOptions.RunContinuationsAsynchronously);
                     ulong? startedNavigationId = null;
+                    string? startedNavigationUri = null;
                     ulong? completedNavigationId = null;
                     void onStarting(object? sender, CoreWebView2NavigationStartingEventArgs e)
                     {
                         startedNavigationId ??= e.NavigationId;
+                        startedNavigationUri ??= e.Uri;
                     }
                     void onNavigated(object? sender, CoreWebView2NavigationCompletedEventArgs e) {
                         completedNavigationId = e.NavigationId;
@@ -96,6 +98,26 @@ internal static class LiteWebViewIntegrationSelfTest
                     core.NavigationCompleted -= onNavigated;
                     Ensure(success, "local virtual host navigation");
                     phase = "correlated_worker_navigation_completion";
+                    const string navA = "https://chatgpt.com/c/11111111-1111-1111-1111-111111111111";
+                    const string navB = "https://chatgpt.com/c/22222222-2222-2222-2222-222222222222";
+                    Ensure(ChatGptLiteForm.MatchesWorkerNavigationStart(navA, navA),
+                        "matching target chat URI binds the corresponding starting navigation");
+                    Ensure(!ChatGptLiteForm.MatchesWorkerNavigationStart(navA, navB),
+                        "late NavigationStarting from prior chat B cannot bind target chat A");
+                    Ensure(!ChatGptLiteForm.MatchesWorkerNavigationStart(
+                        navA, "https://chatgpt.com/auth/login"),
+                        "authentication redirect cannot certify a chat navigation");
+                    Ensure(!ChatGptLiteForm.MatchesWorkerNavigationStart(
+                        navA, "https://other.example/c/11111111-1111-1111-1111-111111111111"),
+                        "foreign host cannot masquerade as worker chat target");
+                    Ensure(!ChatGptLiteForm.MatchesWorkerNavigationStart(
+                        navA, navA + "?source=sidebar"),
+                        "query-string navigation is not the exact scheduled chat");
+                    Ensure(!ChatGptLiteForm.MatchesWorkerNavigationStart(navA, null),
+                        "missing starting URI never binds navigation identity");
+                    Ensure(startedNavigationUri is not null &&
+                        !ChatGptLiteForm.MatchesWorkerNavigationStart(navA, startedNavigationUri),
+                        "actual offline WebView2 fixture navigation is not a scheduled chat URL");
                     Ensure(startedNavigationId.HasValue && completedNavigationId.HasValue,
                         "actual WebView2 navigation provides starting and completed IDs");
                     Ensure(ChatGptLiteForm.MatchesWorkerNavigationCompletion(
@@ -1046,7 +1068,7 @@ internal static class LiteWebViewIntegrationSelfTest
                         10, 10, new Uri(chatUrl), "about:blank"),
                         "archive rejects non-ChatGPT navigation result");
                     LiteEventLog.Write("webview_integration_selftest", new {
-                        passed = true, checks = 197, offline = true
+                        passed = true, checks = 204, offline = true
                     });
                     code = 0;
                 }

@@ -349,6 +349,18 @@ internal sealed partial class ChatGptLiteForm
             requestedNavigationId.Value == completedNavigationId && isSuccess;
     }
 
+    // A previous or unrelated NavigationStarting event may arrive after
+    // subscription and before our Navigate(url) event. Bind the ID only
+    // to the exact chat URL that the scheduler is trying to visit.
+    internal static bool MatchesWorkerNavigationStart(
+        string requestedChatUrl, string? startingUrl)
+    {
+        return LiteDevWakeState.IsChatUrl(startingUrl) &&
+            string.Equals(
+                LiteDevWakeState.NormalizeUrl(startingUrl!),
+                requestedChatUrl, StringComparison.Ordinal);
+    }
+
     private async Task<bool> NavigateWorkerAsync(string url)
     {
         var core = _chatWakeWorker.CoreWebView2;
@@ -372,11 +384,15 @@ internal sealed partial class ChatGptLiteForm
         }
         var completed = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         ulong? requestedNavigationId = null;
+        bool navigationIssued = false;
         void OnStarting(object? sender, CoreWebView2NavigationStartingEventArgs e)
         {
-            // Subscribe immediately before Navigate. Ignore unrelated prior
-            // completions; do not let a later redirect rebind the request.
-            requestedNavigationId ??= e.NavigationId;
+            // An unrelated older NavigationStarting can be delivered late.
+            // Bind only the URL of this Navigate(url), and ignore redirects
+            // with other paths rather than certifying a foreign conversation.
+            if (navigationIssued && requestedNavigationId is null &&
+                MatchesWorkerNavigationStart(url, e.Uri))
+                requestedNavigationId = e.NavigationId;
         }
         void OnCompleted(object? sender, CoreWebView2NavigationCompletedEventArgs e)
         {
@@ -390,6 +406,7 @@ internal sealed partial class ChatGptLiteForm
         try
         {
             _workerVerifiedChatUrl = null;
+            navigationIssued = true;
             core.Navigate(url);
             var ready = await Task.WhenAny(completed.Task, Task.Delay(45000));
             if (ready != completed.Task || !await completed.Task)
