@@ -21,6 +21,8 @@ internal sealed partial class ChatGptLiteForm
     // Monotonic per-worker route epoch prevents A->B->A during an awaited
     // hydration probe from re-certifying a DOM from an obsolete navigation.
     private long _workerRouteEpoch;
+    // Foreground SPA changes must also invalidate two-step assistant preflight.
+    private long _foregroundWakeRouteEpoch;
     private System.Threading.Mutex? _multiWakeMutex;
     private bool _ownsMultiWakeMutex;
     private readonly WebView2 _chatWakeWorker = new()
@@ -494,12 +496,49 @@ internal sealed partial class ChatGptLiteForm
                 new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
     }
 
+    internal static bool IsPreflightRouteStable(
+        string targetUrl, string? source, long initialEpoch, long currentEpoch)
+    {
+        return IsWorkerRouteStable(targetUrl, source, initialEpoch, currentEpoch);
+    }
+
+    internal static async Task<(LiteChatWakePreflight.Observation? First,
+        LiteChatWakePreflight.Observation? Second, bool Stable)>
+        CaptureStablePreflightAsync(string targetUrl,
+            Func<string?> readSource, Func<long> readEpoch,
+            Func<Task<LiteChatWakePreflight.Observation?>> capture,
+            Func<Task> delay)
+    {
+        // A two-snapshot assistant check is only valid when the navigation
+        // identity remains unchanged across both awaited scripts and delay.
+        long epoch = readEpoch();
+        bool stable() => IsPreflightRouteStable(
+            targetUrl, readSource(), epoch, readEpoch());
+        if (!stable()) return (null, null, false);
+        var first = await capture();
+        if (!stable()) return (null, null, false);
+        await delay();
+        if (!stable()) return (null, null, false);
+        var second = await capture();
+        return stable() ? (first, second, true) : (null, null, false);
+    }
+
     private async Task<(string Reason, string Hash, bool Complete)>
         CheckWorkerPreflightAsync(CoreWebView2 core, string url, string previousHash)
     {
-        var first = await ReadWorkerObservationAsync(core);
-        await Task.Delay(1500);
-        var second = await ReadWorkerObservationAsync(core);
+        bool foreground = ReferenceEquals(core, _browser.CoreWebView2);
+        long epoch() => foreground ? _foregroundWakeRouteEpoch : _workerRouteEpoch;
+        var result = await CaptureStablePreflightAsync(
+            url, () => core.Source, epoch,
+            () => ReadWorkerObservationAsync(core),
+            () => Task.Delay(1500));
+        if (!result.Stable)
+        {
+            LiteEventLog.Write("multi_wake_preflight_navigation_changed",
+                new { foreground, definitelyNotSent = true });
+            return ("navigation_changed", "", false);
+        }
+        var (first, second, _) = result;
         string expectedPath = new Uri(url).AbsolutePath;
         string reason = LiteChatWakePreflight.Eligibility(
             first, second, expectedPath, previousHash);
