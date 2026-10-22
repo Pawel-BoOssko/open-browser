@@ -500,7 +500,8 @@ internal sealed partial class ChatGptLiteForm
         // A committed attempt is NOT synonymous with a clicked Send button.
         // Only explicit no-click states may release the durable answer fence.
         return result.StartsWith("busy_", StringComparison.Ordinal) ||
-            result is "missing_composer" or "invalid" or "already_attempted" ||
+            result is "missing_composer" or "invalid" or "already_attempted" or
+                "blocked_navigation" ||
             (result == "submission_requested" &&
                 (phase == "draft_button_missing" ||
                  phase.StartsWith("blocked_", StringComparison.Ordinal)));
@@ -665,9 +666,12 @@ internal sealed partial class ChatGptLiteForm
                         _noteStore.Load(key));
                     string receipt = Guid.NewGuid().ToString("N");
                     string payload = "[OB-" + receipt + "]\n" + text;
+                    // Bind target identity inside the *same* script invocation
+                    // that injects the prompt. A changed SPA route must not send.
                     string js = "window.__OPENBROWSER_RESUME_SENDER__?.sendDirect(" +
                         JsonSerializer.Serialize(payload) + "," +
-                        JsonSerializer.Serialize(receipt) + ",true)";
+                        JsonSerializer.Serialize(receipt) + ",true," +
+                        JsonSerializer.Serialize(new Uri(due.Url).AbsolutePath) + ")";
                     var result = await ExecuteWorkerScriptAsync(
                         wakeCore, js);
                     state = JsonSerializer.Deserialize<string>(result) ?? "sender_missing";

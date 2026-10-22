@@ -137,6 +137,9 @@ internal static class LiteWebViewIntegrationSelfTest
                     Ensure(!ChatGptLiteForm.IsDefinitelyUnsentWake(
                         "submission_requested", "sender_missing"),
                         "indeterminate sender outcome retains durable fence");
+                    Ensure(ChatGptLiteForm.IsDefinitelyUnsentWake(
+                        "blocked_navigation", "not_submitted"),
+                        "target mismatch before injection releases the durable answer fence");
                     Ensure(!ChatGptLiteForm.IsDefinitelyUnsentWake(
                         "failed_TimeoutException", "not_submitted"),
                         "script timeout cannot be treated as definitely unsent");
@@ -448,10 +451,27 @@ internal static class LiteWebViewIntegrationSelfTest
                         "]\nKontynuuj wyłącznie drugą testową rozmowę.";
                     string directB = "window.__OPENBROWSER_RESUME_SENDER__.sendDirect(" +
                         JsonSerializer.Serialize(payloadB) + "," +
-                        JsonSerializer.Serialize(receiptB) + ",true)";
+                        JsonSerializer.Serialize(receiptB) + ",true," +
+                        JsonSerializer.Serialize(new Uri(otherUrl).AbsolutePath) + ")";
                     Ensure(await EvaluateAsync(core,
                         "window.__OPENBROWSER_RESUME_SENDER__.hasAck('" + receipt + "')") ==
                         "false", "receipt from chat A is absent in chat B");
+                    phase = "host_target_bound_before_draft_injection";
+                    string badTargetJs = "window.__OPENBROWSER_RESUME_SENDER__.sendDirect(" +
+                        JsonSerializer.Serialize(payloadB) + "," +
+                        JsonSerializer.Serialize(receiptB) + ",true," +
+                        JsonSerializer.Serialize(new Uri(chatUrl).AbsolutePath) + ")";
+                    Ensure(await EvaluateAsync(core, badTargetJs) == "blocked_navigation",
+                        "host preflight for chat A cannot write into navigated chat B");
+                    Ensure(await EvaluateAsync(core,
+                        "document.querySelector('#prompt-textarea').innerText") == "",
+                        "wrong target leaves real WebView2 composer untouched");
+                    Ensure(await EvaluateAsync(core,
+                        "window.__OPENBROWSER_RESUME_SENDER__.diagnose().pendingReceipts") == "0",
+                        "wrong target does not retain a pending message body");
+                    Ensure(await EvaluateAsync(core,
+                        "document.querySelectorAll('main [data-user-message-bubble]').length") == "2",
+                        "wrong target cannot insert a new user bubble");
                     await core.ExecuteScriptAsync(
                         "document.querySelector('form[data-chatgpt-composer]').dataset.qaDelayMs='1300'");
                     Ensure(await EvaluateAsync(core, directB) == "submission_requested",
@@ -539,7 +559,7 @@ internal static class LiteWebViewIntegrationSelfTest
                         10, 10, new Uri(chatUrl), "about:blank"),
                         "archive rejects non-ChatGPT navigation result");
                     LiteEventLog.Write("webview_integration_selftest", new {
-                        passed = true, checks = 102, offline = true
+                        passed = true, checks = 107, offline = true
                     });
                     code = 0;
                 }

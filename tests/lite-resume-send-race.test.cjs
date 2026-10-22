@@ -296,6 +296,31 @@ function setup(options = {}) {
 }
 {
   const p = setup();
+  const correct = p.win.location.pathname;
+  const wrong = "/c/99999999-9999-9999-9999-999999999999";
+  assert.equal(p.sender.sendDirect(prompt, id, true, wrong),
+    "blocked_navigation", "wrong host-selected chat cannot inject any draft");
+  assert.equal(p.editor.innerText, "",
+    "rejected target must leave user's composer untouched");
+  assert.equal(p.sender.diagnose().pendingReceipts, 0,
+    "rejected target cannot retain pending payload");
+  assert.equal(p.count(), 0, "cross-chat rejection cannot click Send");
+  assert.equal(p.sender.sendDirect(prompt, id, true, correct),
+    "submission_requested", "failed target guard must not consume receipt");
+  assert.equal(p.sender.submitDirect(id), "click_invoked");
+  assert.equal(p.count(), 1, "exact chat target sends once");
+}
+{
+  const p = setup();
+  const expected = p.win.location.pathname;
+  p.win.location.pathname = "/c/99999999-9999-9999-9999-999999999999";
+  assert.equal(p.sender.sendDirect(prompt, id, true, expected),
+    "blocked_navigation", "SPA changed after preflight blocks new injection");
+  assert.equal(p.editor.innerText, "", "wrong chat keeps its editor untouched");
+  assert.equal(p.count(), 0);
+}
+{
+  const p = setup();
   p.win.location.pathname = "/c/abcdefabcdef%3A123456789012345678901234567890";
   assert.equal(p.sender.sendDirect(prompt, id, true), "submission_requested",
     "encoded colon in ChatGPT conversation ID must allow a wake");
@@ -368,4 +393,4 @@ function setup(options = {}) {
     "evicted oldest pending receipt cannot silently submit");
   assert.equal(p.sender.submitDirect(receipts[0]), "blocked_pending_evicted");
 }
-console.log("LiteResumeSenderRace: 36 PASS");
+console.log("LiteResumeSenderRace: 38 PASS");
