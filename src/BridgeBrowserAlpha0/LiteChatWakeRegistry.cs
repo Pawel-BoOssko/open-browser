@@ -228,6 +228,8 @@ internal static class LiteChatWakeRegistry
             if (!numbered.Contains("wake-lifecycle.jsonl") ||
                 !numbered.Contains("chat_started") ||
                 !numbered.Contains("chat_finished")) return 12;
+            int projectPolicy = LiteProjectRegistry.WakePolicySelfTest();
+            if (projectPolicy != 0) return 100 + projectPolicy;
             int wakeJournal = LiteWakeJournal.SelfTest();
             if (wakeJournal != 0) return 20 + wakeJournal;
             int throttle = LiteHttpReadThrottle.SelfTest();

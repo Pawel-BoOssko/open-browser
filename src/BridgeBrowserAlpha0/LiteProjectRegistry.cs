@@ -14,7 +14,8 @@ internal sealed class LiteProjectRegistry
         public string Id { get; set; } = Guid.NewGuid().ToString("N");
         public string Title { get; set; } = "";
         public string Url { get; set; } = "";
-        public string Role { get; set; } = "worker";
+        // Only lead is permitted to execute. All other chats are archives.
+        public string Role { get; set; } = "archive";
         public DateTimeOffset AddedUtc { get; set; } = DateTimeOffset.UtcNow;
     }
 
@@ -126,8 +127,59 @@ internal sealed class LiteProjectRegistry
         if (!project.Chats.Any(c => c.Id == chatId))
             throw new ArgumentException("Unknown chat");
         foreach (var chat in project.Chats)
-            chat.Role = chat.Id == chatId ? "lead" : "worker";
+            chat.Role = chat.Id == chatId ? "lead" : "archive";
         Save();
+    }
+
+    /// <summary>Fail closed on multiple active executors of one project.</summary>
+    internal static bool CanScheduleProjectLeads(
+        IReadOnlyList<Project> projects, IReadOnlyList<LiteChatWakeRegistry.Chat> wakes)
+    {
+        var mapped = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var project in projects)
+        {
+            var leads = project.Chats.Where(c => c.Role == "lead").ToList();
+            if (leads.Count > 1) return false;
+            foreach (var chat in project.Chats)
+            {
+                if (mapped.TryGetValue(chat.Url, out var owner) && owner != project.Id)
+                    return false;
+                mapped[chat.Url] = project.Id;
+            }
+            if (wakes.Any(w => w.Enabled && project.Chats.Any(c =>
+                c.Url == w.Url && (leads.Count != 1 || leads[0].Url != c.Url))))
+                return false;
+        }
+        return true;
+    }
+
+    internal static int WakePolicySelfTest()
+    {
+        const string a = "https://chatgpt.com/c/11111111-1111-1111-1111-111111111111";
+        const string b = "https://chatgpt.com/c/22222222-2222-2222-2222-222222222222";
+        const string c = "https://chatgpt.com/c/33333333-3333-3333-3333-333333333333";
+        var p1 = new Project { Chats = new List<Chat> {
+            new() { Url=a, Role="lead" }, new() { Url=b, Role="archive" }
+        }};
+        var p2 = new Project { Chats = new List<Chat> {
+            new() { Url=c, Role="lead" }
+        }};
+        var w = new List<LiteChatWakeRegistry.Chat> {
+            new(){ Url=a, Enabled=true }, new(){ Url=c, Enabled=true }
+        };
+        if (!CanScheduleProjectLeads(new[]{p1,p2},w)) return 1;
+        w.Add(new LiteChatWakeRegistry.Chat { Url=b, Enabled=true });
+        if (CanScheduleProjectLeads(new[]{p1,p2},w)) return 2;
+        w.RemoveAt(2);
+        p1.Chats[0].Role="archive";
+        if (CanScheduleProjectLeads(new[]{p1,p2},w)) return 3;
+        p1.Chats[0].Role="lead";
+        p1.Chats[1].Role="lead";
+        if (CanScheduleProjectLeads(new[]{p1,p2},w)) return 4;
+        p1.Chats[1].Role="archive";
+        p2.Chats[0].Url=a;
+        if (CanScheduleProjectLeads(new[]{p1,p2},w)) return 5;
+        return 0;
     }
 
     internal void Save()
