@@ -290,7 +290,12 @@
   function recoveredDraftVisible() {
     return lastRecoveredReceipt !== null && hasAck(lastRecoveredReceipt);
   }
-  function submitOwnDraft() {
+  function submitOwnDraft(expectedPath = null) {
+    // Host-selected recovery has the same chat identity fence as sendDirect.
+    // Never submit a recovered OB draft from a different SPA conversation.
+    if (expectedPath !== null &&
+        (typeof expectedPath !== "string" || w.location.pathname !== expectedPath))
+      return "blocked_navigation";
     if (busy()) return "busy_generating";
     const el = composer();
     if (!el) return "missing_composer";

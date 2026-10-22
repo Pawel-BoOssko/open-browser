@@ -214,6 +214,9 @@ internal static class LiteWebViewIntegrationSelfTest
                     Ensure(!ChatGptLiteForm.IsDefinitelyUnsentWake(
                         "submission_requested", "sender_missing"),
                         "indeterminate sender outcome retains durable fence");
+                    Ensure(!ChatGptLiteForm.IsDefinitelyUnsentWake(
+                        "already_attempted", "not_submitted"),
+                        "same receipt may have been clicked; missing ACK is not proof of no send");
                     Ensure(ChatGptLiteForm.IsDefinitelyUnsentWake(
                         "blocked_navigation", "not_submitted"),
                         "target mismatch before injection releases the durable answer fence");
@@ -694,7 +697,26 @@ internal static class LiteWebViewIntegrationSelfTest
                         "window.__OPENBROWSER_RESUME_PROBE__?.observe()?.text"))
                         .Contains("Zielona latarnia"),
                         "second chat has its distinct assistant answer");
-
+                    phase = "recovered_draft_target_fence";
+                    const string ownDraftReceipt = "0a1b2c3d4e5f60718293a4b5c6d7e8f9";
+                    await core.ExecuteScriptAsync(
+                        "document.querySelector('#prompt-textarea').innerText=" +
+                        JsonSerializer.Serialize("[OB-" + ownDraftReceipt +
+                            "]\nPrzywróć tylko testową rozmowę B."));
+                    Ensure(await EvaluateAsync(core,
+                        "window.__OPENBROWSER_RESUME_SENDER__.submitOwnDraft(" +
+                        JsonSerializer.Serialize(new Uri(chatUrl).AbsolutePath) + ")") ==
+                        "blocked_navigation",
+                        "recovery for chat A must not click chat B's persisted OB draft");
+                    Ensure(await EvaluateAsync(core,
+                        "document.querySelector('#prompt-textarea').innerText.includes('" +
+                        ownDraftReceipt + "')") == "true",
+                        "wrong target recovery leaves chat B draft untouched");
+                    Ensure(await EvaluateAsync(core,
+                        "document.querySelectorAll('main [data-user-message-bubble]').length") ==
+                        "2", "wrong target recovery adds no user message");
+                    await core.ExecuteScriptAsync(
+                        "document.querySelector('#prompt-textarea').innerText=''");
                     // Exercise the SAME host-managed sendDirect + submitDirect
                     // protocol as background waking, not only its URL guard.
                     phase = "background_second_chat_receipt_isolation";
@@ -812,7 +834,7 @@ internal static class LiteWebViewIntegrationSelfTest
                         10, 10, new Uri(chatUrl), "about:blank"),
                         "archive rejects non-ChatGPT navigation result");
                     LiteEventLog.Write("webview_integration_selftest", new {
-                        passed = true, checks = 146, offline = true
+                        passed = true, checks = 150, offline = true
                     });
                     code = 0;
                 }

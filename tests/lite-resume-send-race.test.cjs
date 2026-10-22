@@ -344,6 +344,22 @@ function setup(options = {}) {
     "receipt in user bubble confirms recovered wake delivery");
 }
 {
+  const p = setup({ formButton: true, missingSendButton: true });
+  const target = p.win.location.pathname;
+  p.editor.innerText = "[OB-" + id + "]\n" + prompt;
+  p.win.location.pathname = "/c/99999999-9999-9999-9999-999999999999";
+  assert.equal(p.sender.submitOwnDraft(target), "blocked_navigation",
+    "recovery selected for chat A cannot submit an OB draft after SPA changes to chat B");
+  assert.equal(p.count(), 0, "wrong-chat recovery never clicks Send");
+  assert.equal(p.editor.innerText, "[OB-" + id + "]\n" + prompt,
+    "wrong-chat recovery does not modify the draft or consume its receipt");
+  assert.equal(p.sender.recoveredDraftVisible(), false);
+  p.win.location.pathname = target;
+  assert.equal(p.sender.submitOwnDraft(target), "click_invoked",
+    "matching recovery target still submits its existing OB draft");
+  assert.equal(p.count(), 1, "correct target clicks exactly once");
+}
+{
   const p = setup();
   p.editor.innerText = "Private text of the user";
   assert.equal(p.sender.submitOwnDraft(), "not_own_draft",
@@ -393,4 +409,4 @@ function setup(options = {}) {
     "evicted oldest pending receipt cannot silently submit");
   assert.equal(p.sender.submitDirect(receipts[0]), "blocked_pending_evicted");
 }
-console.log("LiteResumeSenderRace: 38 PASS");
+console.log("LiteResumeSenderRace: 39 PASS (recovery target fence)");

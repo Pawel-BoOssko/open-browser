@@ -610,9 +610,9 @@ internal sealed partial class ChatGptLiteForm
     {
         // A committed attempt is NOT synonymous with a clicked Send button.
         // Only explicit no-click states may release the durable answer fence.
+        // already_attempted MAY have clicked previously; never auto-retry it.
         return result.StartsWith("busy_", StringComparison.Ordinal) ||
-            result is "missing_composer" or "invalid" or "already_attempted" or
-                "blocked_navigation" ||
+            result is "missing_composer" or "invalid" or "blocked_navigation" ||
             (result == "submission_requested" &&
                 (phase == "draft_button_missing" ||
                  phase.StartsWith("blocked_", StringComparison.Ordinal)));
@@ -718,7 +718,8 @@ internal sealed partial class ChatGptLiteForm
                         // A previous attempt may have left OUR unique OB wake
                         // in the editor. Retry only that draft, never user text.
                         var encoded = await ExecuteWorkerScriptAsync(wakeCore,
-                            "window.__OPENBROWSER_RESUME_SENDER__?.submitOwnDraft()");
+                            "window.__OPENBROWSER_RESUME_SENDER__?.submitOwnDraft(" +
+                            JsonSerializer.Serialize(new Uri(due.Url).AbsolutePath) + ")");
                         var recovery = JsonSerializer.Deserialize<string>(encoded)
                             ?? "sender_missing";
                         if (recovery is "click_invoked" or "already_visible")
