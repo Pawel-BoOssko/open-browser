@@ -332,6 +332,60 @@ internal static class LiteWebViewIntegrationSelfTest
                     Ensure(ChatGptLiteForm.CanResumeAfterUnconfirmedRecovery(
                         "armed", "", "ready", nextHash),
                         "ordinary schedules without uncertain recovery keep working");
+                    phase = "terminal_completion_overrides_uncertain_draft";
+                    var terminalOld = new LiteChatWakePreflight.Observation {
+                        Location = recoverPath, Role = "assistant",
+                        Text = "[OPENBROWSER-PLAN-COMPLETE]",
+                        ComposerReady = true, TurnCount = 5,
+                        AssistantNodeCount = 3
+                    };
+                    var terminalNew = new LiteChatWakePreflight.Observation {
+                        Location = recoverPath, Role = "assistant",
+                        Text = terminalOld.Text, ComposerReady = true,
+                        TurnCount = 5, AssistantNodeCount = 3
+                    };
+                    string terminalEligibility = LiteChatWakePreflight.Eligibility(
+                        terminalOld, terminalNew, recoverPath, "");
+                    Ensure(terminalEligibility == "ready" &&
+                        LiteChatWakePreflight.IsCompletion(terminalNew.Text),
+                        "terminal marker only qualifies after stable correct-chat preflight");
+                    Ensure(ChatGptLiteForm.ChooseWakePreflightGate(true,
+                        "own_draft_clicked_unconfirmed", "", "ready", "") ==
+                        ChatGptLiteForm.WakePreflightGate.Complete,
+                        "terminal completion disables schedule despite unknown old fingerprint");
+                    Ensure(ChatGptLiteForm.ChooseWakePreflightGate(true,
+                        "own_draft_clicked_unconfirmed", oldHash, "ready", oldHash) ==
+                        ChatGptLiteForm.WakePreflightGate.Complete,
+                        "verified terminal response also supersedes identical recovery hash");
+                    Ensure(ChatGptLiteForm.ChooseWakePreflightGate(true,
+                        "armed", "", "ready", "") ==
+                        ChatGptLiteForm.WakePreflightGate.Complete,
+                        "normal schedule still stops on verified terminal answer");
+                    Ensure(ChatGptLiteForm.ChooseWakePreflightGate(true,
+                        "own_draft_clicked_unconfirmed", "", "wrong_chat", "") ==
+                        ChatGptLiteForm.WakePreflightGate.HoldUnconfirmedRecovery,
+                        "foreign chat cannot forge terminal completion");
+                    Ensure(ChatGptLiteForm.ChooseWakePreflightGate(false,
+                        "own_draft_clicked_unconfirmed", "", "ready", nextHash) ==
+                        ChatGptLiteForm.WakePreflightGate.HoldUnconfirmedRecovery,
+                        "ordinary answer with unknown baseline must remain fenced");
+                    Ensure(ChatGptLiteForm.ChooseWakePreflightGate(false,
+                        "own_draft_clicked_unconfirmed", oldHash, "ready", oldHash) ==
+                        ChatGptLiteForm.WakePreflightGate.HoldUnconfirmedRecovery,
+                        "ordinary same-answer recovery must not duplicate wake");
+                    Ensure(ChatGptLiteForm.ChooseWakePreflightGate(false,
+                        "own_draft_clicked_unconfirmed", oldHash, "ready", nextHash) ==
+                        ChatGptLiteForm.WakePreflightGate.Continue,
+                        "genuinely new stable reply resumes ordinary schedule");
+                    Ensure(ChatGptLiteForm.ChooseWakePreflightGate(false,
+                        "armed", "", "ready", nextHash) ==
+                        ChatGptLiteForm.WakePreflightGate.Continue,
+                        "unaffected chat remains eligible for normal wake");
+                    Ensure(ChatGptLiteForm.ChooseWakePreflightGate(false,
+                        "own_draft_clicked_unconfirmed", oldHash,
+                        "draft_present", nextHash) ==
+                        ChatGptLiteForm.WakePreflightGate.HoldUnconfirmedRecovery,
+                        "own draft present never permits re-click without completion");
                     Ensure(ChatGptLiteForm.IsDefinitelyUnsentWake(
                         "blocked_navigation", "not_submitted"),
                         "target mismatch before injection releases the durable answer fence");
@@ -965,7 +1019,7 @@ internal static class LiteWebViewIntegrationSelfTest
                         10, 10, new Uri(chatUrl), "about:blank"),
                         "archive rejects non-ChatGPT navigation result");
                     LiteEventLog.Write("webview_integration_selftest", new {
-                        passed = true, checks = 182, offline = true
+                        passed = true, checks = 192, offline = true
                     });
                     code = 0;
                 }

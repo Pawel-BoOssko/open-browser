@@ -608,6 +608,28 @@ internal sealed partial class ChatGptLiteForm
             !string.Equals(priorHash, observedHash, StringComparison.OrdinalIgnoreCase);
     }
 
+    internal enum WakePreflightGate
+    {
+        Continue,
+        HoldUnconfirmedRecovery,
+        Complete
+    }
+
+    internal static WakePreflightGate ChooseWakePreflightGate(
+        bool verifiedComplete, string? priorState, string? priorHash,
+        string preflightReason, string? observedHash)
+    {
+        // A verified terminal response MUST disable its schedule even when
+        // a previous recovery click lacked an ACK or fingerprint. Completion
+        // requires a "ready" two-snapshot preflight in the intended chat.
+        if (verifiedComplete && preflightReason == "ready")
+            return WakePreflightGate.Complete;
+        return CanResumeAfterUnconfirmedRecovery(
+            priorState, priorHash, preflightReason, observedHash)
+                ? WakePreflightGate.Continue
+                : WakePreflightGate.HoldUnconfirmedRecovery;
+    }
+
     internal static string NextStateAfterWakeDeferral(string priorState,
         string reason) =>
         IsUnconfirmedRecoveredDraftState(priorState) ? priorState : "waiting_" + reason;
@@ -734,25 +756,27 @@ internal sealed partial class ChatGptLiteForm
                     var preflight = await CheckWorkerPreflightAsync(
                         wakeCore, due.Url,
                         due.LastAnswerFingerprint);
-                    if (!CanResumeAfterUnconfirmedRecovery(due.LastState,
-                        due.LastAnswerFingerprint, preflight.Reason, preflight.Hash))
-                    {
-                        // Require a PROVEN NEW stable assistant answer, not
-                        // merely "ready" after the old draft disappears. A
-                        // missing previous hash must fail closed after restart.
-                        due.DueUtc = DateTimeOffset.UtcNow.AddMinutes(5);
-                        LiteChatWakeRegistry.Write(entries);
-                        LiteEventLog.Write("multi_wake_own_draft_unconfirmed_held",
-                            new { retryMinutes = 5, clickMayHaveOccurred = true });
-                        UpdateMultiWakeStatus();
-                        return;
-                    }
-                    if (preflight.Complete)
+                    var gate = ChooseWakePreflightGate(
+                        preflight.Complete, due.LastState,
+                        due.LastAnswerFingerprint, preflight.Reason, preflight.Hash);
+                    if (gate == WakePreflightGate.Complete)
                     {
                         due.Enabled = false;
                         due.LastState = "complete";
                         LiteChatWakeRegistry.Write(entries);
                         LiteEventLog.Write("multi_wake_completed");
+                        UpdateMultiWakeStatus();
+                        return;
+                    }
+                    if (gate == WakePreflightGate.HoldUnconfirmedRecovery)
+                    {
+                        // Only verified terminal completion may override the
+                        // recovery fence without the old answer's fingerprint.
+                        // Any ordinary reply must prove a NEW stable answer.
+                        due.DueUtc = DateTimeOffset.UtcNow.AddMinutes(5);
+                        LiteChatWakeRegistry.Write(entries);
+                        LiteEventLog.Write("multi_wake_own_draft_unconfirmed_held",
+                            new { retryMinutes = 5, clickMayHaveOccurred = true });
                         UpdateMultiWakeStatus();
                         return;
                     }
