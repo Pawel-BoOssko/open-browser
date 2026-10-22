@@ -304,6 +304,9 @@
     if (!match) return "not_own_draft";
     lastRecoveredReceipt = match[1];
     if (hasAck(match[1])) return "already_visible";
+    // A previous click can lack a visible React ACK. Never click the same
+    // receipt twice inside one SPA document, even if the draft remains.
+    if (attempted.has(match[1])) return "already_attempted";
     const form = el.closest?.("form") ||
       w.document.querySelector("form[data-chatgpt-composer]");
     const btn = sendButton(el) ||
@@ -311,10 +314,17 @@
       w.document.querySelector('[data-testid="send-button"],button[aria-label="Wyślij"],button[aria-label="Send"],button[aria-label="Send message"]');
     if (!btn || btn.disabled || btn.getAttribute?.("aria-disabled") === "true")
       return "draft_button_missing";
+    // Record the potential click BEFORE invoking UI code: a click handler may
+    // throw after dispatch, so even click_failed is delivery-uncertain.
+    rememberAttempt(match[1]);
+    rememberPhase(match[1], "click_invoked");
     try {
       btn.click();
       return "click_invoked";
-    } catch (_) { return "click_failed"; }
+    } catch (_) {
+      rememberPhase(match[1], "click_failed");
+      return "click_failed";
+    }
   }
   w.__OPENBROWSER_RESUME_SENDER__ = { send, sendDirect, submitDirect,
     submitOwnDraft, recoveredDraftVisible, hasAck, diagnose, phase };

@@ -585,6 +585,16 @@ internal sealed partial class ChatGptLiteForm
         });
     }
 
+    // A recovered OB draft may have clicked but still be present because
+    // React did not expose its user bubble. Its persisted state must fence
+    // any re-click after a process restart or a new SPA document.
+    internal static bool IsUnconfirmedRecoveredDraftState(string? state) =>
+        state == "own_draft_clicked_unconfirmed";
+
+    internal static string NextStateAfterWakeDeferral(string priorState,
+        string reason) =>
+        IsUnconfirmedRecoveredDraftState(priorState) ? priorState : "waiting_" + reason;
+
     private void DeferWakeWithoutSend(string url, DateTimeOffset now,
         string reason, int minutes = 2)
     {
@@ -592,7 +602,10 @@ internal sealed partial class ChatGptLiteForm
         var entry = registered.FirstOrDefault(c => c.Url == url && c.Enabled);
         if (entry is null) return;
         entry.DueUtc = now.AddMinutes(minutes);
-        entry.LastState = "waiting_" + reason;
+        // Backpressure, generation and hydration deferrals are NOT proof
+        // that an earlier own-draft recovery did not click. Keep the
+        // ambiguity marker durable through every unrelated deferral.
+        entry.LastState = NextStateAfterWakeDeferral(entry.LastState, reason);
         LiteChatWakeRegistry.Write(registered);
         LiteEventLog.Write("multi_wake_preflight_skipped", new {
             reason, retryMinutes = minutes, definitelyNotSent = true
@@ -704,6 +717,19 @@ internal sealed partial class ChatGptLiteForm
                     var preflight = await CheckWorkerPreflightAsync(
                         wakeCore, due.Url,
                         due.LastAnswerFingerprint);
+                    if (IsUnconfirmedRecoveredDraftState(due.LastState) &&
+                        preflight.Reason != "ready")
+                    {
+                        // No fresh stable assistant answer has appeared. An
+                        // earlier click may be in-flight; never re-click its
+                        // lingering own draft after timeout, reload or restart.
+                        due.DueUtc = DateTimeOffset.UtcNow.AddMinutes(5);
+                        LiteChatWakeRegistry.Write(entries);
+                        LiteEventLog.Write("multi_wake_own_draft_unconfirmed_held",
+                            new { retryMinutes = 5, clickMayHaveOccurred = true });
+                        UpdateMultiWakeStatus();
+                        return;
+                    }
                     if (preflight.Complete)
                     {
                         due.Enabled = false;
@@ -722,7 +748,8 @@ internal sealed partial class ChatGptLiteForm
                             JsonSerializer.Serialize(new Uri(due.Url).AbsolutePath) + ")");
                         var recovery = JsonSerializer.Deserialize<string>(encoded)
                             ?? "sender_missing";
-                        if (recovery is "click_invoked" or "already_visible")
+                        if (recovery is "click_invoked" or "already_visible" or
+                            "click_failed" or "already_attempted")
                         {
                             // A click is not delivery. Wait briefly for the
                             // unique receipt in a real user message bubble.

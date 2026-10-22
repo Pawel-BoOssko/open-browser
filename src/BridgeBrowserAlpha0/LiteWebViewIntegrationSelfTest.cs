@@ -217,6 +217,26 @@ internal static class LiteWebViewIntegrationSelfTest
                     Ensure(!ChatGptLiteForm.IsDefinitelyUnsentWake(
                         "already_attempted", "not_submitted"),
                         "same receipt may have been clicked; missing ACK is not proof of no send");
+                    Ensure(ChatGptLiteForm.IsUnconfirmedRecoveredDraftState(
+                        "own_draft_clicked_unconfirmed"),
+                        "durable unknown recovery click must block repeated click after restart");
+                    Ensure(!ChatGptLiteForm.IsUnconfirmedRecoveredDraftState(
+                        "own_draft_visible_ack"),
+                        "visible user receipt removes unconfirmed recovery fence");
+                    Ensure(!ChatGptLiteForm.IsUnconfirmedRecoveredDraftState(
+                        "waiting_draft_present"),
+                        "explicitly unsent draft can still attempt first recovery");
+                    Ensure(ChatGptLiteForm.NextStateAfterWakeDeferral(
+                        "own_draft_clicked_unconfirmed", "worker_backpressure") ==
+                        "own_draft_clicked_unconfirmed",
+                        "shared worker cooldown must not erase an uncertain old click");
+                    Ensure(ChatGptLiteForm.NextStateAfterWakeDeferral(
+                        "own_draft_clicked_unconfirmed", "generating") ==
+                        "own_draft_clicked_unconfirmed",
+                        "assistant still generating cannot erase own-draft duplicate fence");
+                    Ensure(ChatGptLiteForm.NextStateAfterWakeDeferral(
+                        "armed", "no_composer") == "waiting_no_composer",
+                        "ordinary no-click deferrals retain existing retry semantics");
                     Ensure(ChatGptLiteForm.IsDefinitelyUnsentWake(
                         "blocked_navigation", "not_submitted"),
                         "target mismatch before injection releases the durable answer fence");
@@ -834,7 +854,7 @@ internal static class LiteWebViewIntegrationSelfTest
                         10, 10, new Uri(chatUrl), "about:blank"),
                         "archive rejects non-ChatGPT navigation result");
                     LiteEventLog.Write("webview_integration_selftest", new {
-                        passed = true, checks = 150, offline = true
+                        passed = true, checks = 156, offline = true
                     });
                     code = 0;
                 }

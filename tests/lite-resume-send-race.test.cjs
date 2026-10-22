@@ -339,6 +339,9 @@ function setup(options = {}) {
   assert.equal(p.count(), 1);
   assert.equal(p.sender.recoveredDraftVisible(), false,
     "click alone cannot confirm delivery");
+  assert.equal(p.sender.submitOwnDraft(), "already_attempted",
+    "lingering own draft after uncertain click cannot click again");
+  assert.equal(p.count(), 1, "same recovered receipt clicks at most once");
   p.showAcknowledgment("[OB-" + id + "]\n" + prompt);
   assert.equal(p.sender.recoveredDraftVisible(), true,
     "receipt in user bubble confirms recovered wake delivery");
@@ -409,4 +412,4 @@ function setup(options = {}) {
     "evicted oldest pending receipt cannot silently submit");
   assert.equal(p.sender.submitDirect(receipts[0]), "blocked_pending_evicted");
 }
-console.log("LiteResumeSenderRace: 39 PASS (recovery target fence)");
+console.log("LiteResumeSenderRace: 40 PASS (durable recovery click fence)");
