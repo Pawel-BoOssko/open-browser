@@ -18,6 +18,23 @@ function Save-Status([string]$state, [string]$details) {
 }
 
 try {
+    # Release guard runs before the ordinary keepalive and can restore prior stable release.
+    $releaseGuard = Join-Path $diagnostics 'lite-release-manager.ps1'
+    $releaseState = Join-Path $diagnostics 'lite-release-state.json'
+    if (Test-Path -LiteralPath $releaseGuard -PathType Leaf) {
+        & $releaseGuard -Mode Watchdog | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            Save-Status 'release_guard_error' ('exit=' + $LASTEXITCODE)
+            return
+        }
+        if (Test-Path -LiteralPath $releaseState) {
+            $s = Get-Content -LiteralPath $releaseState -Raw -Encoding UTF8 | ConvertFrom-Json
+            if ($s.phase -in @('promoting','rolling_back')) {
+                Save-Status 'release_transition' ([string]$s.phase)
+                return
+            }
+        }
+    }
     $existing = @(Get-Process -Name 'BridgeBrowserAlpha0' -ErrorAction SilentlyContinue)
     if ($existing.Count -gt 0) {
         if (@($existing | Where-Object { $_.Responding }).Count -gt 0) {

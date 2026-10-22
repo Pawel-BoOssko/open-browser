@@ -229,3 +229,9 @@ Observed issues to keep visible:
 
 ## 2026-10-18 15:47 | developer-agent | Open Browser Lite | partial
 Observation: testy 8 bezinterfejsowych modułów .NET zakończone exit=0; 26 scenariuszy JavaScript PASS. Nowy planista rezydencji kart i klasyfikator dowodów dostarczenia są w SOURCE, lecz nie sterują jeszcze rzeczywistym WebView2. Domyślne usuwanie DOM w JavaScript ustawiono na opt-in, ale flaga WinForms nadal wymaga uzgodnienia, ponieważ edycja pola została odrzucona przez zabezpieczenia. Nie wdrażać nowego EXE do LIVE bez sprawdzenia zgodności UI i testu React. Wystąpiły równoległe edycje kolejki notatek, chwilowo psujące kompilację; ostatni build Debug PASS. Pełny rejestr blokad: docs/Rejestr nieudanych komend.md.
+
+
+## 2026-10-22 15:34 CEST: odzyskano realne użycie i szybkie wydanie na produkcję
+Właściciel cofnął zakaz naprawy, restartowania i wdrażania z handoffu. Oczekuje wdrażania na PBOX1 ASAP z działającym auto rollback. Produkcja jest narzędziem własnym agenta. Wersja 1.72.58 jest wdrożona i użytkownik potwierdził, że z niej pisze. Inne nadal otwarte problemy: początkowy load error bardzo długiego starego czatu, brak niezależnego realnego background 5–10 E2E, brak >=8h soak v1.72.58. Script rollback + istniejący Keepalive przetestowany ręczną promocją i symulowanym brakiem procesu, wynik PASS.
+
+- 2026-10-22 15:36 CEST: Zgłoszenie właściciela: nadmierna ostrożność wobec restartów i produkcyjnych aktualizacji spowalnia rozwój Open Browser Lite, który jest dedykowanym narzędziem asystenta. Zakaz napraw/deploy z handoffu został wprost cofnięty; nowe testowane wydania wdrażać ASAP. Przeprowadzono LIVE v1.72.58 PBOX1 i potwierdzono działanie trwałego rollbacku (ręcznego i po symulowanym zniknięciu procesu). Otwarty incydent: obecny WebView2 nadal okresowo nie wczytuje czatu mimo Responding=True. Szczegóły w WORK_STATUS 15:36.

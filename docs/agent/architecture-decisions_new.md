@@ -322,3 +322,7 @@ Source evidence:
 
 - Cross-tab communication: unresolved.
 - Watchdog/recovery: unresolved.
+
+
+## 2026-10-22: Open Browser Lite: deployment ASAP z auto rollback, zatwierdzenie właściciela
+Decyzja nadrzędna wobec tymczasowego handoff-only i zakazu restartu z godziny 14:11: **wdrażać najnowsze przetestowane wersje na PBOX1 bez dodatkowego pytania o zgodę**, jeżeli środowisko i narzędzia umożliwiają operację. Deployment jest zwykłym krokiem rozwojowym. Warunek: zachować istniejącą sprawdzoną wersję i profil, trwały skrypt z automatycznym rollback przez zastany Keepalive/Windows Scheduled Task. Nie dodawać niepotrzebnej nowej usługi, harmonogramu ani manual git commit/push. To nie znosi rzeczywistych ograniczeń dostępu ani zabezpieczeń danych. Obserwacja wykonania: LIVE 1.72.58 22.10 15:34 CEST, potwierdzenie użytkownika o wysłaniu wiadomości z nowej aplikacji.
