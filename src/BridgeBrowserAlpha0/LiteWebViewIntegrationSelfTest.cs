@@ -375,6 +375,8 @@ internal static class LiteWebViewIntegrationSelfTest
                     Ensure(await EvaluateAsync(core,
                         "window.__OPENBROWSER_RESUME_SENDER__.hasAck('" + receipt + "')") ==
                         "false", "receipt from chat A is absent in chat B");
+                    await core.ExecuteScriptAsync(
+                        "document.querySelector('form[data-chatgpt-composer]').dataset.qaDelayMs='1300'");
                     Ensure(await EvaluateAsync(core, directB) == "submission_requested",
                         "host prepares a unique wake draft in chat B");
                     Ensure(await EvaluateAsync(core,
@@ -385,7 +387,17 @@ internal static class LiteWebViewIntegrationSelfTest
                         "click_invoked", "host flushes chat B using its composer form");
                     Ensure(await EvaluateAsync(core,
                         "window.__OPENBROWSER_RESUME_SENDER__.hasAck('" + receiptB + "')") ==
+                        "false", "delayed React user bubble is not immediate");
+                    Ensure(await ChatGptLiteForm.WaitForWakeReceiptAsync(core, receiptB),
+                        "host bounded receipt wait observes delayed real user bubble");
+                    Ensure(await EvaluateAsync(core,
+                        "window.__OPENBROWSER_RESUME_SENDER__.hasAck('" + receiptB + "')") ==
                         "true", "second chat has a real unique user-bubble receipt");
+                    Ensure(await EvaluateAsync(core,
+                        "document.querySelectorAll('main [data-user-message-bubble]').length") ==
+                        "3", "delayed ACK polling never triggers duplicate submission");
+                    Ensure(!await ChatGptLiteForm.WaitForWakeReceiptAsync(core, "not-receipt"),
+                        "invalid receipt rejected without touching the renderer");
                     Ensure(await EvaluateAsync(core,
                         "window.__OPENBROWSER_RESUME_SENDER__.diagnose().pendingReceipts") ==
                         "0", "clicked background wake releases the full pending payload");
@@ -450,7 +462,7 @@ internal static class LiteWebViewIntegrationSelfTest
                         10, 10, new Uri(chatUrl), "about:blank"),
                         "archive rejects non-ChatGPT navigation result");
                     LiteEventLog.Write("webview_integration_selftest", new {
-                        passed = true, checks = 83, offline = true
+                        passed = true, checks = 87, offline = true
                     });
                     code = 0;
                 }
@@ -521,8 +533,10 @@ document.querySelector('form[data-chatgpt-composer]').addEventListener('submit',
  const item=document.createElement('div');
  item.setAttribute('data-user-message-bubble','');
  item.textContent=editor.innerText;
- document.querySelector('main').appendChild(item);
  editor.innerText='';
+ const delay=Number(e.currentTarget.dataset.qaDelayMs||0);
+ if (delay>0) setTimeout(()=>document.querySelector('main').appendChild(item),delay);
+ else document.querySelector('main').appendChild(item);
 });
 </script>
 </body></html>

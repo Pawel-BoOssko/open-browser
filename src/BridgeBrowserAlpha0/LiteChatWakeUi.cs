@@ -195,6 +195,42 @@ internal sealed partial class ChatGptLiteForm
         return await execution;
     }
 
+    // After a click, React can append the user bubble asynchronously.
+    // Probe for a bounded interval without EVER submitting the receipt again.
+    // A timed-out renderer gets no subsequent script on this attempt.
+    internal static async Task<bool> WaitForWakeReceiptAsync(
+        CoreWebView2 core, string receipt)
+    {
+        const int totalBudgetMs = 4200;
+        if (receipt.Length != 32 || !receipt.All(c =>
+            c is >= '0' and <= '9' or >= 'a' and <= 'f')) return false;
+        string check = "window.__OPENBROWSER_RESUME_SENDER__?.hasAck(" +
+            JsonSerializer.Serialize(receipt) + ") === true";
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        for (int probe = 0; probe < 8; probe++)
+        {
+            int left = totalBudgetMs - (int)clock.ElapsedMilliseconds;
+            if (left <= 0) break;
+            try
+            {
+                if (await ExecuteWorkerScriptAsync(core, check,
+                    Math.Min(1200, left)) == "true") return true;
+            }
+            catch (TimeoutException)
+            {
+                LiteEventLog.Write("multi_wake_receipt_probe_timeout", new {
+                    probe = probe + 1, elapsedMs = clock.ElapsedMilliseconds
+                });
+                return false;
+            }
+            int pause = Math.Min(400,
+                totalBudgetMs - (int)clock.ElapsedMilliseconds);
+            if (pause <= 0) break;
+            await Task.Delay(pause);
+        }
+        return false;
+    }
+
     private async Task EnsureWakeWorkerAsync()
     {
         if (_chatWakeWorker.CoreWebView2 is not null) return;
@@ -685,13 +721,12 @@ internal sealed partial class ChatGptLiteForm
                         // Do not synthesize Enter or submit an unhydrated form.
                         // The unique receipt was NOT confirmed as submitted.
                     }
-                    // Receipt verification MUST be identical to sender logic:
-                    // current main's USER bubbles only, full [OB-<id>] marker.
-                    // A sidebar preview or assistant quote can never prove delivery.
+                    // Only after a successful submit click: wait briefly
+                    // for React's real USER bubble in this exact chat.
+                    // This never clicks Send a second time.
                     bool visible = state == "submission_requested" &&
-                        await ExecuteWorkerScriptAsync(wakeCore,
-                            "window.__OPENBROWSER_RESUME_SENDER__?.hasAck(" +
-                            JsonSerializer.Serialize(receipt) + ") === true") == "true";
+                        phase is "click_invoked" or "form_submitted" &&
+                        await WaitForWakeReceiptAsync(wakeCore, receipt);
                     if (!visible && IsDefinitelyUnsentWake(state, phase))
                     {
                         entries = LiteChatWakeRegistry.Read();
