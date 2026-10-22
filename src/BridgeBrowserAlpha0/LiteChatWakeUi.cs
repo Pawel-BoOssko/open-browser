@@ -18,6 +18,9 @@ internal sealed partial class ChatGptLiteForm
     // Set only after a full worker navigation and observed chat history.
     // SPA SourceChanged and any full navigation revoke this identity.
     private string? _workerVerifiedChatUrl;
+    // Monotonic per-worker route epoch prevents A->B->A during an awaited
+    // hydration probe from re-certifying a DOM from an obsolete navigation.
+    private long _workerRouteEpoch;
     private System.Threading.Mutex? _multiWakeMutex;
     private bool _ownsMultiWakeMutex;
     private readonly WebView2 _chatWakeWorker = new()
@@ -246,15 +249,22 @@ internal sealed partial class ChatGptLiteForm
             ?? throw new InvalidOperationException("Background WebView2 not initialized");
         await core.AddScriptToExecuteOnDocumentCreatedAsync(script);
         await core.AddScriptToExecuteOnDocumentCreatedAsync(probeScript);
-        core.NavigationStarting += (_, _) => _workerVerifiedChatUrl = null;
+        core.NavigationStarting += (_, _) => {
+            _workerRouteEpoch++;
+            _workerVerifiedChatUrl = null;
+        };
         core.SourceChanged += (_, _) =>
         {
+            _workerRouteEpoch++;
             if (_workerVerifiedChatUrl is not null &&
                 (!LiteDevWakeState.IsChatUrl(core.Source) ||
                  LiteDevWakeState.NormalizeUrl(core.Source) != _workerVerifiedChatUrl))
                 _workerVerifiedChatUrl = null;
         };
-        core.ProcessFailed += (_, _) => _workerVerifiedChatUrl = null;
+        core.ProcessFailed += (_, _) => {
+            _workerRouteEpoch++;
+            _workerVerifiedChatUrl = null;
+        };
         core.Settings.AreDevToolsEnabled = false;
         // Keep worker responsive while loading a real conversation. Switch to
         // Low only once the wake attempt ends and the worker is idle.
@@ -272,22 +282,34 @@ internal sealed partial class ChatGptLiteForm
             LiteDevWakeState.NormalizeUrl(currentSource!) == targetUrl;
     }
 
+    internal static bool IsWorkerRouteStable(string url, string? source,
+        long beforeEpoch, long afterEpoch)
+    {
+        return beforeEpoch == afterEpoch &&
+            VerifiedWorkerMatches(url, source, url);
+    }
+
     internal static async Task<bool> VerifyWorkerHydrationAsync(
         string url, string? verifiedUrl, Func<string?> readSource,
-        Func<Task<string>> probe, Func<string?>? readVerifiedUrl = null)
+        Func<Task<string>> probe, Func<string?>? readVerifiedUrl = null,
+        Func<long>? readEpoch = null)
     {
         // Check both sides of the asynchronous DOM read. A route can change
         // while the WebView2 script is awaiting its result. SourceChanged can
         // also revoke verifiedUrl, even if SPA navigates A->B->A.
+        long beforeEpoch = readEpoch?.Invoke() ?? 0;
         if (!VerifiedWorkerMatches(verifiedUrl, readSource(), url)) return false;
         string result = await probe();
         return result == "true" && VerifiedWorkerMatches(
-            readVerifiedUrl?.Invoke() ?? verifiedUrl, readSource(), url);
+            readVerifiedUrl is null ? verifiedUrl : readVerifiedUrl(),
+            readSource(), url) &&
+            (readEpoch is null || IsWorkerRouteStable(
+                url, readSource(), beforeEpoch, readEpoch()));
     }
 
     internal static async Task<bool> IsWorkerHydratedForChatAsync(
         CoreWebView2 core, string url, string? verifiedUrl,
-        Func<string?>? readVerifiedUrl = null)
+        Func<string?>? readVerifiedUrl = null, Func<long>? readEpoch = null)
     {
         // The current DOM may be from chat A during an SPA route change to B.
         // A matching address/composer/history alone is NOT proof of identity.
@@ -296,7 +318,7 @@ internal sealed partial class ChatGptLiteForm
             return await VerifyWorkerHydrationAsync(
                 url, verifiedUrl, () => core.Source,
                 () => ExecuteWorkerScriptAsync(core, WakeWorkerHydratedScript),
-                readVerifiedUrl);
+                readVerifiedUrl, readEpoch);
         }
         catch (TimeoutException)
         {
@@ -323,7 +345,8 @@ internal sealed partial class ChatGptLiteForm
         try
         {
             if (await IsWorkerHydratedForChatAsync(core, url,
-                _workerVerifiedChatUrl, () => _workerVerifiedChatUrl))
+                _workerVerifiedChatUrl, () => _workerVerifiedChatUrl,
+                () => _workerRouteEpoch))
             {
                 LiteEventLog.Write("multi_wake_worker_reused_hydrated");
                 return true;
@@ -360,6 +383,7 @@ internal sealed partial class ChatGptLiteForm
                 // A composer can render before history, but may never hydrate.
                 // Never type into an empty shell; bound TOTAL attempts to 25 s.
                 hydrationAttempts++;
+                long probeRouteEpoch = _workerRouteEpoch;
                 string found;
                 try
                 {
@@ -379,7 +403,8 @@ internal sealed partial class ChatGptLiteForm
                 {
                     // A SPA can change the worker route while the awaited
                     // history script is running; never certify stale history.
-                    if (!VerifiedWorkerMatches(url, core.Source, url))
+                    if (!IsWorkerRouteStable(url, core.Source,
+                        probeRouteEpoch, _workerRouteEpoch))
                     {
                         LiteEventLog.Write("multi_wake_worker_route_changed_during_probe");
                         return false;

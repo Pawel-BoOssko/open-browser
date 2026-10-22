@@ -274,6 +274,76 @@ internal static class LiteWebViewIntegrationSelfTest
                         "hydrated background chat may be reused without reload");
                     Ensure(!await ChatGptLiteForm.IsWorkerHydratedForChatAsync(core, chatUrl, null),
                         "newly selected URL without verified history cannot reuse worker");
+
+                    phase = "worker_navigation_during_async_hydration";
+                    var heldProbe = new TaskCompletionSource<string>(
+                        TaskCreationOptions.RunContinuationsAsynchronously);
+                    var inFlight = ChatGptLiteForm.VerifyWorkerHydrationAsync(
+                        chatUrl, chatUrl, () => core.Source, () => heldProbe.Task);
+                    Ensure(!inFlight.IsCompleted,
+                        "hydration probe remains pending before route change");
+                    await core.ExecuteScriptAsync(
+                        "history.replaceState({},'', '/c/22222222-2222-2222-2222-222222222222')");
+                    heldProbe.SetResult("true");
+                    Ensure(!await inFlight,
+                        "true DOM probe cannot certify a URL that changed while awaiting");
+                    await core.ExecuteScriptAsync(
+                        "history.replaceState({},'', '/c/11111111-1111-1111-1111-111111111111')");
+                    string? activeVerifiedUrl = chatUrl;
+                    var roundTripProbe = new TaskCompletionSource<string>(
+                        TaskCreationOptions.RunContinuationsAsynchronously);
+                    var roundTrip = ChatGptLiteForm.VerifyWorkerHydrationAsync(
+                        chatUrl, chatUrl, () => core.Source,
+                        () => roundTripProbe.Task, () => activeVerifiedUrl);
+                    Ensure(!roundTrip.IsCompleted,
+                        "same-chat second hydration must await its probe");
+                    await core.ExecuteScriptAsync(
+                        "history.replaceState({},'', '/c/22222222-2222-2222-2222-222222222222')");
+                    activeVerifiedUrl = null; // production SourceChanged invalidates it
+                    await core.ExecuteScriptAsync(
+                        "history.replaceState({},'', '/c/11111111-1111-1111-1111-111111111111')");
+                    roundTripProbe.SetResult("true");
+                    Ensure(!await roundTrip,
+                        "SPA A-B-A must not restore revoked verified worker identity");
+                    Ensure(await ChatGptLiteForm.VerifyWorkerHydrationAsync(
+                        chatUrl, chatUrl, () => core.Source,
+                        () => Task.FromResult("true"), () => chatUrl),
+                        "unchanged verified chat remains reusable");
+                    Ensure(!await ChatGptLiteForm.VerifyWorkerHydrationAsync(
+                        chatUrl, chatUrl, () => core.Source,
+                        () => Task.FromResult("false"), () => chatUrl),
+                        "empty DOM still fails without route changes");
+                    int invalidProbeCount = 0;
+                    Ensure(!await ChatGptLiteForm.VerifyWorkerHydrationAsync(
+                        otherUrl, otherUrl, () => core.Source, () => {
+                            invalidProbeCount++;
+                            return Task.FromResult("true");
+                        }) && invalidProbeCount == 0,
+                        "mismatching source rejects hydration without running JS");
+                    phase = "worker_navigation_epoch_aba_race";
+                    long testRouteEpoch = 7;
+                    var epochProbe = new TaskCompletionSource<string>(
+                        TaskCreationOptions.RunContinuationsAsynchronously);
+                    var awaitingEpoch = ChatGptLiteForm.VerifyWorkerHydrationAsync(
+                        chatUrl, chatUrl, () => core.Source, () => epochProbe.Task,
+                        () => chatUrl, () => testRouteEpoch);
+                    Ensure(!awaitingEpoch.IsCompleted,
+                        "in-flight hydration records current navigation epoch");
+                    testRouteEpoch += 2; // SPA A -> B -> A; URL now unchanged
+                    epochProbe.SetResult("true");
+                    Ensure(!await awaitingEpoch,
+                        "same URL after A-B-A cannot accept an old DOM result");
+                    Ensure(!ChatGptLiteForm.IsWorkerRouteStable(
+                        chatUrl, core.Source, 7, testRouteEpoch),
+                        "route epoch invalidates reused result despite equal source");
+                    Ensure(ChatGptLiteForm.IsWorkerRouteStable(
+                        chatUrl, core.Source, testRouteEpoch, testRouteEpoch),
+                        "unchanged navigation epoch preserves successful hydration");
+                    Ensure(await ChatGptLiteForm.VerifyWorkerHydrationAsync(
+                        chatUrl, chatUrl, () => core.Source,
+                        () => Task.FromResult("true"), () => chatUrl, () => testRouteEpoch),
+                        "verified source with stable epoch remains reusable");
+                    phase = "worker_reuse_same_chat_isolated";
                     Ensure(!ChatGptLiteForm.VerifiedWorkerMatches(
                         chatUrl, otherUrl, chatUrl),
                         "verified worker identity is revoked by a different source");
@@ -559,7 +629,7 @@ internal static class LiteWebViewIntegrationSelfTest
                         10, 10, new Uri(chatUrl), "about:blank"),
                         "archive rejects non-ChatGPT navigation result");
                     LiteEventLog.Write("webview_integration_selftest", new {
-                        passed = true, checks = 107, offline = true
+                        passed = true, checks = 119, offline = true
                     });
                     code = 0;
                 }
