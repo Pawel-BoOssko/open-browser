@@ -26,27 +26,39 @@
     // A single selector returns DOM order and deduplicates nodes matching
     // both old and DIL markers. Avoid repeated whole-document scans and the
     // O(n log n) compareDocumentPosition sort on very long conversations.
-    const parts = main ? Array.from(main.querySelectorAll(
+    // querySelectorAll returns a static, iterable NodeList; do not copy it
+    // into an extra Array just to read its length and traverse it once.
+    const parts = main ? main.querySelectorAll(
       '[data-message-author-role],[data-user-message-bubble],' +
-      '[data-chatgpt-selection-message-id]')) : [];
+      '[data-chatgpt-selection-message-id]') : [];
     const last = parts[parts.length - 1] || null;
     const role = last ? (
       last.getAttribute?.('data-message-author-role') ||
       (last.hasAttribute?.('data-chatgpt-selection-message-id') ? 'assistant' :
         last.hasAttribute?.('data-user-message-bubble') ? 'user' : 'unknown')) :
       'unknown';
-    const text = last && role === "assistant" ?
-      visibleText(last).slice(-8000) : "";
-    // Metadata only: distinguish an empty assistant reply from a stale user
-    // bubble without copying any extra conversation text into diagnostics.
-    const isAssistant = n => n.getAttribute?.('data-message-author-role') === 'assistant' ||
-      n.hasAttribute?.('data-chatgpt-selection-message-id');
-    const isUser = n => n.getAttribute?.('data-message-author-role') === 'user' ||
-      n.hasAttribute?.('data-user-message-bubble');
-    const assistantNodeCount = parts.filter(isAssistant).length;
-    const userNodeCount = parts.filter(isUser).length;
-    const lastAssistant = parts.slice().reverse().find(isAssistant);
-    const lastAssistantChars = visibleText(lastAssistant).length;
+    // Read the message metadata in ONE pass. A long conversation must not
+    // allocate reversed copies or traverse all messages three extra times.
+    // Reuse the newest assistant's text to avoid a second innerText read
+    // (which can force layout on a large React/DIL message subtree).
+    let assistantNodeCount = 0;
+    let userNodeCount = 0;
+    let lastAssistant = null;
+    for (const part of parts) {
+      const oldRole = part.getAttribute?.('data-message-author-role');
+      if (oldRole === 'assistant' ||
+          part.hasAttribute?.('data-chatgpt-selection-message-id')) {
+        assistantNodeCount++;
+        lastAssistant = part;
+      }
+      if (oldRole === 'user' ||
+          part.hasAttribute?.('data-user-message-bubble')) userNodeCount++;
+    }
+    const lastVisible = last && role === 'assistant' ? visibleText(last) : '';
+    const text = lastVisible.slice(-8000);
+    const lastAssistantChars = lastAssistant ?
+      (lastAssistant === last && role === 'assistant' ?
+        lastVisible.length : visibleText(lastAssistant).length) : 0;
     const stop = Array.from(d.querySelectorAll(
       '[data-testid="stop-button"],button[aria-label*="Stop generating"],button[aria-label*="Przerwij generowanie"],button[aria-label="Zatrzymaj"]'))
       .some(button =>

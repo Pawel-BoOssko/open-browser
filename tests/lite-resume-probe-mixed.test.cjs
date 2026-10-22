@@ -124,4 +124,31 @@ function observe(legacy, modern, options = {}) {
     "unhydrated main must not fall back to the sidebar");
   assert.equal(s.turnCount, 0);
 }
-console.log("LiteResumeProbeMixed: 11 PASS");
+{
+  const assistant = node(1, "assistant", true);
+  let expensiveTextReads = 0;
+  Object.defineProperty(assistant, "innerText", {
+    get() { expensiveTextReads++; return "Finished assistant answer"; }
+  });
+  const s = observe([], [assistant]);
+  assert.equal(s.text, "Finished assistant answer");
+  assert.equal(s.lastAssistantChars, "Finished assistant answer".length);
+  assert.equal(expensiveTextReads, 1,
+    "newest assistant innerText is read only once despite two output fields");
+}
+{
+  const assistant = node(1, "assistant", false);
+  const latestUser = node(2, "user", true);
+  let assistantReads = 0;
+  Object.defineProperty(assistant, "innerText", {
+    get() { assistantReads++; return "Previous assistant response"; }
+  });
+  const s = observe([assistant], [latestUser]);
+  assert.equal(s.role, "user");
+  assert.equal(s.assistantNodeCount, 1);
+  assert.equal(s.userNodeCount, 1);
+  assert.equal(s.lastAssistantChars, "Previous assistant response".length);
+  assert.equal(assistantReads, 1,
+    "newest prior assistant length is read without reversed NodeList copies");
+}
+console.log("LiteResumeProbeMixed: 13 PASS");
