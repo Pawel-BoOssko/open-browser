@@ -86,6 +86,19 @@ internal static class LiteWebViewIntegrationSelfTest
                         TimeSpan.FromSeconds(18));
                     core.NavigationCompleted -= onNavigated;
                     Ensure(success, "local virtual host navigation");
+                    phase = "worker_hydration_total_deadline";
+                    Ensure(ChatGptLiteForm.WorkerHistoryProbeBudgetMs(0) == 6500,
+                        "first hydration probe has at most 6.5s budget");
+                    Ensure(ChatGptLiteForm.WorkerHistoryProbeBudgetMs(18500) == 6500,
+                        "script timeout cannot exceed remaining hydration window");
+                    Ensure(ChatGptLiteForm.WorkerHistoryProbeBudgetMs(20000) == 5000,
+                        "script deadline shrinks with the remaining window");
+                    Ensure(ChatGptLiteForm.WorkerHistoryProbeBudgetMs(24999) == 1,
+                        "last hydration probe cannot exceed total 25s window");
+                    Ensure(ChatGptLiteForm.WorkerHistoryProbeBudgetMs(25000) == 0,
+                        "total hydration deadline stops further probe attempts");
+                    Ensure(ChatGptLiteForm.WorkerHistoryProbeBudgetMs(32000) == 0,
+                        "already expired hydration never schedules another script");
                     phase = "check_hydrated_worker";
                     Ensure(await EvaluateAsync(core,
                         ChatGptLiteForm.WakeWorkerHydratedScript) == "true",
@@ -275,7 +288,7 @@ internal static class LiteWebViewIntegrationSelfTest
                         10, 10, new Uri(chatUrl), "about:blank"),
                         "archive rejects non-ChatGPT navigation result");
                     LiteEventLog.Write("webview_integration_selftest", new {
-                        passed = true, checks = 38, offline = true
+                        passed = true, checks = 44, offline = true
                     });
                     code = 0;
                 }

@@ -229,6 +229,14 @@ internal sealed partial class ChatGptLiteForm
         }
     }
 
+    internal static int WorkerHistoryProbeBudgetMs(long elapsedMs)
+    {
+        // A single broken chat must not occupy the shared worker for
+        // 35 separate 6.5-second renderer timeouts.
+        if (elapsedMs < 0 || elapsedMs >= 25000) return 0;
+        return (int)Math.Min(6500L, 25000L - elapsedMs);
+    }
+
     private async Task<bool> NavigateWorkerAsync(string url)
     {
         var core = _chatWakeWorker.CoreWebView2;
@@ -248,16 +256,36 @@ internal sealed partial class ChatGptLiteForm
             core.Navigate(url);
             var ready = await Task.WhenAny(completed.Task, Task.Delay(45000));
             if (ready != completed.Task || !await completed.Task) return false;
-            for (int i = 0; i < 35; i++)
+            var hydrationClock = System.Diagnostics.Stopwatch.StartNew();
+            int hydrationAttempts = 0;
+            while (true)
             {
+                int remaining = WorkerHistoryProbeBudgetMs(hydrationClock.ElapsedMilliseconds);
+                if (remaining <= 0) break;
                 if (core.Source is null ||
                     !LiteDevWakeState.IsChatUrl(core.Source) ||
                     LiteDevWakeState.NormalizeUrl(core.Source) != url) return false;
-                // A composer can render before the selected conversation
-                // has loaded. Never type into a shell with zero chat turns.
-                string found = await ExecuteWorkerScriptAsync(core, WakeWorkerHydratedScript);
+                // A composer can render before history, but may never hydrate.
+                // Never type into an empty shell; bound TOTAL attempts to 25 s.
+                hydrationAttempts++;
+                string found;
+                try
+                {
+                    found = await ExecuteWorkerScriptAsync(
+                        core, WakeWorkerHydratedScript, remaining);
+                }
+                catch (TimeoutException)
+                {
+                    LiteEventLog.Write("multi_wake_history_probe_timeout", new {
+                        elapsedMs = hydrationClock.ElapsedMilliseconds,
+                        attempts = hydrationAttempts, waitBudgetMs = 25000
+                    });
+                    return false; // Do not queue another script on a hung renderer.
+                }
                 if (found == "true") return true;
-                await Task.Delay(700);
+                int pause = Math.Min(700,
+                    WorkerHistoryProbeBudgetMs(hydrationClock.ElapsedMilliseconds));
+                if (pause > 0) await Task.Delay(pause);
             }
             // Metadata-only diagnostic for app shell rendered without history.
             try
@@ -280,6 +308,8 @@ internal sealed partial class ChatGptLiteForm
                     var v = parsed.RootElement;
                     LiteEventLog.Write("multi_wake_history_not_ready", new {
                         domWaitSeconds = 25,
+                        hydrationAttempts,
+                        elapsedMs = hydrationClock.ElapsedMilliseconds,
                         bodyChars = v.GetProperty("bodyChars").GetInt32(),
                         mainCount = v.GetProperty("mainCount").GetInt32(),
                         chatTurns = v.GetProperty("chatTurns").GetInt32(),
@@ -294,7 +324,10 @@ internal sealed partial class ChatGptLiteForm
             catch (Exception ex)
             {
                 LiteEventLog.Write("multi_wake_history_not_ready", new {
-                    domWaitSeconds = 25, diagnosticError = ex.GetType().Name
+                    domWaitSeconds = 25,
+                    hydrationAttempts,
+                    elapsedMs = hydrationClock.ElapsedMilliseconds,
+                    diagnosticError = ex.GetType().Name
                 });
             }
             return false;
