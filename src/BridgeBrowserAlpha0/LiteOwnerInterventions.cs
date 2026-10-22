@@ -87,6 +87,35 @@ internal static class LiteOwnerInterventions
     internal static void DispatchWithClassicOutlook(string status, string id,
         string project)
     {
+        // Explicit enablement is required after a REAL mail profile is verified.
+        // Merely having Outlook.exe installed is insufficient (PBOX1 currently
+        // has a classic MAPI profile with zero configured accounts).
+        string config = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "OpenBrowser", "ChatGPT-Lite", "owner-mail.json");
+        bool enabled = false;
+        try
+        {
+            if (File.Exists(config))
+            {
+                using var json = JsonDocument.Parse(File.ReadAllBytes(config));
+                enabled = json.RootElement.TryGetProperty("enabled", out var v) &&
+                    v.ValueKind == JsonValueKind.True &&
+                    json.RootElement.TryGetProperty("transport", out var t) &&
+                    t.GetString() == "classic-outlook";
+            }
+        }
+        catch (Exception ex)
+        {
+            LiteEventLog.Write("owner_email_config_invalid",
+                new { errorType = ex.GetType().Name });
+        }
+        if (!enabled)
+        {
+            LiteEventLog.Write("owner_email_not_configured",
+                new { reason = "verified_mail_transport_required" });
+            return;
+        }
         // Never interfere with the foreground ChatGPT WebView2 thread.
         var thread = new Thread(() => AttemptOutlook(status, id, project))
         { IsBackground = true, Name = "OB-Lite-Owner-Mail" };
