@@ -459,6 +459,17 @@ internal sealed partial class ChatGptLiteForm
         return !useForeground && !gate.MayProbe(now);
     }
 
+    internal static bool IsDefinitelyUnsentWake(string result, string phase)
+    {
+        // A committed attempt is NOT synonymous with a clicked Send button.
+        // Only explicit no-click states may release the durable answer fence.
+        return result.StartsWith("busy_", StringComparison.Ordinal) ||
+            result is "missing_composer" or "invalid" or "already_attempted" ||
+            (result == "submission_requested" &&
+                (phase == "draft_button_missing" ||
+                 phase.StartsWith("blocked_", StringComparison.Ordinal)));
+    }
+
     private async Task PollAllChatWakesAsync()
     {
         if (!_multiWakeEnabled || !_ownsMultiWakeMutex ||
@@ -611,8 +622,7 @@ internal sealed partial class ChatGptLiteForm
                     var result = await ExecuteWorkerScriptAsync(
                         wakeCore, js);
                     state = JsonSerializer.Deserialize<string>(result) ?? "sender_missing";
-                    if (state.StartsWith("busy_", StringComparison.Ordinal) ||
-                        state is "missing_composer" or "invalid" or "already_attempted")
+                    if (IsDefinitelyUnsentWake(state, "not_submitted"))
                     {
                         // Confirmed no editor submission: release the answer fence,
                         // unlike an unacknowledged click where outcome is uncertain.
@@ -675,16 +685,31 @@ internal sealed partial class ChatGptLiteForm
                         // Do not synthesize Enter or submit an unhydrated form.
                         // The unique receipt was NOT confirmed as submitted.
                     }
-                    bool visible = false;
-                    if (state == "submission_requested")
+                    // Receipt verification MUST be identical to sender logic:
+                    // current main's USER bubbles only, full [OB-<id>] marker.
+                    // A sidebar preview or assistant quote can never prove delivery.
+                    bool visible = state == "submission_requested" &&
+                        await ExecuteWorkerScriptAsync(wakeCore,
+                            "window.__OPENBROWSER_RESUME_SENDER__?.hasAck(" +
+                            JsonSerializer.Serialize(receipt) + ") === true") == "true";
+                    if (!visible && IsDefinitelyUnsentWake(state, phase))
                     {
-                        string snippet = "[OB-" + receipt + "]";
-                        string check = "Array.from(document.querySelectorAll('" +
-                            "[data-user-message-bubble],[data-message-author-role=\\\"user\\\"]'))" +
-                            ".slice(-6).some(x => String(x.innerText || x.textContent || '').includes(" +
-                            JsonSerializer.Serialize(snippet) + "))";
-                        visible = await ExecuteWorkerScriptAsync(
-                            wakeCore, check) == "true";
+                        entries = LiteChatWakeRegistry.Read();
+                        var unsent = entries.FirstOrDefault(x => x.Url == due.Url);
+                        if (unsent is not null && unsent.Enabled &&
+                            unsent.LastAttemptUtc == now)
+                        {
+                            unsent.LastAnswerFingerprint = "";
+                            unsent.DueUtc = DateTimeOffset.UtcNow.AddMinutes(2);
+                            unsent.LastState = "waiting_" + phase;
+                            LiteChatWakeRegistry.Write(entries);
+                        }
+                        LiteEventLog.Write("multi_wake_definitely_unsent", new {
+                            reason = phase, definitelyNotSent = true,
+                            retryMinutes = 2
+                        });
+                        UpdateMultiWakeStatus();
+                        return;
                     }
                     LiteEventLog.Write("multi_wake_send", new {
                         state, phase, visibleUserBubble = visible,

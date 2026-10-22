@@ -99,6 +99,31 @@ internal static class LiteWebViewIntegrationSelfTest
                         "total hydration deadline stops further probe attempts");
                     Ensure(ChatGptLiteForm.WorkerHistoryProbeBudgetMs(32000) == 0,
                         "already expired hydration never schedules another script");
+                    phase = "wake_delivery_uncertainty_fence";
+                    Ensure(ChatGptLiteForm.IsDefinitelyUnsentWake(
+                        "busy_generating", "not_submitted"),
+                        "preflight busy never counts as a delivery attempt");
+                    Ensure(ChatGptLiteForm.IsDefinitelyUnsentWake(
+                        "missing_composer", "not_submitted"),
+                        "missing composer releases the answer fence");
+                    Ensure(ChatGptLiteForm.IsDefinitelyUnsentWake(
+                        "submission_requested", "draft_button_missing"),
+                        "unsubmitted own draft retries without a 20-minute stall");
+                    Ensure(ChatGptLiteForm.IsDefinitelyUnsentWake(
+                        "submission_requested", "blocked_navigation"),
+                        "SPA route change cannot preserve a no-click answer fence");
+                    Ensure(ChatGptLiteForm.IsDefinitelyUnsentWake(
+                        "submission_requested", "blocked_editor_changed"),
+                        "modified editor cannot become an assumed send");
+                    Ensure(!ChatGptLiteForm.IsDefinitelyUnsentWake(
+                        "submission_requested", "click_invoked"),
+                        "clicked but missing ACK remains uncertain");
+                    Ensure(!ChatGptLiteForm.IsDefinitelyUnsentWake(
+                        "submission_requested", "sender_missing"),
+                        "indeterminate sender outcome retains durable fence");
+                    Ensure(!ChatGptLiteForm.IsDefinitelyUnsentWake(
+                        "failed_TimeoutException", "not_submitted"),
+                        "script timeout cannot be treated as definitely unsent");
                     phase = "background_worker_circuit_breaker";
                     var workerGate = new LiteRendererBackpressure();
                     var now = DateTimeOffset.UtcNow;
@@ -409,7 +434,7 @@ internal static class LiteWebViewIntegrationSelfTest
                         10, 10, new Uri(chatUrl), "about:blank"),
                         "archive rejects non-ChatGPT navigation result");
                     LiteEventLog.Write("webview_integration_selftest", new {
-                        passed = true, checks = 70, offline = true
+                        passed = true, checks = 78, offline = true
                     });
                     code = 0;
                 }
