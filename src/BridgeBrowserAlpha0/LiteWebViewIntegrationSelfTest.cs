@@ -185,6 +185,33 @@ internal static class LiteWebViewIntegrationSelfTest
                         core, chatUrl, null),
                         "return after SPA route change needs fresh verified navigation");
                     const string receipt = "1234567890abcdef1234567890abcdef";
+                    phase = "ack_scoped_to_active_main_user_bubbles";
+                    await core.ExecuteScriptAsync("""
+                        (() => {
+                          const aside=document.querySelector('aside');
+                          aside.setAttribute('data-user-message-bubble','');
+                          aside.textContent='[OB-1234567890abcdef1234567890abcdef] Sidebar preview';
+                          const n=document.createElement('div');
+                          n.id='qa-assistant-quote';
+                          n.setAttribute('data-chatgpt-selection-message-id','qa-quote');
+                          n.textContent='I saw [OB-1234567890abcdef1234567890abcdef] in a quoted answer';
+                          document.querySelector('main').appendChild(n);
+                        })()
+                        """);
+                    Ensure(await EvaluateAsync(core,
+                        "window.__OPENBROWSER_RESUME_SENDER__.hasAck('" + receipt + "')") ==
+                        "false", "sidebar marker and assistant quote cannot spoof ACK");
+                    await core.ExecuteScriptAsync("""
+                        (() => {
+                          const a=document.querySelector('aside');
+                          a.removeAttribute('data-user-message-bubble');
+                          a.textContent='Background spinner';
+                          document.getElementById('qa-assistant-quote').remove();
+                        })()
+                        """);
+                    Ensure(await EvaluateAsync(core,
+                        "window.__OPENBROWSER_RESUME_SENDER__.hasAck('" + receipt + "')") ==
+                        "false", "no receipt before a real user message");
                     var js = "window.__OPENBROWSER_RESUME_SENDER__?.send(" +
                         JsonSerializer.Serialize("Napisz ósmy rozdział tej testowej książki.") +
                         "," + JsonSerializer.Serialize(receipt) + ")";
@@ -382,7 +409,7 @@ internal static class LiteWebViewIntegrationSelfTest
                         10, 10, new Uri(chatUrl), "about:blank"),
                         "archive rejects non-ChatGPT navigation result");
                     LiteEventLog.Write("webview_integration_selftest", new {
-                        passed = true, checks = 68, offline = true
+                        passed = true, checks = 70, offline = true
                     });
                     code = 0;
                 }

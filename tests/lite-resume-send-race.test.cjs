@@ -368,4 +368,4 @@ function setup(options = {}) {
     "evicted oldest pending receipt cannot silently submit");
   assert.equal(p.sender.submitDirect(receipts[0]), "blocked_pending_evicted");
 }
-console.log("LiteResumeSenderRace: 33 PASS");
+console.log("LiteResumeSenderRace: 36 PASS");
