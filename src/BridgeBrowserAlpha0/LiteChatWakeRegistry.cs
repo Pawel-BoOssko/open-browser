@@ -150,8 +150,12 @@ internal static class LiteChatWakeRegistry
         string body = Message(entry, notes);
         string marker = "[OB-" + receipt + "] [OB-WAKE-" +
             entry.WakeSequence.ToString("D6") + "]";
-        bool project = body.Contains("Open Browser Lite", StringComparison.OrdinalIgnoreCase) ||
-            body.Contains(@"D:\projects\open-browser", StringComparison.OrdinalIgnoreCase);
+        // Project-only work instructions must be selected from the configured
+        // schedule, NEVER from user notes attached to an unrelated chat.
+        bool project = entry.Prompt.Contains("Open Browser Lite",
+                StringComparison.OrdinalIgnoreCase) ||
+            entry.Prompt.Contains(@"D:\projects\open-browser",
+                StringComparison.OrdinalIgnoreCase);
         if (project)
             body += "\n\nOBOWIĄZKOWY CHECKPOINT [OB-WAKE-" +
                 entry.WakeSequence.ToString("D6") +
@@ -218,6 +222,9 @@ internal static class LiteChatWakeRegistry
             list[1].WakeSequence = 2;
             if (NumberedMessage(list[1], "", "0123456789abcdef0123456789abcdef")
                 .Contains("OBOWIĄZKOWY CHECKPOINT")) return 10;
+            if (NumberedMessage(list[1], "W notatkach padło Open Browser Lite",
+                    "0123456789abcdef0123456789abcdef")
+                .Contains("OBOWIĄZKOWY CHECKPOINT")) return 13;
             if (!numbered.Contains("wake-lifecycle.jsonl") ||
                 !numbered.Contains("chat_started") ||
                 !numbered.Contains("chat_finished")) return 12;
