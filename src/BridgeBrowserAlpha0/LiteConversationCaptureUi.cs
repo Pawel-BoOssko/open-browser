@@ -14,6 +14,28 @@ internal sealed partial class ChatGptLiteForm
     };
     private bool _archiveEnabled = true;
     private bool _capturePending;
+    private Task<string>? _captureTask;
+    private long _captureEpoch;
+
+    private void ResetCaptureForNewLocation()
+    {
+        // A hung script belongs to the old document and must not block
+        // snapshots for a newly selected chat. Late completions cannot write.
+        _captureEpoch++;
+        _captureTask = null;
+        _capturePending = false;
+    }
+
+    internal static bool IsArchiveResultCurrent(long startedEpoch,
+        long currentEpoch, Uri startedUri, string? currentSource)
+    {
+        if (startedEpoch != currentEpoch ||
+            !Uri.TryCreate(currentSource, UriKind.Absolute, out var liveUri))
+            return false;
+        return string.Equals(liveUri.GetLeftPart(UriPartial.Path),
+            startedUri.GetLeftPart(UriPartial.Path),
+            StringComparison.OrdinalIgnoreCase);
+    }
 
     private void InitializeCapture()
     {
@@ -37,33 +59,34 @@ internal sealed partial class ChatGptLiteForm
     private async Task CaptureVisibleAnswersAsync()
     {
         var core = _browser.CoreWebView2;
-        if (!_archiveEnabled || _capturePending || core is null) return;
+        if (!_archiveEnabled || _capturePending ||
+            _captureTask is { IsCompleted: false } || core is null) return;
         if (!Uri.TryCreate(core.Source, UriKind.Absolute, out var uri) ||
             uri.Host != "chatgpt.com" ||
             !(uri.AbsolutePath.StartsWith("/c/", StringComparison.OrdinalIgnoreCase) ||
               uri.AbsolutePath.StartsWith("/g/", StringComparison.OrdinalIgnoreCase))) return;
 
         _capturePending = true;
-        bool timedOut = false;
+        long epoch = _captureEpoch;
         try
         {
             var call = core.ExecuteScriptAsync(
                 "window.__OPENBROWSER_LITE_SNAPSHOT__ ? JSON.stringify(window.__OPENBROWSER_LITE_SNAPSHOT__.collect()) : null");
+            _captureTask = call;
             if (await Task.WhenAny(call, Task.Delay(7000)) != call)
             {
-                timedOut = true;
                 LiteEventLog.Write("archive_probe_timeout");
-                // Do not await a hung renderer on the UI path or start another probe.
-                _ = call.ContinueWith(t =>
-                {
-                    _ = t.Exception;
-                    _capturePending = false;
-                }, CancellationToken.None, TaskContinuationOptions.None,
-                    TaskScheduler.FromCurrentSynchronizationContext());
+                // Remain single-flight for this document, but never await
+                // indefinitely. Observe eventual exceptions off the UI thread.
+                _ = call.ContinueWith(t => { _ = t.Exception; },
+                    CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted,
+                    TaskScheduler.Default);
                 return;
             }
             string result = await call;
-            if (!_archiveEnabled || IsDisposed) return;
+            if (!_archiveEnabled || IsDisposed ||
+                !IsArchiveResultCurrent(epoch, _captureEpoch, uri, core.Source))
+                return;
             string? json = JsonSerializer.Deserialize<string>(result);
             if (string.IsNullOrWhiteSpace(json)) return;
             using var document = JsonDocument.Parse(json);
@@ -88,7 +111,14 @@ internal sealed partial class ChatGptLiteForm
         }
         finally
         {
-            if (!timedOut) _capturePending = false;
+            // An old page's finished probe must not clear a new page's
+            // pending flag or overwrite the current in-flight task.
+            if (epoch == _captureEpoch)
+            {
+                _capturePending = false;
+                if (_captureTask is { IsCompleted: true })
+                    _captureTask = null;
+            }
         }
     }
 }

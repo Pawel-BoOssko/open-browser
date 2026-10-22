@@ -205,6 +205,7 @@ internal sealed partial class ChatGptLiteForm : Form
                 _domProbeTask = null;
                 _pruneProbeTask = null;
                 _responseProbeTask = null;
+                ResetCaptureForNewLocation();
                 _status.Text = "Ładowanie...";
                 LiteEventLog.Write("navigation_start", new { host = LiteEventLog.HostOnly(e.Uri) });
             };
@@ -217,7 +218,11 @@ internal sealed partial class ChatGptLiteForm : Form
                 if (e.IsSuccess) _ = ApplyHardPruneModeAsync();
             };
             core.HistoryChanged += (_, _) => UpdateNavigation();
-            core.SourceChanged += (_, _) => { SwitchNotesForUrl(core.Source); UpdateMultiWakeStatus(); };
+            core.SourceChanged += (_, _) => {
+                ResetCaptureForNewLocation();
+                SwitchNotesForUrl(core.Source);
+                UpdateMultiWakeStatus();
+            };
             core.ProcessFailed += (_, e) =>
             {
                 LiteEventLog.Write("webview_process_failed", new

@@ -260,8 +260,22 @@ internal static class LiteWebViewIntegrationSelfTest
                         "window.__OPENBROWSER_RESUME_PROBE__?.observe()?.text"))
                         .Contains("Czarny kompas"),
                         "original answer returns without cross-chat contamination");
+
+                    phase = "archive_cross_navigation_fence";
+                    Ensure(ChatGptLiteForm.IsArchiveResultCurrent(
+                        10, 10, new Uri(chatUrl), chatUrl),
+                        "archive accepts same chat and same navigation epoch");
+                    Ensure(!ChatGptLiteForm.IsArchiveResultCurrent(
+                        10, 11, new Uri(chatUrl), chatUrl),
+                        "archive rejects stale script after navigation");
+                    Ensure(!ChatGptLiteForm.IsArchiveResultCurrent(
+                        10, 10, new Uri(chatUrl), otherUrl),
+                        "archive rejects a completed script from another chat");
+                    Ensure(!ChatGptLiteForm.IsArchiveResultCurrent(
+                        10, 10, new Uri(chatUrl), "about:blank"),
+                        "archive rejects non-ChatGPT navigation result");
                     LiteEventLog.Write("webview_integration_selftest", new {
-                        passed = true, checks = 34, offline = true
+                        passed = true, checks = 38, offline = true
                     });
                     code = 0;
                 }
