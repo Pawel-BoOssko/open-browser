@@ -2,9 +2,40 @@
   "use strict";
   if (w.__OPENBROWSER_RESUME_SENDER__) return;
   if (!w.document || w.location.hostname !== "chatgpt.com") return;
+  // Bounded metadata: long-lived SPA documents must not accumulate receipts
+  // and old pending message bodies indefinitely.
+  const MAX_RECEIPTS = 128;
+  const MAX_PENDING = 8;
+  const PENDING_LIFETIME_MS = 15 * 60 * 1000;
   const attempted = new Set();
-  const phases = new Map(); // receipt -> prepared / clicked / blocked; no message text stored
-  const directPending = new Map(); // receipt -> {editor,path}, never store message text
+  const phases = new Map(); // receipt -> latest phase, no message text
+  const directPending = new Map(); // receipt -> current editor/path/payload, briefly
+  function rememberAttempt(id) {
+    attempted.add(id);
+    while (attempted.size > MAX_RECEIPTS)
+      attempted.delete(attempted.values().next().value);
+  }
+  function rememberPhase(id, value) {
+    phases.set(id, value);
+    while (phases.size > MAX_RECEIPTS)
+      phases.delete(phases.keys().next().value);
+  }
+  function forgetDirect(id, result) {
+    directPending.delete(id);
+    rememberPhase(id, result);
+    return result;
+  }
+  function expireDirectPending() {
+    const now = Date.now();
+    for (const [id, item] of directPending) {
+      if (now - item.createdAt >= PENDING_LIFETIME_MS)
+        forgetDirect(id, "blocked_pending_expired");
+    }
+    while (directPending.size >= MAX_PENDING) {
+      const id = directPending.keys().next().value;
+      forgetDirect(id, "blocked_pending_evicted");
+    }
+  }
   const samePayload = (value, payload) => String(value || "")
     .replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim() ===
       String(payload).replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim();
