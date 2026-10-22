@@ -200,6 +200,7 @@ internal sealed partial class ChatGptLiteForm : Form
 
             core.NavigationStarting += (_, e) =>
             {
+                _foregroundWakeRouteEpoch++;
                 // A new document is allowed a fresh DOM probe, even if a
                 // previous document left an unresolved ExecuteScriptAsync.
                 _domProbeTask = null;
@@ -219,12 +220,14 @@ internal sealed partial class ChatGptLiteForm : Form
             };
             core.HistoryChanged += (_, _) => UpdateNavigation();
             core.SourceChanged += (_, _) => {
+                _foregroundWakeRouteEpoch++;
                 ResetCaptureForNewLocation();
                 SwitchNotesForUrl(core.Source);
                 UpdateMultiWakeStatus();
             };
             core.ProcessFailed += (_, e) =>
             {
+                _foregroundWakeRouteEpoch++;
                 LiteEventLog.Write("webview_process_failed", new
                 {
                     kind = e.ProcessFailedKind.ToString(),

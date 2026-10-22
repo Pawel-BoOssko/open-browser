@@ -115,6 +115,83 @@ internal static class LiteWebViewIntegrationSelfTest
                         "total hydration deadline stops further probe attempts");
                     Ensure(ChatGptLiteForm.WorkerHistoryProbeBudgetMs(32000) == 0,
                         "already expired hydration never schedules another script");
+                    phase = "two_snapshot_preflight_route_fence";
+                    const string preflightA =
+                        "https://chatgpt.com/c/11111111-1111-1111-1111-111111111111";
+                    const string preflightB =
+                        "https://chatgpt.com/c/22222222-2222-2222-2222-222222222222";
+                    string simulatedSource = preflightA;
+                    long simulatedEpoch = 5;
+                    int captures = 0;
+                    var observation = new LiteChatWakePreflight.Observation {
+                        Location = "/c/11111111-1111-1111-1111-111111111111",
+                        Role = "assistant", Text = "Completed",
+                        ComposerReady = true, TurnCount = 4, AssistantNodeCount = 2
+                    };
+                    Task<LiteChatWakePreflight.Observation?> readObservation() {
+                        captures++;
+                        return Task.FromResult<LiteChatWakePreflight.Observation?>(observation);
+                    }
+                    var stablePreflight = await ChatGptLiteForm.CaptureStablePreflightAsync(
+                        preflightA, () => simulatedSource, () => simulatedEpoch,
+                        readObservation, () => Task.CompletedTask);
+                    Ensure(stablePreflight.Stable && captures == 2,
+                        "stable chat history accepts exactly two observations");
+                    Ensure(LiteChatWakePreflight.Eligibility(
+                        stablePreflight.First, stablePreflight.Second,
+                        observation.Location, "") == "ready",
+                        "stable preflight still permits a completed unchanged assistant answer");
+                    captures = 0;
+                    simulatedSource = preflightB;
+                    var wrongPreflight = await ChatGptLiteForm.CaptureStablePreflightAsync(
+                        preflightA, () => simulatedSource, () => simulatedEpoch,
+                        readObservation, () => Task.CompletedTask);
+                    Ensure(!wrongPreflight.Stable && captures == 0,
+                        "different chat is rejected before any script execution");
+                    simulatedSource = preflightA;
+                    captures = 0;
+                    var pendingSnapshot = new TaskCompletionSource<LiteChatWakePreflight.Observation?>(
+                        TaskCreationOptions.RunContinuationsAsynchronously);
+                    var duringFirst = ChatGptLiteForm.CaptureStablePreflightAsync(
+                        preflightA, () => simulatedSource, () => simulatedEpoch,
+                        () => { captures++; return pendingSnapshot.Task; },
+                        () => Task.CompletedTask);
+                    Ensure(!duringFirst.IsCompleted && captures == 1,
+                        "preflight starts one bounded asynchronous DOM observation");
+                    simulatedSource = preflightB;
+                    simulatedEpoch++;
+                    pendingSnapshot.SetResult(observation);
+                    Ensure(!(await duringFirst).Stable && captures == 1,
+                        "navigation during first observation prevents a second script");
+                    simulatedSource = preflightA;
+                    captures = 0;
+                    long beforeAba = simulatedEpoch;
+                    var abaPreflight = await ChatGptLiteForm.CaptureStablePreflightAsync(
+                        preflightA, () => simulatedSource, () => simulatedEpoch,
+                        readObservation, () => {
+                            simulatedEpoch += 2; // route A -> B -> A; same final URL
+                            return Task.CompletedTask;
+                        });
+                    Ensure(!abaPreflight.Stable && captures == 1,
+                        "A-B-A navigation during 1.5s delay cannot certify old answer");
+                    Ensure(!ChatGptLiteForm.IsPreflightRouteStable(
+                        preflightA, simulatedSource, beforeAba, simulatedEpoch),
+                        "same URL with changed epoch is not a stable preflight");
+                    captures = 0;
+                    var secondPending = new TaskCompletionSource<LiteChatWakePreflight.Observation?>(
+                        TaskCreationOptions.RunContinuationsAsynchronously);
+                    var duringSecond = ChatGptLiteForm.CaptureStablePreflightAsync(
+                        preflightA, () => simulatedSource, () => simulatedEpoch,
+                        () => {
+                            captures++;
+                            return captures == 1 ? readObservation() : secondPending.Task;
+                        }, () => Task.CompletedTask);
+                    Ensure(!duringSecond.IsCompleted,
+                        "second observation remains pending during navigation");
+                    simulatedEpoch += 2;
+                    secondPending.SetResult(observation);
+                    Ensure(!(await duringSecond).Stable,
+                        "route A-B-A during second snapshot cannot confirm an old response");
                     phase = "wake_delivery_uncertainty_fence";
                     Ensure(ChatGptLiteForm.IsDefinitelyUnsentWake(
                         "busy_generating", "not_submitted"),
@@ -656,7 +733,7 @@ internal static class LiteWebViewIntegrationSelfTest
                         10, 10, new Uri(chatUrl), "about:blank"),
                         "archive rejects non-ChatGPT navigation result");
                     LiteEventLog.Write("webview_integration_selftest", new {
-                        passed = true, checks = 127, offline = true
+                        passed = true, checks = 136, offline = true
                     });
                     code = 0;
                 }
