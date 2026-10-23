@@ -314,6 +314,15 @@ internal static class LiteChatWakeRegistry
                 ChatGptLiteForm.DescribeActivityLine(
                     "{\"utc\":\"2026-10-23T11:20:29Z\",\"actor\":\"chat\"}") is not null)
                 return 151;
+            var probeDelayed = new DateTimeOffset(2026, 10, 23, 11, 20, 0,
+                TimeSpan.Zero);
+            if (ChatGptLiteForm.ResponseProbeIsStalled(null,
+                    probeDelayed.AddMinutes(3)) ||
+                ChatGptLiteForm.ResponseProbeIsStalled(probeDelayed,
+                    probeDelayed.AddSeconds(34)) ||
+                !ChatGptLiteForm.ResponseProbeIsStalled(probeDelayed,
+                    probeDelayed.AddSeconds(35)))
+                return 152;
             int keepalivePauseTest = LiteKeepalivePause.SelfTest();
             if (keepalivePauseTest != 0) return 155 + keepalivePauseTest;
             int noteIsolation = LiteChatNotes.SelfTest();

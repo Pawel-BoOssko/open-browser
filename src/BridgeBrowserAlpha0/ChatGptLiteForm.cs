@@ -285,6 +285,7 @@ internal sealed partial class ChatGptLiteForm : Form
                 _responseProbeGeneration++;
                 _responseProbePending = false;
                 _responseProbeTask = null;
+                _responseProbeDelayedSinceUtc = null;
                 _lastGenerationSignal = false;
                 _lastResponseFailure = "";
                 _responseFailureSinceUtc = null;

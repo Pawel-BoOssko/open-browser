@@ -15,6 +15,15 @@ internal sealed partial class ChatGptLiteForm
     private DateTimeOffset? _responseFailureSinceUtc;
     private DateTimeOffset _lastFailureObservationUtc;
     private bool _lastGenerationSignal;
+    private DateTimeOffset? _responseProbeDelayedSinceUtc;
+    private DateTimeOffset _lastResponseProbeStalledEventUtc;
+
+    // Keep one outstanding renderer request, but do not leave a stale
+    // "Generowanie" label indefinitely if that request never completes.
+    internal static bool ResponseProbeIsStalled(
+        DateTimeOffset? delayedSinceUtc, DateTimeOffset nowUtc) =>
+        delayedSinceUtc.HasValue &&
+        nowUtc - delayedSinceUtc.Value >= TimeSpan.FromSeconds(35);
 
     private async Task InstallResponseDiagnosticsAsync(CoreWebView2 core)
     {
@@ -38,8 +47,41 @@ internal sealed partial class ChatGptLiteForm
     private async Task PollResponseDiagnosticsAsync()
     {
         var core = _browser.CoreWebView2;
-        if (core is null || _responseProbePending ||
-            _responseProbeTask is { IsCompleted: false }) return;
+        if (core is null || _responseProbePending) return;
+        if (_responseProbeTask is { IsCompleted: false })
+        {
+            var nowUtc = DateTimeOffset.UtcNow;
+            if (ResponseProbeIsStalled(_responseProbeDelayedSinceUtc, nowUtc))
+            {
+                if (!_status.Text.StartsWith("ChatGPT:", StringComparison.Ordinal) &&
+                    !_status.Text.StartsWith("Błąd procesu strony", StringComparison.Ordinal))
+                    _status.Text = "Renderer: brak odpowiedzi na odczyt";
+                Text = "Open Browser Lite | Renderer opóźniony | " +
+                    LiteBuildInfo.Display();
+                if (nowUtc - _lastResponseProbeStalledEventUtc > TimeSpan.FromMinutes(2))
+                {
+                    _lastResponseProbeStalledEventUtc = nowUtc;
+                    LiteEventLog.Write("response_probe_still_pending", new {
+                        durationSeconds = (int)(nowUtc -
+                            _responseProbeDelayedSinceUtc!.Value).TotalSeconds,
+                        anotherProbeStarted = false
+                    });
+                }
+            }
+            return;
+        }
+        if (_responseProbeDelayedSinceUtc is DateTimeOffset delayedSince)
+        {
+            bool succeeded = _responseProbeTask?.IsCompletedSuccessfully == true;
+            LiteEventLog.Write("response_probe_late_completion", new {
+                elapsedSeconds = (int)(DateTimeOffset.UtcNow - delayedSince).TotalSeconds,
+                succeeded
+            });
+            _responseProbeDelayedSinceUtc = null;
+            // A delayed probe's result may be stale. The next fresh probe
+            // will supply the correct generation/error signal.
+            UpdateTaskbarTitle(_lastGenerationSignal, _lastResponseFailure);
+        }
         if (!Uri.TryCreate(core.Source, UriKind.Absolute, out var uri) ||
             uri.Host != "chatgpt.com") return;
         _responseProbePending = true;
@@ -54,6 +96,7 @@ internal sealed partial class ChatGptLiteForm
             var winner = await Task.WhenAny(query, Task.Delay(8000));
             if (winner != query)
             {
+                _responseProbeDelayedSinceUtc = DateTimeOffset.UtcNow;
                 LiteEventLog.Write("response_probe_delayed", new { beyondMs = 8000 });
                 // Never keep the Windows UI await hanging. An unfinished
                 // ExecuteScriptAsync stays tracked, so no second call piles up.
