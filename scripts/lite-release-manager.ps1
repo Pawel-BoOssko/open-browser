@@ -115,9 +115,50 @@ try{
   if($s){Log ('STATE='+$s.phase+' candidate='+[IO.Path]::GetFileName((Split-Path $s.candidateExe -Parent)))}else{Log 'NO_RELEASE_STATE'}
   exit 0
  }
+ if($Mode -eq 'QueueNextStart'){
+  # Non-disruptive promotion: never stop a running browser. Only the already
+  # installed Keepalive (no new task) can start this candidate after the
+  # current browser exits normally. Guard validates it and owns rollback.
+  $s=Load
+  if($s -and $s.phase -in @('promoting','rolling_back','queued','trial')){
+   throw 'Another release transition is active'
+  }
+  if(-not(Test-Path -LiteralPath $staged -PathType Leaf)){throw 'Candidate executable missing'}
+  $hash=[BitConverter]::ToString([Security.Cryptography.SHA256]::Create().ComputeHash(
+    [IO.File]::ReadAllBytes($staged))).Replace('-','').ToLowerInvariant()
+  if($hash -ne $expectedSha){throw 'Candidate SHA-256 mismatch'}
+  $shell=New-Object -ComObject WScript.Shell
+  $previous=$shell.CreateShortcut($shortcut).TargetPath
+  if(-not(Test-Path -LiteralPath $previous -PathType Leaf) -or $previous -eq $staged){
+   throw 'Current installed release missing or same as candidate'
+  }
+  $running=@(Get-CimInstance Win32_Process -Filter "name='BridgeBrowserAlpha0.exe'")
+  if(@($running|Where-Object {$_.ExecutablePath -ne $previous}).Count -or
+     $running.Count -ne 1){
+   throw 'Queue requires exactly one verified current browser process'
+  }
+  $queuedAt=(Get-Date).ToUniversalTime().ToString('o')
+  $s=[pscustomobject]@{
+   phase='queued';candidateExe=$staged;candidateSha=$expectedSha
+   previousExe=$previous;startedUtc=$queuedAt;updatedUtc=$queuedAt
+   badPolls=0;reason='';lastHealthyUtc=$null;candidatePid=0
+   cleanCloseRestarts=0;waitingToStartSinceUtc=$null
+   previousPid=[int]$running[0].ProcessId
+  }
+  Save $s
+  try{
+   SetTarget $staged
+   Log 'NEXT_START_QUEUED_CURRENT_PROCESS_UNTOUCHED'
+  }catch{
+   Log ('NEXT_START_QUEUE_FAILED='+$_.Exception.GetType().Name)
+   Rollback $s 'queue_failed'
+   throw
+  }
+  exit 0
+ }
  if($Mode -eq 'Promote'){
   $s=Load
-  if($s -and $s.phase -in @('promoting','rolling_back')){throw 'Previous release transition is unresolved'}
+  if($s -and $s.phase -in @('promoting','rolling_back','queued')){throw 'Previous release transition is unresolved'}
   # A healthy trial may become the rollback target of the next verified build.
   # Keep its state snapshot before replacing the current release transaction.
   if($s -and $s.phase -eq 'trial'){
@@ -156,6 +197,62 @@ try{
  if(-not $s){Log 'NO_RELEASE_TO_WATCH';exit 0}
  if($Mode -eq 'Rollback'){Rollback $s 'manual_requested';exit 0}
  if($s.phase -eq 'rolled_back'){exit 0}
+ if($s.phase -eq 'queued'){
+  # Verification is read-only while the existing old browser is running.
+  # At the next natural exit Keepalive launches the already selected shortcut.
+  $shell=New-Object -ComObject WScript.Shell
+  $actualTarget=$shell.CreateShortcut($shortcut).TargetPath
+  if($actualTarget -ne [string]$s.candidateExe -or
+     -not(Test-Path -LiteralPath $s.candidateExe -PathType Leaf)){
+   Rollback $s 'queued_target_changed';exit 0
+  }
+  $actualSha=[BitConverter]::ToString([Security.Cryptography.SHA256]::Create().ComputeHash(
+    [IO.File]::ReadAllBytes($s.candidateExe))).Replace('-','').ToLowerInvariant()
+  if($actualSha -ne [string]$s.candidateSha){
+   Rollback $s 'queued_sha_mismatch';exit 0
+  }
+  $all=@(Get-CimInstance Win32_Process -Filter "name='BridgeBrowserAlpha0.exe'")
+  $new=@($all|Where-Object {$_.ExecutablePath -eq $s.candidateExe})
+  $old=@($all|Where-Object {$_.ExecutablePath -eq $s.previousExe})
+  if(@($all|Where-Object {$_.ExecutablePath -ne $s.candidateExe -and
+                              $_.ExecutablePath -ne $s.previousExe}).Count -gt 0 -or
+     $new.Count -gt 1 -or ($new.Count -gt 0 -and $old.Count -gt 0)){
+   Rollback $s 'queued_unexpected_process';exit 0
+  }
+  if($new.Count -eq 1){
+   $candidate=Get-Process -Id $new[0].ProcessId -ErrorAction SilentlyContinue
+   if($candidate -and $candidate.Responding -and $candidate.MainWindowHandle -ne 0){
+    $s.candidatePid=[int]$candidate.Id
+    $s.phase='trial';$s.lastHealthyUtc=(Get-Date).ToUniversalTime().ToString('o')
+    $s.updatedUtc=$s.lastHealthyUtc;Save $s
+    Log ('QUEUED_CANDIDATE_ADOPTED pid='+$candidate.Id)
+   }else{
+    $s.badPolls=[int]$s.badPolls+1;Save $s
+    if($s.badPolls -ge 2){Rollback $s 'queued_candidate_unresponsive'}
+   }
+   exit 0
+  }
+  if($old.Count -gt 0){exit 0} # current chat left running, no interference
+  if(-not $s.waitingToStartSinceUtc){
+   # Do not activate the new release after a crash or forced stop.
+   # Only a recent, exact-PID, post-queue graceful window close qualifies.
+   $oldClose=[pscustomobject]@{
+    candidatePid=[int]$s.previousPid
+    lastHealthyUtc=[string]$s.startedUtc
+   }
+   if(-not (HasRecentTrialCleanClose $oldClose $root)){
+    Rollback $s 'queued_previous_missing_without_graceful_close'
+    exit 0
+   }
+   $s |Add-Member -NotePropertyName waitingToStartSinceUtc -NotePropertyValue (
+      (Get-Date).ToUniversalTime().ToString('o')) -Force
+   Save $s;Log 'QUEUED_WAIT_KEEPALIVE_NEXT_START';exit 0
+  }
+  $age=([datetime]::UtcNow -
+     ([datetimeoffset]::Parse([string]$s.waitingToStartSinceUtc)).UtcDateTime).TotalSeconds
+  if($age -gt 420){Rollback $s 'queued_candidate_did_not_start'}
+  exit 0
+ }
  if($s.phase -eq 'promoting'){
   $age=([datetime]::UtcNow-[datetime]$s.startedUtc).TotalSeconds
   if($age -gt 90){Rollback $s 'stale_promoting_state'}
