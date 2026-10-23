@@ -5,6 +5,9 @@ param([switch]$DryRun)
 $ErrorActionPreference = 'Stop'
 $diagnostics = Join-Path $env:LOCALAPPDATA 'OpenBrowser\ChatGPT-Lite\diagnostics'
 $statusFile = Join-Path $diagnostics 'lite-keepalive-status.json'
+# File presence is a deliberate user pause, including if JSON is truncated.
+# Manual launch via Start Menu remains possible while Keepalive is paused.
+$pauseFile = Join-Path $diagnostics 'keepalive-paused.json'
 
 function Save-Status([string]$state, [string]$details) {
     [System.IO.Directory]::CreateDirectory($diagnostics) | Out-Null
@@ -18,6 +21,13 @@ function Save-Status([string]$state, [string]$details) {
 }
 
 try {
+    # First-class owner opt-out. Do not run the release guard or relaunch
+    # anything while the owner has requested quiet time (e.g., a meeting).
+    # A manual start of the browser can later clear this marker with Resume.
+    if (Test-Path -LiteralPath $pauseFile -PathType Leaf) {
+        Save-Status 'paused_by_user' 'Keepalive, release guard and auto-restart suppressed'
+        return
+    }
     # Release guard runs before the ordinary keepalive and can restore prior stable release.
     $releaseGuard = Join-Path $diagnostics 'lite-release-manager.ps1'
     $releaseState = Join-Path $diagnostics 'lite-release-state.json'

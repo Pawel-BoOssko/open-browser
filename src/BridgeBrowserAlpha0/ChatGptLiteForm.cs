@@ -104,11 +104,12 @@ internal sealed partial class ChatGptLiteForm : Form
         var advancedPanel = new FlowLayoutPanel
         {
             FlowDirection = FlowDirection.TopDown, WrapContents = false,
-            Width = 225, Height = 240, Padding = new Padding(6)
+            Width = 225, Height = 302, Padding = new Padding(6)
         };
         foreach (var control in new Control[] {
             _technicalInfoButton, _devWakePin, _resumeToggle,
-            _domToggle, _hardPruneToggle, _archiveToggle
+            _domToggle, _hardPruneToggle, _archiveToggle,
+            _openArchive, _domInfo
         })
         {
             control.Width = 205;
@@ -123,7 +124,8 @@ internal sealed partial class ChatGptLiteForm : Form
             advanced.Show(advancedButton, new Point(0, advancedButton.Height));
         navigationRow.Controls.AddRange(new Control[] {
             _back, _forward, _reload, _home, _chatWakeConfigure,
-            _devWakeToggle, _openArchive, _inspectorToggle, advancedButton, _domInfo
+            _devWakeToggle, _keepalivePauseButton, _inspectorToggle,
+            advancedButton
         });
         toolbar.Controls.Add(overviewRow, 0, 0);
         toolbar.Controls.Add(navigationRow, 0, 1);
@@ -133,6 +135,7 @@ internal sealed partial class ChatGptLiteForm : Form
             Orientation = Orientation.Vertical,
             Size = new Size(1150, 750)
         };
+        content.FixedPanel = FixedPanel.Panel1;
         content.Panel1MinSize = 205;
         content.Panel2MinSize = 400;
         content.SplitterDistance = 270;
@@ -144,6 +147,7 @@ internal sealed partial class ChatGptLiteForm : Form
             Orientation = Orientation.Vertical,
             Size = new Size(1200, 780)
         };
+        workspace.FixedPanel = FixedPanel.Panel2;
         workspace.Panel1MinSize = 660;
         workspace.Panel2MinSize = 225;
         workspace.SplitterDistance = 900;
@@ -160,6 +164,7 @@ internal sealed partial class ChatGptLiteForm : Form
         Controls.Add(workspace);
         Controls.Add(toolbar);
 
+        InitializeKeepalivePauseUi();
         _back.Enabled = false;
         _forward.Enabled = false;
         _reload.Click += async (_, _) => await ReloadCurrentChatSafelyAsync();

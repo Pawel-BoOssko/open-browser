@@ -15,7 +15,13 @@ internal sealed partial class ChatGptLiteForm
             RestoreWindow();
             new LiteArchiveViewer().Show(this);
         });
-        menu.Items.Add("Zamknij aplikację", null, (_, _) => Close());
+        menu.Items.Add("Wstrzymaj autostart i zamknij", null, (_, _) =>
+            PauseAndClose());
+        menu.Items.Add("Wznów autostart", null, (_, _) =>
+        {
+            if (LiteKeepalivePause.IsPaused()) ToggleKeepalivePause();
+        });
+        menu.Items.Add("Zamknij aplikację (bez pauzy)", null, (_, _) => Close());
         _tray = new NotifyIcon
         {
             Icon = Icon,

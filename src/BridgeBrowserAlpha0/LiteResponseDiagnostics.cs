@@ -134,7 +134,7 @@ internal sealed partial class ChatGptLiteForm
                 if (failure.Length > 0)
                     _status.Text = "ChatGPT: " + failure + " (dostarczenie niepotwierdzone)";
                 else if (_status.Text.StartsWith("ChatGPT:", StringComparison.Ordinal))
-                    _status.Text = "Gotowe";
+                    _status.Text = generating ? "Generowanie..." : "Gotowe";
             }
             // The UI may retain a hidden stale error or may truly have a
             // failed answer despite repeated successful history GETs. Record
@@ -159,6 +159,9 @@ internal sealed partial class ChatGptLiteForm
                 });
                 _lastGenerationSignal = generating;
                 UpdateTaskbarTitle(generating, failure);
+                if (failure.Length == 0 &&
+                    !_status.Text.StartsWith("Błąd procesu strony", StringComparison.Ordinal))
+                    _status.Text = generating ? "Generowanie..." : "Gotowe";
             }
         }
         catch (Exception ex)
