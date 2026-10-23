@@ -1051,7 +1051,7 @@ internal sealed partial class ChatGptLiteForm
                     string receipt = Guid.NewGuid().ToString("N");
                     LiteWakeJournal.Write("attempt_reserved", due.WakeSequence, receipt);
                     string payload = LiteChatWakeRegistry.NumberedMessage(
-                        due, _noteStore.Load(key), receipt);
+                        due, _noteStore.Load(key), receipt, DateTimeOffset.UtcNow);
                     // Bind target identity inside the *same* script invocation
                     // that injects the prompt. A changed SPA route must not send.
                     string js = "window.__OPENBROWSER_RESUME_SENDER__?.sendDirect(" +

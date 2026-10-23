@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -274,6 +275,22 @@ internal static class LiteChatWakeRegistry
             if (!numbered.Contains("wake-lifecycle.jsonl") ||
                 !numbered.Contains("chat_started") ||
                 !numbered.Contains("chat_finished")) return 12;
+            // Every wake carries an engine-generated absolute timestamp that
+            // the model must repeat as the first line of its answer.
+            var summerUtc = new DateTimeOffset(2026, 10, 23, 8, 41, 12, TimeSpan.Zero);
+            var summer = NumberedMessage(list[0], "", "0123456789abcdef0123456789abcdef",
+                summerUtc);
+            if (!summer.Contains("WYBUDZENIE URUCHOMIONE: 2026-10-23 10:41:12 +02:00") ||
+                !summer.Contains("UTC 2026-10-23 08:41:12") ||
+                !summer.Contains("Napisz datę i godzinę.") ||
+                !summer.Contains("DATA I GODZINA WYBUDZENIA: 2026-10-23 10:41:12 +02:00"))
+                return 14;
+            var winterUtc = new DateTimeOffset(2026, 11, 2, 8, 41, 12, TimeSpan.Zero);
+            var winter = NumberedMessage(list[1], "", "0123456789abcdef0123456789abcdef",
+                winterUtc);
+            if (!winter.Contains("WYBUDZENIE URUCHOMIONE: 2026-11-02 09:41:12 +01:00") ||
+                !winter.Contains("DATA I GODZINA WYBUDZENIA: 2026-11-02 09:41:12 +01:00"))
+                return 15;
             if (ChatGptLiteForm.WakeDeferralMinutes("response_error", 2) != 15 ||
                 ChatGptLiteForm.WakeDeferralMinutes("response_error", 20) != 20 ||
                 ChatGptLiteForm.WakeDeferralMinutes("generating", 2) != 2 ||
