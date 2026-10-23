@@ -116,11 +116,10 @@ try{
   exit 0
  }
  if($Mode -eq 'QueueNextStart'){
-  # Non-disruptive promotion: never stop a running browser. Only the already
-  # installed Keepalive (no new task) can start this candidate after the
-  # current browser exits normally. Guard validates it and owns rollback.
+  # Non-disruptive promotion: never stop a running browser. Only existing
+  # Keepalive may start candidate after current browser exits normally.
   $s=Load
-  if($s -and $s.phase -in @('promoting','rolling_back','queued','trial')){
+  if($s -and $s.phase -in @('promoting','rolling_back','queued')){
    throw 'Another release transition is active'
   }
   if(-not(Test-Path -LiteralPath $staged -PathType Leaf)){throw 'Candidate executable missing'}
@@ -136,6 +135,17 @@ try{
   if(@($running|Where-Object {$_.ExecutablePath -ne $previous}).Count -or
      $running.Count -ne 1){
    throw 'Queue requires exactly one verified current browser process'
+  }
+  # A proven healthy trial may itself be the rollback target of a newer
+  # queued build. Archive its complete earlier rollback chain first.
+  if($s -and $s.phase -eq 'trial'){
+   if($previous -ne [string]$s.candidateExe -or
+      -not (Get-Process -Id $running[0].ProcessId -ErrorAction SilentlyContinue).Responding){
+    throw 'Cannot queue over unhealthy or unexpected active trial'
+   }
+   $prior=Join-Path $root ('lite-release-prior-'+(Get-Date -Format 'yyyyMMdd-HHmmss')+'.json')
+   [IO.File]::Copy($stateFile,$prior,$false)
+   Log ('PRIOR_TRIAL_SAVED='+$prior)
   }
   $queuedAt=(Get-Date).ToUniversalTime().ToString('o')
   $s=[pscustomobject]@{

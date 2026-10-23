@@ -30,6 +30,13 @@ function Get-CimInstance {
  }
  return @()
 }
+function Get-Process {
+ param([int]$Id,[string]$ErrorAction)
+ if($Id -eq 13579 -and (Test-Path -LiteralPath '__ALIVE__')){
+  return [pscustomobject]@{Id=13579;Responding=$true}
+ }
+ return $null
+}
 '@
  $mock=$mock.Replace('__ALIVE__',$alive).Replace('__OLD__',$old)
  $text=$text.Replace('$ErrorActionPreference=''Stop''',
@@ -51,6 +58,20 @@ function Get-CimInstance {
  if($LASTEXITCODE -ne 0){throw 'watchdog while old running failed'}
  $s=Get-Content (Join-Path $root 'lite-release-state.json') -Raw|ConvertFrom-Json
  if($s.phase -ne 'queued' -or $s.waitingToStartSinceUtc){throw 'Old process interrupted'}
+ # Second scenario: the same running old executable is a healthy active trial.
+ # A newer candidate must be queued without interrupting it; prior trial
+ # metadata, including its earlier rollback, must be archived.
+ $s.phase='trial';$s.candidateExe=$old;$s.candidatePid=13579
+ $s.lastHealthyUtc=[datetime]::UtcNow.ToString('o')
+ $s |ConvertTo-Json -Depth 8|Set-Content (Join-Path $root 'lite-release-state.json')
+ $link=$shell.CreateShortcut($shortcut);$link.TargetPath=$old;$link.Save()
+ & $sandbox -Mode QueueNextStart -CandidateExe $candidate -ExpectedSha $sha
+ if($LASTEXITCODE -ne 0){throw 'Queue over healthy trial failed'}
+ $s=Get-Content (Join-Path $root 'lite-release-state.json') -Raw|ConvertFrom-Json
+ if($s.phase -ne 'queued' -or $s.previousExe -ne $old -or
+    @((Get-ChildItem $root -Filter 'lite-release-prior-*.json')).Count -ne 1){
+   throw 'Trial queue or archive failed'
+ }
  Remove-Item -LiteralPath $alive -Force
  $now=[datetime]::UtcNow
  $json=@{utc=$now.ToString('o');pid=13579;eventName='window_closing'}|ConvertTo-Json -Compress
