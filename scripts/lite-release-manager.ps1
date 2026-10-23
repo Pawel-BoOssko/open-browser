@@ -1,7 +1,7 @@
 # Open Browser Lite: durable release switch with automatic rollback via existing Keepalive.
 # User-owned PBOX1. No new scheduled tasks. Does not modify WebView2 profile or DPAPI.
 param(
-    [ValidateSet('Audit','Promote','Watchdog','Rollback')][string]$Mode='Audit',
+    [ValidateSet('Audit','Promote','QueueNextStart','Watchdog','Rollback')][string]$Mode='Audit',
     [string]$CandidateExe='',
     [string]$ExpectedSha=''
 )
