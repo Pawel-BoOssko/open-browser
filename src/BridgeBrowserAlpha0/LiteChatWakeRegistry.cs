@@ -158,11 +158,33 @@ internal static class LiteChatWakeRegistry
 
     // One stable numeric ID per attempted wake in this chat, even if
     // the renderer later crashes or an ACK is missing. Gaps are intentional.
-    internal static string NumberedMessage(Chat entry, string notes, string receipt)
+    internal static string NumberedMessage(Chat entry, string notes, string receipt,
+        DateTimeOffset? wakeStartedUtc = null)
     {
+        // The engine owns this timestamp. Never ask the model to guess the
+        // actual time of dispatch from its own potentially stale clock.
+        DateTimeOffset startedUtc = (wakeStartedUtc ?? DateTimeOffset.UtcNow)
+            .ToUniversalTime();
+        TimeZoneInfo warsaw = TimeZoneInfo.FindSystemTimeZoneById(
+            "Central European Standard Time");
+        DateTimeOffset startedLocal = TimeZoneInfo.ConvertTime(startedUtc, warsaw);
+        string stamp = startedLocal.ToString(
+            "yyyy-MM-dd HH:mm:ss zzz", CultureInfo.InvariantCulture);
+        string started = "WYBUDZENIE URUCHOMIONE: " + stamp +
+            " (Warszawa, czas silnika; UTC " +
+            startedUtc.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture) +
+            ")";
         string body = Message(entry, notes);
         string marker = "[OB-" + receipt + "] [OB-WAKE-" +
             entry.WakeSequence.ToString("D6") + "]";
+        // Required for every project: this is visible in ChatGPT history even
+        // when a model starts its substantive work many minutes later.
+        body = started + "\n" +
+            "Napisz datę i godzinę. Pierwszy wiersz swojej odpowiedzi " +
+            "zapisz dokładnie: DATA I GODZINA WYBUDZENIA: " + stamp +
+            " (Warszawa). To godzina rozpoczęcia wybudzenia podana przez silnik, " +
+            "nie zgaduj innej i nie zastępuj jej czasem generowania odpowiedzi. " +
+            "Następnie wykonaj polecenie projektu.\n\n" + body;
         // Project-only work instructions must be selected from the configured
         // schedule, NEVER from user notes attached to an unrelated chat.
         bool project = entry.Prompt.Contains("Open Browser Lite",
