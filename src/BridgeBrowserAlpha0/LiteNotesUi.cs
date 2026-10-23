@@ -19,7 +19,7 @@ internal sealed partial class ChatGptLiteForm
     private readonly Label _noteState = new()
     {
         AutoSize = false, Dock = DockStyle.Bottom, Height = 54,
-        Text = "Notatki są lokalne; automatyczne wysyłanie do czatu jest osobnym etapem."
+        Text = "Zaszyfrowane notatki tego czatu są dołączane do następnego wybudzenia. W zwykłej rozmowie nie są wysyłane automatycznie."
     };
     private readonly Label _noteChat = new()
     {
@@ -124,7 +124,9 @@ internal sealed partial class ChatGptLiteForm
             _noteEditor.ReadOnly = false;
             _noteEditor.Text = text;
             _notesDirty = false;
-            _noteState.Text = "Zapis lokalny, zaszyfrowany. Nie przekazano do modelu.";
+            _noteState.Text = target == "inbox"
+                ? "Zapis lokalny. Wybierz czat, aby jego notatki trafiły do wybudzenia."
+                : "Zapis lokalny, zaszyfrowany. Dołączane przy najbliższym wybudzeniu tego czatu.";
             _noteChat.Text = target == "inbox"
                 ? "Notatki ogólne (bez przypisanego czatu)"
                 : "Notatki: " + target.Replace("chatgpt.com", "");
@@ -148,7 +150,7 @@ internal sealed partial class ChatGptLiteForm
             _noteStore.Save(_noteKey, _noteEditor.Text);
             _notesDirty = false;
             _noteState.Text = "Zapisano lokalnie • " + DateTime.Now.ToString("HH:mm:ss") +
-                ". Oczekuje na ręczne przekazanie.";
+                ". Dołączę do następnego wybudzenia tego czatu.";
             LiteEventLog.Write("notes_saved", new { length = _noteEditor.TextLength });
             return true;
         }

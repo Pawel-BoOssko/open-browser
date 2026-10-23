@@ -296,6 +296,8 @@ internal static class LiteChatWakeRegistry
                 ChatGptLiteForm.WakeDeferralMinutes("generating", 2) != 2 ||
                 ChatGptLiteForm.WakeDeferralMinutes("backend_http_429", 3) != 3)
                 return 130;
+            int noteIsolation = LiteChatNotes.SelfTest();
+            if (noteIsolation != 0) return 140 + noteIsolation;
             int modelStatus = LiteModelStatus.SelfTest();
             if (modelStatus != 0) return 110 + modelStatus;
             int ownerQueue = LiteOwnerInterventions.SelfTest();

@@ -27,6 +27,10 @@ internal sealed partial class ChatGptLiteForm : Form
     private readonly Button _reload = new() { Text = "Odśwież", Width = 95 };
     private readonly Button _home = new() { Text = "ChatGPT", Width = 95 };
     private readonly Button _openArchive = new() { Text = "Archiwum", Width = 90 };
+    private readonly Button _inspectorToggle = new()
+    {
+        Text = "Ukryj panel ▸", Width = 119
+    };
     private readonly Label _buildVersion = new()
     {
         AutoSize = true,
@@ -60,15 +64,69 @@ internal sealed partial class ChatGptLiteForm : Form
 
         InitializeWindowRecovery();
 
-        var toolbar = new FlowLayoutPanel
+        // Navigation and supervision no longer compete for one overflowing
+        // horizontal strip. Primary actions stay visible at 1280px.
+        var toolbar = new TableLayoutPanel
         {
-            Dock = DockStyle.Top,
-            Height = 42,
-            Padding = new Padding(8, 4, 8, 0),
-            WrapContents = false,
-            AutoScroll = true
+            Dock = DockStyle.Top, Height = 82, ColumnCount = 1, RowCount = 2,
+            BackColor = Color.FromArgb(247, 249, 252),
+            Padding = new Padding(7, 3, 7, 2)
         };
-        toolbar.Controls.AddRange(new Control[] { _buildVersion, _technicalInfoButton, _highIndicator, _devWakeToggle, _devWakePin, _chatWakeConfigure, _devWakeStatus, _resumeToggle, _resumeStatus, _back, _forward, _reload, _home, _domToggle, _hardPruneToggle, _archiveToggle, _openArchive, _status, _domInfo });
+        toolbar.RowStyles.Add(new RowStyle(SizeType.Absolute, 34));
+        toolbar.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        var overviewRow = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Fill, WrapContents = false, AutoScroll = false,
+            Margin = new Padding(0)
+        };
+        _buildVersion.AutoSize = false;
+        _buildVersion.Width = 292;
+        _buildVersion.Height = 30;
+        _status.AutoSize = false;
+        _status.Width = 150;
+        _status.Height = 30;
+        _status.AutoEllipsis = true;
+        _devWakeStatus.AutoSize = false;
+        _devWakeStatus.Width = 258;
+        _devWakeStatus.Height = 30;
+        _devWakeStatus.AutoEllipsis = true;
+        overviewRow.Controls.AddRange(new Control[] {
+            _buildVersion, _status, _highIndicator, _devWakeStatus,
+            _resumeStatus
+        });
+        var navigationRow = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Fill, WrapContents = false, AutoScroll = false,
+            Margin = new Padding(0), Padding = new Padding(2, 2, 0, 0)
+        };
+        var advancedButton = new Button { Text = "Więcej ustawień ▾", Width = 141 };
+        var advanced = new ContextMenuStrip { AutoSize = true };
+        var advancedPanel = new FlowLayoutPanel
+        {
+            FlowDirection = FlowDirection.TopDown, WrapContents = false,
+            Width = 225, Height = 240, Padding = new Padding(6)
+        };
+        foreach (var control in new Control[] {
+            _technicalInfoButton, _devWakePin, _resumeToggle,
+            _domToggle, _hardPruneToggle, _archiveToggle
+        })
+        {
+            control.Width = 205;
+            advancedPanel.Controls.Add(control);
+        }
+        advanced.Items.Add(new ToolStripControlHost(advancedPanel)
+        {
+            AutoSize = false, Size = advancedPanel.Size,
+            Margin = Padding.Empty, Padding = Padding.Empty
+        });
+        advancedButton.Click += (_, _) =>
+            advanced.Show(advancedButton, new Point(0, advancedButton.Height));
+        navigationRow.Controls.AddRange(new Control[] {
+            _back, _forward, _reload, _home, _chatWakeConfigure,
+            _devWakeToggle, _openArchive, _inspectorToggle, advancedButton, _domInfo
+        });
+        toolbar.Controls.Add(overviewRow, 0, 0);
+        toolbar.Controls.Add(navigationRow, 0, 1);
         var content = new SplitContainer
         {
             Dock = DockStyle.Fill,
@@ -90,7 +148,15 @@ internal sealed partial class ChatGptLiteForm : Form
         workspace.Panel2MinSize = 225;
         workspace.SplitterDistance = 900;
         workspace.Panel1.Controls.Add(content);
-        workspace.Panel2.Controls.Add(CreateNotesUi());
+        workspace.Panel2.Controls.Add(CreateInspectorUi());
+        _inspectorToggle.Click += (_, _) =>
+        {
+            workspace.Panel2Collapsed = !workspace.Panel2Collapsed;
+            _inspectorToggle.Text = workspace.Panel2Collapsed
+                ? "Pokaż panel ◂" : "Ukryj panel ▸";
+            LiteEventLog.Write("inspector_visibility_changed",
+                new { visible = !workspace.Panel2Collapsed });
+        };
         Controls.Add(workspace);
         Controls.Add(toolbar);
 
@@ -152,6 +218,7 @@ internal sealed partial class ChatGptLiteForm : Form
             _highTimer.Stop();
             _pruneReportTimer.Stop();
             _noteSaveTimer.Stop();
+            _activityTimer.Stop();
             DisposeWindowRecovery();
             LiteEventLog.Write("window_closing");
         };

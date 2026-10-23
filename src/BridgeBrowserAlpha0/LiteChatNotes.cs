@@ -26,6 +26,34 @@ internal sealed class LiteChatNotes
         public string Text { get; set; } = "";
     }
 
+    // Regression: notes cannot leak from one conversation into another.
+    internal static int SelfTest()
+    {
+        string path = Path.Combine(Path.GetTempPath(),
+            "obl_notes_isolation_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var store = new LiteChatNotes(path);
+            string a = NormalizeKey("https://chatgpt.com/c/11111111-1111-1111-1111-111111111111");
+            string b = NormalizeKey("https://chatgpt.com/c/22222222-2222-2222-2222-222222222222");
+            if (a == b || a == "inbox" || b == "inbox") return 1;
+            store.Save(a, "TEST_NOTES_PRIVATE_A");
+            if (store.Load(a) != "TEST_NOTES_PRIVATE_A" ||
+                store.Load(b) != "") return 2;
+            if (!LiteChatWakeRegistry.Message(
+                    new LiteChatWakeRegistry.Chat { Prompt = "continue" },
+                    store.Load(a)).Contains("TEST_NOTES_PRIVATE_A"))
+                return 3;
+            if (LiteChatWakeRegistry.Message(
+                    new LiteChatWakeRegistry.Chat { Prompt = "continue" },
+                    store.Load(b)).Contains("TEST_NOTES_PRIVATE_A"))
+                return 4;
+            return 0;
+        }
+        catch { return 5; }
+        finally { try { Directory.Delete(path, true); } catch { } }
+    }
+
     internal static string NormalizeKey(string? url)
     {
         if (Uri.TryCreate(url, UriKind.Absolute, out var uri) &&

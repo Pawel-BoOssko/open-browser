@@ -14,7 +14,7 @@ internal sealed partial class ChatGptLiteForm
     };
     private readonly TextBox _projectTitle = new()
     {
-        Width = 172, PlaceholderText = "Nazwa projektu"
+        Width = 130, PlaceholderText = "Nazwa projektu"
     };
     private string? _selectedProjectId;
 
@@ -60,6 +60,7 @@ internal sealed partial class ChatGptLiteForm
         container.Controls.Add(addRow, 0, 1);
 
         container.Controls.Add(_projectList, 0, 2);
+        _projectList.Resize += (_, _) => ResizeProjectRows();
         var pin = new Button
         {
             Text = "Przypnij bieżący czat", Dock = DockStyle.Fill,
@@ -211,6 +212,27 @@ internal sealed partial class ChatGptLiteForm
         finally
         {
             _projectList.ResumeLayout();
+            ResizeProjectRows();
+        }
+    }
+
+    // Keep project names and lead controls readable when side panels resize.
+    // The previous hard-coded width of 238px clipped buttons in a 220px panel.
+    private void ResizeProjectRows()
+    {
+        int width = Math.Max(180, _projectList.ClientSize.Width - 17);
+        foreach (Control control in _projectList.Controls)
+        {
+            control.Width = width;
+            if (control is not Panel row) continue;
+            var buttons = row.Controls.OfType<Button>().ToArray();
+            if (buttons.Length >= 2)
+            {
+                buttons[0].Width = Math.Max(120, width - 57);
+                buttons[1].Left = width - 49;
+            }
+            foreach (var label in row.Controls.OfType<Label>())
+                label.Width = Math.Max(112, width - 61);
         }
     }
 
