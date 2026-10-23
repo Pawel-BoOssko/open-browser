@@ -208,6 +208,12 @@ internal sealed partial class ChatGptLiteForm
                         Left = 9, Top = 32, Width = 173, Height = 20,
                         AutoEllipsis = true,
                         Text = chat.Role != "lead" ? "Archiwum — bez autopracy" :
+                            wake?.HandoffPhase == "request_pending"
+                              ? "HANDOFF: kolejna pobudka" :
+                            wake?.HandoffPhase == "requested"
+                              ? (wake.LastState == "status_wait_user"
+                                  ? "HANDOFF gotowy — przejmij nowy czat"
+                                  : "HANDOFF: oczekiwanie na zapis") :
                             wake?.Enabled == true
                               ? "WŁ. " + wake.EffectiveMinutes + "m | " +
                                 wake.LastState + " | " +
@@ -383,8 +389,9 @@ internal sealed partial class ChatGptLiteForm
                 "przejęcie i kontynuuj sekwencyjnie. Stary czat jest archiwum.";
             if (prompt.Length + suffix.Length > 16000)
                 prompt = prompt[..(16000 - suffix.Length)];
-            LiteChatWakeRegistry.Configure(plans, newUrl,
+            var newSchedule = LiteChatWakeRegistry.Configure(plans, newUrl,
                 old.EffectiveMinutes, prompt + suffix, DateTimeOffset.UtcNow);
+            newSchedule.HandoffPhase = "";
             if (!LiteProjectRegistry.CanScheduleProjectLeads(
                 _projects.Projects, plans))
                 throw new InvalidOperationException(
