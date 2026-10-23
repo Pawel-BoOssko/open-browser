@@ -29,6 +29,9 @@ internal static class LiteChatWakeRegistry
         // Durable dedup for each NEW model-confirmed owner intervention.
         // Never implies an email was actually delivered.
         public string LastInterventionKey { get; set; } = "";
+        // Optional, rollback-compatible one-shot handoff state.
+        // Empty: normal; request_pending: prepare prompt; requested: no repeat.
+        public string HandoffPhase { get; set; } = "";
         public string Prompt { get; set; } = "";
     }
 
@@ -77,6 +80,7 @@ internal static class LiteChatWakeRegistry
                     c.Minutes is < 20 or > 1440 ||
                     (c.FastMinutes != 0 && c.FastMinutes is < 15 or >= 20) ||
                     c.Prompt.Length > 16000 || c.WakeSequence < 0 ||
+                    c.HandoffPhase is not ("" or "request_pending" or "requested") ||
                     (c.LastAnswerFingerprint.Length != 0 &&
                      (c.LastAnswerFingerprint.Length != 64 ||
                       !c.LastAnswerFingerprint.All(Uri.IsHexDigit))))
@@ -103,6 +107,7 @@ internal static class LiteChatWakeRegistry
             !LiteDevWakeState.IsChatUrl(c.Url) || c.Minutes is < 20 or > 1440 ||
             (c.FastMinutes != 0 && c.FastMinutes is < 15 or >= 20) ||
             c.Prompt.Length > 16000 || c.WakeSequence < 0 ||
+            c.HandoffPhase is not ("" or "request_pending" or "requested") ||
             (c.LastAnswerFingerprint.Length != 0 &&
              (c.LastAnswerFingerprint.Length != 64 ||
               !c.LastAnswerFingerprint.All(Uri.IsHexDigit)))) ||
@@ -186,6 +191,8 @@ internal static class LiteChatWakeRegistry
             " (Warszawa). To godzina rozpoczęcia wybudzenia podana przez silnik, " +
             "nie zgaduj innej i nie zastępuj jej czasem generowania odpowiedzi. " +
             "Następnie wykonaj polecenie projektu.\n\n" + body;
+        if (entry.HandoffPhase == "request_pending")
+            body += LiteChatHandoff.RequestText;
         // Project-only work instructions must be selected from the configured
         // schedule, NEVER from user notes attached to an unrelated chat.
         bool project = entry.Prompt.Contains("Open Browser Lite",
@@ -216,6 +223,23 @@ internal static class LiteChatWakeRegistry
                 "Jeśli zapis do PBOX1 się nie uda, wskaż to w checkpointcie " +
                 "na SatanAMD, nie udawaj sukcesu. " +
                 "Nie używaj ChatGPT Tasks ani wewnętrznych automatyzacji.";
+        // Radar models sometimes mix the displayed [OB-...] marker and
+        // [OB-WAKE-...] into one receipt value in chat-side journal entries.
+        // Keep the engine's mechanical evidence untouched; make the optional
+        // chat-side metadata contract unambiguous without a resend.
+        if (entry.Prompt.Contains("Networking Radar",
+            StringComparison.OrdinalIgnoreCase))
+            body += "\n\nWażne dla wpisów actor=chat w wake-lifecycle.jsonl: " +
+                "wakeSequence jest LICZBĄ " + entry.WakeSequence +
+                " (bez OB-WAKE- i bez cudzysłowów), receipt to DOKŁADNIE " +
+                "32 znaki hex: " + receipt +
+                " (bez OB-, bez nawiasów, bez dodawania |OB-WAKE-...). " +
+                "Jeśli zapisujesz chat_started/chat_finished, użyj " +
+                "osobnych pól JSON: wakeSequence=" + entry.WakeSequence +
+                ", receipt=\"" + receipt +
+                "\", actor=\"chat\", stage=\"chat_started\" lub \"chat_finished\"; " +
+                "utc powinien zawierać rzeczywisty czas ISO UTC wpisu. " +
+                "Nie poprawiaj historycznych wpisów i nie dopisuj ACK silnika.";
         // Advisory protocol for the two verified project executors.
         // Older, unrelated schedules keep their exact previous payload.
         if (project || entry.Prompt.Contains("Networking Radar",
@@ -234,6 +258,7 @@ internal static class LiteChatWakeRegistry
     {
         try
         {
+            if (LiteChatHandoff.SelfTest() != 0) return 167;
             var now = DateTimeOffset.UtcNow;
             string a = "https://chatgpt.com/c/11111111-1111-1111-1111-111111111111";
             string b = "https://chatgpt.com/c/22222222-2222-2222-2222-222222222222";

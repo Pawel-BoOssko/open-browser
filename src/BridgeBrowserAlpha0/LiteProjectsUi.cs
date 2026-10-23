@@ -28,7 +28,7 @@ internal sealed partial class ChatGptLiteForm
         container.RowStyles.Add(new RowStyle(SizeType.Absolute, 36));
         container.RowStyles.Add(new RowStyle(SizeType.Absolute, 40));
         container.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        container.RowStyles.Add(new RowStyle(SizeType.Absolute, 48));
+        container.RowStyles.Add(new RowStyle(SizeType.Absolute, 105));
 
         container.Controls.Add(new Label
         {
@@ -67,7 +67,28 @@ internal sealed partial class ChatGptLiteForm
             Padding = new Padding(3)
         };
         pin.Click += (_, _) => PinCurrentChat();
-        container.Controls.Add(pin, 0, 3);
+        var handoff = new Button
+        {
+            Text = "Poproś o HANDOFF", Dock = DockStyle.Fill,
+            Height = 30
+        };
+        handoff.Click += (_, _) => RequestSelectedProjectHandoff();
+        var transfer = new Button
+        {
+            Text = "Przejmij otwarty czat jako wykonawcę",
+            Dock = DockStyle.Fill, Height = 30
+        };
+        transfer.Click += (_, _) => TakeOverSelectedProjectChat();
+        var handoffActions = new TableLayoutPanel {
+            Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3
+        };
+        handoffActions.RowStyles.Add(new RowStyle(SizeType.Absolute, 34));
+        handoffActions.RowStyles.Add(new RowStyle(SizeType.Absolute, 34));
+        handoffActions.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        handoffActions.Controls.Add(pin, 0, 0);
+        handoffActions.Controls.Add(handoff, 0, 1);
+        handoffActions.Controls.Add(transfer, 0, 2);
+        container.Controls.Add(handoffActions, 0, 3);
 
         try
         {
@@ -285,6 +306,101 @@ internal sealed partial class ChatGptLiteForm
             LiteEventLog.Write("project_lead_wake_toggle_failed",
                 new { errorType = ex.GetType().Name });
             MessageBox.Show(this, ex.Message, "Wybudzenia projektu");
+        }
+    }
+
+    private void RequestSelectedProjectHandoff()
+    {
+        try
+        {
+            _projects = LiteProjectRegistry.OpenDefault();
+            var project = _projects.Projects.FirstOrDefault(p =>
+                p.Id == _selectedProjectId)
+                ?? throw new InvalidOperationException("Wybierz projekt.");
+            var lead = project.Chats.SingleOrDefault(c => c.Role == "lead")
+                ?? throw new InvalidOperationException(
+                    "Projekt nie ma jednego czatu wykonawczego.");
+            var wakes = LiteChatWakeRegistry.Read();
+            var wake = wakes.SingleOrDefault(w => w.Url == lead.Url)
+                ?? throw new InvalidOperationException(
+                    "W tym projekcie nie ma harmonogramu wykonawcy.");
+            if (!LiteChatHandoff.Request(wake, manual: true,
+                isRegisteredProjectLead: true))
+                throw new InvalidOperationException(
+                    "Prośba o HANDOFF już czeka, została wysłana albo autopraca jest wyłączona.");
+            wake.DueUtc = DateTimeOffset.UtcNow;
+            LiteChatWakeRegistry.Write(wakes);
+            LiteEventLog.Write("project_handoff_requested", new {
+                projectChatCount = project.Chats.Count,
+                ownerRequested = true
+            });
+            MessageBox.Show(this,
+                "Przy następnym BEZPIECZNYM wybudzeniu wykonawca otrzyma " +
+                "jednorazową prośbę o zapis handoffu. Nie wysyłam teraz " +
+                "drugiej wiadomości i nie tworzę nowego czatu.",
+                "Open Browser — rotacja czatu",
+                MessageBoxButtons.OK, MessageBoxIcon.Information);
+            RenderProjects();
+        }
+        catch (Exception ex)
+        {
+            LiteEventLog.Write("project_handoff_request_failed",
+                new { errorType = ex.GetType().Name });
+            MessageBox.Show(this, ex.Message, "Open Browser — rotacja czatu");
+        }
+    }
+
+    private void TakeOverSelectedProjectChat()
+    {
+        try
+        {
+            _projects = LiteProjectRegistry.OpenDefault();
+            var project = _projects.Projects.FirstOrDefault(p =>
+                p.Id == _selectedProjectId)
+                ?? throw new InvalidOperationException("Wybierz projekt.");
+            var oldLead = project.Chats.SingleOrDefault(c => c.Role == "lead")
+                ?? throw new InvalidOperationException("Brak starego wykonawcy.");
+            string newUrl = LiteDevWakeState.NormalizeUrl(
+                _browser.CoreWebView2?.Source ?? "");
+            var plans = LiteChatWakeRegistry.Read();
+            var old = plans.SingleOrDefault(w => w.Url == oldLead.Url)
+                ?? throw new InvalidOperationException("Brak poprzedniego harmonogramu.");
+            if (!LiteChatHandoff.CanTakeOver(old, newUrl))
+                throw new InvalidOperationException(
+                    "Handoff nie jest gotowy lub stary wykonawca nadal pracuje. " +
+                    "Wymagane: jednorazowa prośba, stabilna odpowiedź " +
+                    "z [OB-STATUS: WAIT_USER] i nowy rzeczywisty URL czatu.");
+            var next = project.Chats.FirstOrDefault(c => c.Url == newUrl);
+            if (next is null)
+                next = _projects.AddChat(project.Id, "Wykonawca po handoff", newUrl);
+            // Fail closed: old schedule already disabled by WAIT_USER. Change
+            // lead role before arming new one. A partial failure never allows
+            // two project executors to run concurrently.
+            _projects.PromoteLead(project.Id, next.Id);
+            var prompt = old.Prompt.Trim();
+            const string suffix = "\nNowy czat wykonawczy po rotacji: odczytaj " +
+                "najnowszy HANDOFF oraz checkpoint projektu, potwierdź " +
+                "przejęcie i kontynuuj sekwencyjnie. Stary czat jest archiwum.";
+            if (prompt.Length + suffix.Length > 16000)
+                prompt = prompt[..(16000 - suffix.Length)];
+            LiteChatWakeRegistry.Configure(plans, newUrl,
+                old.EffectiveMinutes, prompt + suffix, DateTimeOffset.UtcNow);
+            if (!LiteProjectRegistry.CanScheduleProjectLeads(
+                _projects.Projects, plans))
+                throw new InvalidOperationException(
+                    "Zabronione dwóch aktywnych wykonawców projektu.");
+            LiteChatWakeRegistry.Write(plans);
+            LiteEventLog.Write("project_handoff_new_lead_armed", new {
+                oldChatArchived = true, newChatScheduled = true
+            });
+            RenderProjects();
+            UpdateMultiWakeStatus();
+        }
+        catch (Exception ex)
+        {
+            LiteEventLog.Write("project_handoff_takeover_failed",
+                new { errorType = ex.GetType().Name });
+            MessageBox.Show(this, ex.Message, "Open Browser — przejęcie czatu");
         }
     }
 

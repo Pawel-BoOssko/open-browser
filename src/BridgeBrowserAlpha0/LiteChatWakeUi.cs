@@ -592,7 +592,7 @@ internal sealed partial class ChatGptLiteForm
     }
 
     private async Task<(string Reason, string Hash, bool Complete,
-        LiteModelStatus.Parsed? Status)>
+        LiteModelStatus.Parsed? Status, int ObservedTurns)>
         CheckWorkerPreflightAsync(CoreWebView2 core, string url, string previousHash)
     {
         bool foreground = ReferenceEquals(core, _browser.CoreWebView2);
@@ -605,7 +605,7 @@ internal sealed partial class ChatGptLiteForm
         {
             LiteEventLog.Write("multi_wake_preflight_navigation_changed",
                 new { foreground, definitelyNotSent = true });
-            return ("navigation_changed", "", false, null);
+            return ("navigation_changed", "", false, null, 0);
         }
         var (first, second, _) = result;
         string expectedPath = new Uri(url).AbsolutePath;
@@ -639,7 +639,7 @@ internal sealed partial class ChatGptLiteForm
         var status = reason == "ready" ? LiteModelStatus.Parse(answer) : null;
         return (reason, hash,
             reason == "ready" && LiteChatWakePreflight.IsCompletion(answer),
-            status);
+            status, second?.TurnCount ?? 0);
     }
 
     internal static TimeSpan RecordWorkerProbeFailure(
@@ -1043,6 +1043,17 @@ internal sealed partial class ChatGptLiteForm
                                 ? due.EffectiveMinutes : 2);
                         return;
                     }
+                    // Request a handoff ONCE at a conservative wake-age
+                    // threshold; normal wake safety and answer fencing remain.
+                    bool isLead = LiteProjectRegistry.OpenDefault().Projects.Any(p =>
+                        p.Chats.Any(c => c.Role == "lead" && c.Url == due.Url));
+                    if (LiteChatHandoff.Request(due, manual: false,
+                        isRegisteredProjectLead: isLead,
+                        observedTurns: preflight.ObservedTurns))
+                        LiteEventLog.Write("project_handoff_auto_requested", new {
+                            wakeSequence = due.WakeSequence, threshold =
+                                LiteChatHandoff.SuggestAfterWakeAttempts
+                        });
                     // Durable fingerprint fences uncertain sends: never resend
                     // for an unchanged assistant answer after a crash/restart.
                     due.LastAnswerFingerprint = preflight.Hash;
@@ -1203,6 +1214,9 @@ internal sealed partial class ChatGptLiteForm
             var current = entries.FirstOrDefault(x => x.Url == due.Url);
             if (current is not null && current.LastAttemptUtc == now)
             {
+                // A committed send attempt might have clicked even without
+                // visible ACK: one-shot handoff requests must not be repeated.
+                LiteChatHandoff.MarkAttempted(current, attemptCommitted);
                 current.LastState = state;
                 LiteChatWakeRegistry.Write(entries);
             }
