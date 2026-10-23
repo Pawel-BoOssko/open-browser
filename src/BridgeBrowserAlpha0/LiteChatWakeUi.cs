@@ -1186,7 +1186,7 @@ internal sealed partial class ChatGptLiteForm
                         ? "worker_script_timeout" : "worker_com_failure");
                 LiteWakeJournal.Write("engine_failure",
                     attemptCommitted ? due.WakeSequence : due.WakeSequence + 1,
-                    result: "exception");
+                    result: LiteWakeJournal.FailureCode(ex, attemptCommitted));
                 LiteEventLog.Write("multi_wake_failed", new {
                     errorType = ex.GetType().Name,
                     submissionMayBeUncertain = attemptCommitted

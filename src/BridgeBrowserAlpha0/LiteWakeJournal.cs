@@ -24,6 +24,20 @@ internal static class LiteWakeJournal
         "recovery", "schedule_completed", "engine_failure"
     };
 
+    // Bounded, privacy-safe diagnostic codes. Never write exception messages,
+    // URLs or payloads to the shared mechanical journal.
+    internal static string FailureCode(Exception error, bool attempted)
+    {
+        string kind = error switch
+        {
+            TimeoutException => "timeout",
+            System.Runtime.InteropServices.COMException => "com",
+            System.Text.Json.JsonException => "json",
+            _ => "other"
+        };
+        return (attempted ? "post_attempt_" : "pre_attempt_") + kind;
+    }
+
     internal static string MakeLine(string phase, long? sequence = null,
         string? receipt = null, string? result = null,
         DateTimeOffset? timestamp = null)
@@ -91,6 +105,16 @@ internal static class LiteWakeJournal
                 !row.Contains("2026-10-22T15:00:00") ||
                 row.Contains("chatgpt.com") || row.Contains("password"))
                 return 1;
+            if (FailureCode(new TimeoutException("private text"), false) != "pre_attempt_timeout" ||
+                FailureCode(new TimeoutException("private text"), true) != "post_attempt_timeout" ||
+                FailureCode(new System.Runtime.InteropServices.COMException(), false) != "pre_attempt_com" ||
+                FailureCode(new JsonException(), true) != "post_attempt_json" ||
+                FailureCode(new InvalidOperationException("https://secret.example/abc"), false) != "pre_attempt_other")
+                return 6;
+            string failure = MakeLine("engine_failure", 28,
+                result: FailureCode(new TimeoutException("secret"), false));
+            if (!failure.Contains("pre_attempt_timeout") ||
+                failure.Contains("secret")) return 7;
             string due = MakeLine("due");
             if (!due.Contains("\"receipt\":null")) return 2;
             try { MakeLine("attempt_reserved", receipt: "BAD-URL"); return 3; }
