@@ -282,13 +282,7 @@ internal sealed partial class ChatGptLiteForm : Form
                 _pruneProbeTask = null;
                 // Full document replacement permits a new response probe;
                 // old callbacks are ignored by generation and route guards.
-                _responseProbeGeneration++;
-                _responseProbePending = false;
-                _responseProbeTask = null;
-                _responseProbeDelayedSinceUtc = null;
-                _lastGenerationSignal = false;
-                _lastResponseFailure = "";
-                _responseFailureSinceUtc = null;
+                InvalidateResponseProbeForRouteChange();
                 ResetCaptureForNewLocation();
                 _status.Text = "Ładowanie...";
                 LiteEventLog.Write("navigation_start", new { host = LiteEventLog.HostOnly(e.Uri) });
@@ -304,6 +298,8 @@ internal sealed partial class ChatGptLiteForm : Form
             core.HistoryChanged += (_, _) => UpdateNavigation();
             core.SourceChanged += (_, _) => {
                 _foregroundWakeRouteEpoch++;
+                InvalidateResponseProbeForRouteChange();
+                UpdateTaskbarTitle(false, "");
                 ResetCaptureForNewLocation();
                 SwitchNotesForUrl(core.Source);
                 UpdateMultiWakeStatus();

@@ -25,6 +25,33 @@ internal sealed partial class ChatGptLiteForm
         delayedSinceUtc.HasValue &&
         nowUtc - delayedSinceUtc.Value >= TimeSpan.FromSeconds(35);
 
+    // ChatGPT changes /c/ routes through History API without a full WebView
+    // navigation. A hung ExecuteScriptAsync from the OLD route must not block
+    // response monitoring on the NEW route forever. The generation fence
+    // makes any late result from the old request harmless.
+    private void InvalidateResponseProbeForRouteChange()
+    {
+        bool hadPending = _responseProbePending ||
+            _responseProbeTask is { IsCompleted: false };
+        _responseProbeGeneration++;
+        _responseProbePending = false;
+        _responseProbeTask = null;
+        _responseProbeDelayedSinceUtc = null;
+        _lastGenerationSignal = false;
+        _lastResponseFailure = "";
+        _responseFailureSinceUtc = null;
+        if (hadPending)
+            LiteEventLog.Write("response_probe_route_invalidated",
+                new { oldPendingIgnored = true, newRouteProbeAllowed = true });
+    }
+
+    internal static bool IsCurrentResponseProbe(long capturedGeneration,
+        long currentGeneration, long capturedRouteEpoch,
+        long currentRouteEpoch, string sourceBefore, string sourceNow) =>
+        capturedGeneration == currentGeneration &&
+        capturedRouteEpoch == currentRouteEpoch &&
+        string.Equals(sourceBefore, sourceNow, StringComparison.Ordinal);
+
     private async Task InstallResponseDiagnosticsAsync(CoreWebView2 core)
     {
         string file = Path.Combine(AppContext.BaseDirectory, "LiteResponseSignal.js");
@@ -106,9 +133,9 @@ internal sealed partial class ChatGptLiteForm
             // SPA history can switch A->B->A while an old script is in
             // flight. Never apply an obsolete failure or generation signal
             // to the newly selected conversation.
-            if (probeGeneration != _responseProbeGeneration ||
-                routeEpoch != _foregroundWakeRouteEpoch ||
-                !string.Equals(routeSource, core.Source, StringComparison.Ordinal))
+            if (!IsCurrentResponseProbe(probeGeneration, _responseProbeGeneration,
+                    routeEpoch, _foregroundWakeRouteEpoch,
+                    routeSource, core.Source))
             {
                 LiteEventLog.Write("response_probe_route_changed",
                     new { ignoredStaleResult = true });
