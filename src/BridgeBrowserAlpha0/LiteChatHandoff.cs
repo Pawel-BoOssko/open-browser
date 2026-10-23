@@ -8,8 +8,10 @@ internal static class LiteChatHandoff
 {
     // Count verified eligibility opportunities conservatively using the
     // durable wake sequence. A manual request can occur sooner.
-    internal const long SuggestAfterWakeAttempts = 40;
-    internal const int SuggestAfterVisibleTurns = 80;
+    // Observed production long-chat cap can arrive before 20 wakes; request
+    // a checkpoint while the conversation can still produce a full handoff.
+    internal const long SuggestAfterWakeAttempts = 14;
+    internal const int SuggestAfterVisibleTurns = 50;
 
     internal static bool ShouldRequest(LiteChatWakeRegistry.Chat chat,
         bool isRegisteredProjectLead, int observedTurns = 0) =>
@@ -65,12 +67,12 @@ internal static class LiteChatHandoff
     {
         var old = new LiteChatWakeRegistry.Chat {
             Url = "https://chatgpt.com/c/11111111-1111-1111-1111-111111111111",
-            Enabled = true, WakeSequence = 39
+            Enabled = true, WakeSequence = 13
         };
         if (ShouldRequest(old, true) || Request(old, false, true)) return 1;
-        if (ShouldRequest(old, true, 79)) return 12;
-        if (!ShouldRequest(old, true, 80)) return 13;
-        old.WakeSequence = 40;
+        if (ShouldRequest(old, true, 49)) return 12;
+        if (!ShouldRequest(old, true, 50)) return 13;
+        old.WakeSequence = 14;
         if (ShouldRequest(old, false) || Request(old, false, false) ||
             !ShouldRequest(old, true) || !Request(old, false, true) ||
             old.HandoffPhase != "request_pending") return 2;

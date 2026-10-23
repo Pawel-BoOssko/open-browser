@@ -403,3 +403,6 @@ Active operational policy files:
 
 Node.js may be available through the local Windows environment, but NODE is not an OpenBridge executor unless listed by implemented commands. Models must not infer a NODE executor from Node being installed.
 <!-- /COMPLETE_DOC_UPDATE_CURRENT_STATE_20260521 -->
+
+## 2026-10-23 [OB-WAKE-000020] SOURCE v1.72.83 (not yet LIVE)
+Latest verified LIVE PBOX1 v1.72.82 PID4232, release phase=trial badPolls0 and rollback v1.72.76. Source1.72.83 lowers one-time handoff request threshold from40/80 to14 wake attempts/50 visible DOM turns for registered project leads, based on actual max-length banner at approximately wake20. Tests SatanAMD: Node23/23, published EXE8/8, manifest exact SHA38c7f29ca89ecf1c2f9a1b84e6b64d9f4d6e24040fe7e99d5e5096cc22e99320, diff check0; no PBOX1 stage/selftests or production switch because remote transfer process was security-denied (no workaround). Handoff still requires confirmed saved document and manual new real /c/ URL; never arm two lead schedules. Main checkpoint docs/OPENBROWSER_LITE_WORK_STATUS_2026-10-21.md and handoff doc updated. No ChatGPT Tasks/manual Git operations or uncertain retransmissions.
