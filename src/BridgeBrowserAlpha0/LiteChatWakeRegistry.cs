@@ -296,6 +296,24 @@ internal static class LiteChatWakeRegistry
                 ChatGptLiteForm.WakeDeferralMinutes("generating", 2) != 2 ||
                 ChatGptLiteForm.WakeDeferralMinutes("backend_http_429", 3) != 3)
                 return 130;
+            // The operational timeline must not bury successful work among
+            // two-minute due/deferred noise, and must tolerate malformed JSONL.
+            const string activityDue = "{\"utc\":\"2026-10-23T11:20:29Z\"," +
+                "\"actor\":\"engine\",\"stage\":\"due\",\"wakeSequence\":15}";
+            const string activityDone = "{\"utc\":\"2026-10-23T11:21:00Z\"," +
+                "\"actor\":\"chat\",\"stage\":\"chat_finished\",\"wakeSequence\":15," +
+                "\"receipt\":\"70d8f4be39ad416c9ab3162cc89d58db\"}";
+            if (ChatGptLiteForm.DescribeActivityLine(activityDue) is not null ||
+                ChatGptLiteForm.DescribeActivityLine(activityDue, showAll: true) is not string dueLine ||
+                !dueLine.Contains("Termin wybudzenia") ||
+                ChatGptLiteForm.DescribeActivityLine(activityDone) is not string doneLine ||
+                !doneLine.Contains("#000015 70d8f4be") ||
+                !doneLine.Contains("Czat zakończył pracę") ||
+                ChatGptLiteForm.DescribeActivityLine("{") is not null ||
+                ChatGptLiteForm.DescribeActivityLine("[]") is not null ||
+                ChatGptLiteForm.DescribeActivityLine(
+                    "{\"utc\":\"2026-10-23T11:20:29Z\",\"actor\":\"chat\"}") is not null)
+                return 151;
             int keepalivePauseTest = LiteKeepalivePause.SelfTest();
             if (keepalivePauseTest != 0) return 155 + keepalivePauseTest;
             int noteIsolation = LiteChatNotes.SelfTest();

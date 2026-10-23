@@ -24,6 +24,7 @@ internal sealed partial class ChatGptLiteForm
         Text = "Ostatnie wybudzenia i zdarzenia • tylko odczyt"
     };
     private TabControl? _inspectorTabs;
+    private bool _activityShowAll;
 
     private Control CreateInspectorUi()
     {
@@ -36,16 +37,24 @@ internal sealed partial class ChatGptLiteForm
             Dock = DockStyle.Bottom, Height = 39,
             WrapContents = false, Padding = new Padding(4)
         };
-        var refresh = new Button { Text = "Odśwież", Width = 90, Height = 28 };
+        var refresh = new Button { Text = "Odśwież", Width = 80, Height = 28 };
         refresh.Click += (_, _) => RefreshActivityView();
-        var copy = new Button { Text = "Kopiuj widok", Width = 118, Height = 28 };
+        var copy = new Button { Text = "Kopiuj", Width = 72, Height = 28 };
         copy.Click += (_, _) =>
         {
             if (_activityView.TextLength > 0)
                 Clipboard.SetText(_activityView.Text);
         };
+        var all = new CheckBox { Text = "Wszystkie", Width = 102,
+            Height = 28, Checked = false };
+        all.CheckedChanged += (_, _) =>
+        {
+            _activityShowAll = all.Checked;
+            RefreshActivityView();
+        };
         commands.Controls.Add(refresh);
         commands.Controls.Add(copy);
+        commands.Controls.Add(all);
         activity.Controls.Add(_activityView);
         activity.Controls.Add(commands);
         activity.Controls.Add(_activityInfo);
@@ -84,19 +93,28 @@ internal sealed partial class ChatGptLiteForm
             if (!string.IsNullOrWhiteSpace(line)) yield return line;
     }
 
-    private static string? DescribeActivityLine(string line)
+    internal static string? DescribeActivityLine(string line, bool showAll = false)
     {
         try
         {
             using var document = JsonDocument.Parse(line);
             var root = document.RootElement;
-            if (!root.TryGetProperty("utc", out var utc) ||
+            if (root.ValueKind != JsonValueKind.Object ||
+                !root.TryGetProperty("utc", out var utc) ||
+                utc.ValueKind != JsonValueKind.String ||
                 !DateTimeOffset.TryParse(utc.GetString(), out var date))
                 return null;
             string time = date.ToLocalTime().ToString("dd.MM HH:mm:ss");
             if (root.TryGetProperty("actor", out var actor))
             {
-                string stage = root.GetProperty("stage").GetString() ?? "";
+                if (!root.TryGetProperty("stage", out var stageValue) ||
+                    stageValue.ValueKind != JsonValueKind.String) return null;
+                string stage = stageValue.GetString() ?? "";
+                // At two-minute retry intervals 'due/deferred' can bury
+                // meaningful events. Keep them accessible under Wszystkie.
+                if (!showAll && (stage is "due" or "deferred" or
+                    "attempt_reserved" or "submission_attempted"))
+                    return null;
                 string sequence = root.TryGetProperty("wakeSequence", out var seq) &&
                     seq.ValueKind == JsonValueKind.Number
                     ? "#" + seq.GetInt64().ToString("D6") : "—";
@@ -105,7 +123,7 @@ internal sealed partial class ChatGptLiteForm
                     "due" => "Termin wybudzenia",
                     "attempt_reserved" => "Przygotowano próbę",
                     "click_invoked" => "Kliknięto Wyślij",
-                    "receipt_confirmed" => "Potwierdzono wiadomość",
+                    "receipt_confirmed" => "Wiadomość widoczna w UI (ACK)",
                     "receipt_uncertain" => "Niepewna wysyłka — bez ponawiania",
                     "chat_started" => "Czat rozpoczął pracę",
                     "chat_checkpoint" => "Zapisano checkpoint",
@@ -113,6 +131,7 @@ internal sealed partial class ChatGptLiteForm
                     "chat_blocked" => "Czat zablokowany",
                     "engine_failure" => "Błąd silnika",
                     "deferred" => "Wybudzenie odroczone",
+                    "submission_attempted" => "Próba kliknięcia Wyślij",
                     "definitely_unsent" => "Na pewno niewysłane",
                     _ => ""
                 };
@@ -122,9 +141,13 @@ internal sealed partial class ChatGptLiteForm
                     ? result.GetString() ?? "" : "";
                 // Engine reasons are short diagnostic codes; keep logs compact.
                 if (reason.Length > 54) reason = reason[..54] + "…";
-                return time + "   " + sequence + "   " + label +
-                    (reason.Length > 0 && stage is "deferred" or "engine_failure"
-                        ? " (" + reason + ")" : "");
+                string receipt = root.TryGetProperty("receipt", out var code) &&
+                    code.ValueKind == JsonValueKind.String &&
+                    code.GetString() is string id && id.Length == 32
+                    ? " " + id[..8] : "";
+                return time + "   " + sequence + receipt + "   " + label +
+                    (reason.Length > 0 && (stage is "deferred" or "engine_failure")
+                        ? " (" + reason.Replace('\r',' ').Replace('\n',' ') + ")" : "");
             }
             string type = root.TryGetProperty("eventName", out var ev)
                 ? ev.GetString() ?? "" : "";
@@ -140,7 +163,11 @@ internal sealed partial class ChatGptLiteForm
             };
             return item.Length == 0 ? null : time + "   Aplikacja   " + item;
         }
-        catch (JsonException) { return null; }
+        catch (Exception ex) when (ex is JsonException or InvalidOperationException
+            or FormatException or ArgumentException or KeyNotFoundException)
+        {
+            return null;
+        }
     }
 
     private void RefreshActivityView()
@@ -160,7 +187,7 @@ internal sealed partial class ChatGptLiteForm
             foreach (string file in files)
             foreach (string line in LastLines(file))
             {
-                string? label = DescribeActivityLine(line);
+                string? label = DescribeActivityLine(line, _activityShowAll);
                 if (label is null) continue;
                 try
                 {
@@ -169,14 +196,17 @@ internal sealed partial class ChatGptLiteForm
                         doc.RootElement.GetProperty("utc").GetString(), out var dt))
                         items.Add((dt, label));
                 }
-                catch (JsonException) { }
+                catch (Exception ex) when (ex is JsonException or
+                    InvalidOperationException or FormatException or KeyNotFoundException) { }
             }
             _activityView.Text = items
                 .OrderByDescending(x => x.Utc).Take(32)
-                .Aggregate("", (text, x) => text + x.Label + Environment.NewLine);
-            _activityInfo.Text = "Ostatnie zdarzenia • " +
-                DateTime.Now.ToString("HH:mm:ss") +
-                " • tylko odczyt, bez treści rozmów";
+                .Aggregate(new StringBuilder(),
+                    (builder, x) => builder.AppendLine(x.Label)).ToString();
+            _activityInfo.Text = (_activityShowAll
+                    ? "Wszystkie etapy" : "Najważniejsze zdarzenia") +
+                " • " + DateTime.Now.ToString("HH:mm:ss") +
+                " • bez treści rozmów";
         }
         catch (Exception ex)
         {
