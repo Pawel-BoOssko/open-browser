@@ -30,6 +30,14 @@ foreach ($name in $checks) {
         Write-Output ('PASS ' + $name)
     }
 }
+try {
+    & (Join-Path $Repository 'scripts\test-lite-release-clean-close.ps1') |
+        Out-Null
+    Write-Output 'PASS release clean-close guard'
+} catch {
+    $failures.Add('release clean-close guard: ' + $_.Exception.Message)
+    Write-Output 'FAIL release clean-close guard'
+}
 if ($StageDirectory) {
     $manifest = Join-Path $StageDirectory 'openbrowser-release-manifest.json'
     if (-not (Test-Path -LiteralPath $manifest)) {
