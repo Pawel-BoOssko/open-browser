@@ -293,6 +293,8 @@ internal static class LiteChatWakeRegistry
                 return 15;
             if (ChatGptLiteForm.WakeDeferralMinutes("response_error", 2) != 15 ||
                 ChatGptLiteForm.WakeDeferralMinutes("response_error", 20) != 20 ||
+                ChatGptLiteForm.WakeDeferralMinutes("assistant_not_complete", 2) != 15 ||
+                ChatGptLiteForm.WakeDeferralMinutes("assistant_not_complete", 20) != 20 ||
                 ChatGptLiteForm.WakeDeferralMinutes("generating", 2) != 2 ||
                 ChatGptLiteForm.WakeDeferralMinutes("backend_http_429", 3) != 3)
                 return 130;

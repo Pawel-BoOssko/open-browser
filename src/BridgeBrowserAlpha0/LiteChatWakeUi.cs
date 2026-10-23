@@ -796,8 +796,13 @@ internal sealed partial class ChatGptLiteForm
     // probing the same failed history every two minutes. Preserve the
     // external scheduler and defer at least one normal 15-minute cycle;
     // never turn a UI failure into an attempted message resend.
+    // When a chat ends on a USER turn with no complete assistant reply,
+    // probing every two minutes cannot make the assistant complete it.
+    // Preserve its state without a resend, and let the normal 15-minute
+    // supervisory cadence try again. Genuine generating work stays at 2m.
     internal static int WakeDeferralMinutes(string reason, int requested) =>
-        reason == "response_error" ? Math.Max(requested, 15) : requested;
+        reason is "response_error" or "assistant_not_complete"
+            ? Math.Max(requested, 15) : requested;
 
     private void DeferWakeWithoutSend(string url, DateTimeOffset now,
         string reason, int minutes = 2)
