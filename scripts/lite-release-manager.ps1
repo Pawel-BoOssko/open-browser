@@ -30,6 +30,32 @@ function Load {
  if(-not(Test-Path -LiteralPath $stateFile)){return $null}
  return (Get-Content -LiteralPath $stateFile -Raw -Encoding UTF8|ConvertFrom-Json)
 }
+# Only an explicitly logged normal close for the exact trial process can
+# authorize ONE keepalive restart. A crash, missing log, wrong PID, changed
+# executable or repeated disappearance still invokes normal rollback.
+function HasRecentTrialCleanClose($s,[string]$eventsFolder){
+ $pidExpected=[int]$s.candidatePid
+ if($pidExpected -le 0){return $false}
+ $lastHealthy=[datetime]::MinValue
+ if($s.lastHealthyUtc){$lastHealthy=([datetimeoffset]::Parse([string]$s.lastHealthyUtc)).UtcDateTime}
+ $now=[datetime]::UtcNow
+ foreach($day in @($now.ToString('yyyy-MM-dd'),$now.AddDays(-1).ToString('yyyy-MM-dd'))){
+  $file=Join-Path $eventsFolder ('lite-events-'+$day+'.jsonl')
+  if(-not(Test-Path -LiteralPath $file)){continue}
+  foreach($line in @(Get-Content -LiteralPath $file -Tail 250 -Encoding UTF8)){
+   try{
+    $e=$line|ConvertFrom-Json -ErrorAction Stop
+    if($e.eventName -ne 'window_closing' -or [int]$e.pid -ne $pidExpected){continue}
+    $stamp=([datetimeoffset]::Parse([string]$e.utc)).UtcDateTime
+    $age=($now-$stamp).TotalSeconds
+    if($age -ge 0 -and $age -le 600 -and $stamp -ge $lastHealthy){
+     return $true
+    }
+   }catch{continue}
+  }
+ }
+ return $false
+}
 function SetTarget([string]$exe){
  if(-not(Test-Path -LiteralPath $exe -PathType Leaf)){throw 'Expected executable not found'}
  $w=New-Object -ComObject WScript.Shell
@@ -110,12 +136,12 @@ try{
   if($previous -eq $staged){throw 'Candidate is already active'}
   $oldProc=@(Get-CimInstance Win32_Process -Filter "name='BridgeBrowserAlpha0.exe'")
   if(@($oldProc|Where-Object {$_.ExecutablePath -ne $previous}).Count){throw 'Unexpected running version'}
-  $s=[pscustomobject]@{phase='promoting';candidateExe=$staged;candidateSha=$expectedSha;previousExe=$previous;startedUtc=(Get-Date).ToUniversalTime().ToString('o');updatedUtc=(Get-Date).ToUniversalTime().ToString('o');badPolls=0;reason='';lastHealthyUtc=$null}
+  $s=[pscustomobject]@{phase='promoting';candidateExe=$staged;candidateSha=$expectedSha;previousExe=$previous;startedUtc=(Get-Date).ToUniversalTime().ToString('o');updatedUtc=(Get-Date).ToUniversalTime().ToString('o');badPolls=0;reason='';lastHealthyUtc=$null;candidatePid=0;cleanCloseRestarts=0}
   Save $s;Log 'PROMOTION_STARTED_BACKUP_REGISTERED'
   try{
    StopLite $previous
    SetTarget $staged
-   [void](Launch $staged)
+   $s.candidatePid=[int](Launch $staged)
    $s.phase='trial';$s.updatedUtc=(Get-Date).ToUniversalTime().ToString('o');$s.lastHealthyUtc=$s.updatedUtc;Save $s
    Log 'PROMOTION_TRIAL_RUNNING'
   }catch{
@@ -141,7 +167,27 @@ try{
  $new=@($proc|Where-Object {$_.ExecutablePath -eq $s.candidateExe})
  $other=@($proc|Where-Object {$_.ExecutablePath -ne $s.candidateExe})
  if($other.Count -gt 0){Rollback $s 'unexpected_active_release';exit 0}
- if($new.Count -eq 0){Rollback $s 'candidate_process_missing';exit 0}
+ if($new.Count -eq 0){
+  # The existing Keepalive, invoked immediately after this release guard,
+  # can reopen the same verified target. This protects an otherwise healthy
+  # trial from being incorrectly rolled back after a deliberate window close.
+  $cleanRestarts=[int]$s.cleanCloseRestarts
+  if($cleanRestarts -eq 0 -and
+     (HasRecentTrialCleanClose $s $root) -and
+     (Test-Path -LiteralPath $s.candidateExe -PathType Leaf)){
+    $sha=[BitConverter]::ToString([Security.Cryptography.SHA256]::Create().ComputeHash(
+      [IO.File]::ReadAllBytes($s.candidateExe))).Replace('-','').ToLowerInvariant()
+    $link=(New-Object -ComObject WScript.Shell).CreateShortcut($shortcut).TargetPath
+    if($sha -eq [string]$s.candidateSha -and $link -eq [string]$s.candidateExe){
+     $s |Add-Member -NotePropertyName cleanCloseRestarts -NotePropertyValue 1 -Force
+     $s.updatedUtc=(Get-Date).ToUniversalTime().ToString('o')
+     Save $s
+     Log 'TRIAL_CLEAN_CLOSE_KEEPALIVE_RESTART_ONCE'
+     exit 0
+    }
+  }
+  Rollback $s 'candidate_process_missing';exit 0
+ }
  $bad=@($new|Where-Object { $p=Get-Process -Id $_.ProcessId -ErrorAction SilentlyContinue; -not $p -or -not $p.Responding -or $p.MainWindowHandle -eq 0 })
  if($bad.Count){$s.badPolls=[int]$s.badPolls+1;Log ('TRIAL_UI_NOT_RESPONDING polls='+$s.badPolls)}
  else{$s.badPolls=0;$s.lastHealthyUtc=(Get-Date).ToUniversalTime().ToString('o')}
