@@ -119,25 +119,41 @@ try{
   # Non-disruptive promotion: never stop a running browser. Only existing
   # Keepalive may start candidate after current browser exits normally.
   $s=Load
-  if($s -and $s.phase -in @('promoting','rolling_back','queued')){
+  if($s -and $s.phase -in @('promoting','rolling_back')){
    throw 'Another release transition is active'
+  }
+  $replaceQueued=($s -and $s.phase -eq 'queued')
+  if($replaceQueued -and $s.waitingToStartSinceUtc){
+   throw 'Old release already exited; queued launch is pending'
   }
   if(-not(Test-Path -LiteralPath $staged -PathType Leaf)){throw 'Candidate executable missing'}
   $hash=[BitConverter]::ToString([Security.Cryptography.SHA256]::Create().ComputeHash(
     [IO.File]::ReadAllBytes($staged))).Replace('-','').ToLowerInvariant()
   if($hash -ne $expectedSha){throw 'Candidate SHA-256 mismatch'}
   $shell=New-Object -ComObject WScript.Shell
-  $previous=$shell.CreateShortcut($shortcut).TargetPath
+  $shortcutTarget=$shell.CreateShortcut($shortcut).TargetPath
+  $previous=if($replaceQueued){[string]$s.previousExe}else{$shortcutTarget}
   if(-not(Test-Path -LiteralPath $previous -PathType Leaf) -or $previous -eq $staged){
    throw 'Current installed release missing or same as candidate'
+  }
+  if($replaceQueued -and $shortcutTarget -ne [string]$s.candidateExe){
+   throw 'Queued shortcut changed; refusing to replace release'
   }
   $running=@(Get-CimInstance Win32_Process -Filter "name='BridgeBrowserAlpha0.exe'")
   if(@($running|Where-Object {$_.ExecutablePath -ne $previous}).Count -or
      $running.Count -ne 1){
    throw 'Queue requires exactly one verified current browser process'
   }
+  if($replaceQueued -and [int]$s.previousPid -ne [int]$running[0].ProcessId){
+   throw 'Queued predecessor PID changed; refusing to replace release'
+  }
   # A proven healthy trial may itself be the rollback target of a newer
   # queued build. Archive its complete earlier rollback chain first.
+  if($replaceQueued){
+   $prior=Join-Path $root ('lite-release-replaced-queue-'+(Get-Date -Format 'yyyyMMdd-HHmmss')+'.json')
+   [IO.File]::Copy($stateFile,$prior,$false)
+   Log ('QUEUED_RELEASE_SUPERSEDED='+$prior)
+  }
   if($s -and $s.phase -eq 'trial'){
    if($previous -ne [string]$s.candidateExe -or
       -not (Get-Process -Id $running[0].ProcessId -ErrorAction SilentlyContinue).Responding){
@@ -158,7 +174,7 @@ try{
   Save $s
   try{
    SetTarget $staged
-   Log 'NEXT_START_QUEUED_CURRENT_PROCESS_UNTOUCHED'
+   Log $(if($replaceQueued){'NEXT_START_QUEUED_REPLACED_NO_RESTART'}else{'NEXT_START_QUEUED_CURRENT_PROCESS_UNTOUCHED'})
   }catch{
    Log ('NEXT_START_QUEUE_FAILED='+$_.Exception.GetType().Name)
    Rollback $s 'queue_failed'

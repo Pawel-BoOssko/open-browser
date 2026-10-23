@@ -58,6 +58,24 @@ function Get-Process {
  if($LASTEXITCODE -ne 0){throw 'watchdog while old running failed'}
  $s=Get-Content (Join-Path $root 'lite-release-state.json') -Raw|ConvertFrom-Json
  if($s.phase -ne 'queued' -or $s.waitingToStartSinceUtc){throw 'Old process interrupted'}
+ # Replace the queued release while the same predecessor is still running.
+ # New file/sha, same predecessor path and PID, no process action.
+ $newest=Join-Path $root 'newest-candidate.exe'
+ Copy-Item -LiteralPath $candidate -Destination $newest
+ [IO.File]::AppendAllText($newest,'test-newer-candidate')
+ $newsha=[BitConverter]::ToString([Security.Cryptography.SHA256]::Create().ComputeHash(
+  [IO.File]::ReadAllBytes($newest))).Replace('-','').ToLowerInvariant()
+ & $sandbox -Mode QueueNextStart -CandidateExe $newest -ExpectedSha $newsha
+ if($LASTEXITCODE -ne 0){throw 'Replacing queued release failed'}
+ $s=Get-Content (Join-Path $root 'lite-release-state.json') -Raw|ConvertFrom-Json
+ if($s.phase -ne 'queued' -or $s.previousExe -ne $old -or
+    $s.previousPid -ne 13579 -or $s.candidateExe -ne $newest -or
+    $shell.CreateShortcut($shortcut).TargetPath -ne $newest -or
+    @((Get-ChildItem $root -Filter 'lite-release-replaced-queue-*.json')).Count -ne 1){
+   throw 'Queued replacement invariants failed'
+ }
+ & $sandbox -Mode Watchdog
+ if($LASTEXITCODE -ne 0){throw 'Watchdog failed on replaced queue'}
  # Second scenario: the same running old executable is a healthy active trial.
  # A newer candidate must be queued without interrupting it; prior trial
  # metadata, including its earlier rollback, must be archived.
