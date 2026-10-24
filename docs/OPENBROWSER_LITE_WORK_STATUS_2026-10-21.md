@@ -1264,3 +1264,9 @@
 - Poprawka P0: rozpoznanie window_closing z poprzedniego dnia; atomic queue supersede przy zgodnym PID, poprzednim EXE oraz SHA i backup starego stanu. SelfTest14/14 + AST0, Queue idempotentne ALREADY_QUEUED, zla suma odrzucona bez zmiany stanu.
 - Windows Keepalive real zadanie ponownie 15:29:42 LastTaskResult0; jeden PID, bez restartu. Brak zmian DPAPI, sesji, leadow, wysylek i Git.
 - Nadal do potwierdzenia: realny clean-close/launch 1.72.91, live worker archive, React DIL limit10 tur i fault rollback; bez przerywania modelu.
+
+## 2026-10-24 16:46 CEST [OB-WAKE-000005] SATAN P0: rollout guard + real worker archive
+- LIVE1.72.92 PID30604, seq5 receipt ebc9ca717b574d06a2d6b2b55dbe9b5e engine visible_ack UTC14:34:31, chat_started UTC14:35:18, paused seq4 late chat_blocked logged UTC14:36:35; bez duplicate POST.
+- SOURCE/STAGED1.72.93 SHA54bfe589..., queued fallback LIVE1.72.92, Node24/24 EXE11/11 PASS. Mitigacja: przy 14 wybudzeniach bez automatycznego sukcesora nie wysylamy przez auto RequestText konczacego WAIT_USER. Automatyczna sukcesja wciaz NOT IMPLEMENTED.
+- SATAN release-manager po rollback wybiera previousExe faktycznego stanu, nie hardcoded1.72.89; AST0 SelfTest18/18 PASS; runtime/source SHAa6f323b0a69dd9750b7893394af32d425faca7933d94d1923ade29e91262aefd.
+- Prawdziwy WebView2 worker zapisal dwa PARTIAL, latest 492 znaki, plik i indeks SHA zweryfikowane. Brak testu FINAL z worker. Bezpieczne przelaczenie dopiero po idle, PBOX1 nietkniety.

@@ -225,3 +225,24 @@ a6f323b0a69dd9750b7893394af32d425faca7933d94d1923ade29e91262aefd
 . Wersja app SOURCE/LIVE 1.72.92, EXE candidate 1.72.93 nie tworzony w tym kroku.
 - Wstepny backup runtime: release-manager-satanamd.backup_20261024_1637.ps1 (pierwszy test markera nie przeszedl przez interpolacje PowerShell, backup identyczny; poprawka i testy przeszly).
 - NEXT P0: ochrona przed automatycznym WAIT_USER przy progu 14 wake, dopoki brak faktycznie przetestowanej sukcesji; testy i osobna wersja staged.
+
+## 2026-10-24 16:43:32 +02:00 [OB-WAKE-000005] K03
+- SOURCE v1.72.93: automatyczny HANDOFF z wymaganiem WAIT_USER zablokowany dopoki brak E2E sukcesji. Przy >=14 wake emitowac tylko bezpieczne project_handoff_auto_gated; manualny HANDOFF wlasciciela nadal dziala. Nie deklarowac pelnej auto rotacji.
+- Zmiany SOURCE: LiteChatHandoff.NeedsRotation/AutonomousSuccessorReady=false, LiteChatWakeUi diagnostyka project_handoff_auto_gated, wersja csproj1.72.93.
+- Testy Node 24/24 PASS, dotnet publish Release 0 errors (WindowsBase warning), STAGED EXE 11/11 exit0 (w tym ChatWake.Handoff i WebView2 fixture). Piersza proba harness PowerShell & EXE nie zwrocila LASTEXITCODE, powtorzony poprawny Start-Process -Wait -PassThru 11/11 exit0.
+- STAGED D:\Apps\OpenBrowserLite\releases\v1.72.93_20261024, SHA256 
+54bfe5891e804808faa1656a31f78183b7fa7b8abefb1c170d83096bc9f06466
+. Manifest zapisany i zweryfikowany; LIVE nadal 1.72.92 PID30604 trial.
+- PBOX1 poza zakresem. NEXT: Queue 1.72.93 nieinwazyjnie, verify previous=1.72.92 i rollback; bez zatrzymywania aktywnej odpowiedzi.
+
+## 2026-10-24 16:46:48 +02:00 [OB-WAKE-000005] K04
+- Release SATA phase=queued candidate v1.72.93 SHA54bfe5891e804808faa1656a31f78183b7fa7b8abefb1c170d83096bc9f06466, previousExe v1.72.92 PID30604 verified. LIVE v1.72.92 jeden proces; bez restartu i bez zadnego ChatGPT send.
+- OBL v1.72.93 w SOURCE/STAGED Node24/24, published EXE11/11 exit0, zero dotnet errors; model manual HANDOFF pozostaje, automatyczny STOP/WAIT_USER od progu14 odroczony do pelnego E2E automatycznej sukcesji.
+- REALNE worker archive LIVE v1.72.92: event worker_archive_saved o UTC14:41:43 oraz14:44:13 przy foreground DOM turns0. Latest responses/<chat-key>/501824c791878b09_partial.md ma 492 znaki i jego SHA256 jest zgodne z ostatnim index.jsonl (UTC14:44:13). To potwierdza worker PARTIAL, nie FINAL.
+- Realne E2E worker FINAL, 10 tur na prawdziwym DIL >10, automatyczna rotacja i 8h soak jeszcze NIE zaliczone; nie ruszano PBOX1 zgodnie z dyspozycja 15:45.
+- NEXT P0: potwierdzic worker FINAL po zakończeniu odpowiedzi seq5, bezpieczna promocja queued v1.72.93 po faktycznym clean close i rollback; nastepnie implementowac dowod HANDOFF plik SHA + nowe /c/ bez szkicu i atomowa zmiane ownership.
+
+## 2026-10-24 16:47 CEST [OB-WAKE-000005] FINAL VERIFIED
+- wake-lifecycle.jsonl seq5 receipt ebc9ca717b574d06a2d6b2b55dbe9b5e: 1 chat_started, 1 chat_finished (aktualny UTC, widoczny ponizej), 1 silnikowy receipt_confirmed visible_ack. Bez wlasnych ACK i resend.
+- SOURCE/STAGED v1.72.93, LIVE v1.72.92 PID30604, release queued newest1.72.93 rollback1.72.92. Nie wdrozono LIVE 1.72.93, nie zamknieto aplikacji.
+- PBOX1 bez zmian na polecenie wlasciciela. Auto HANDOFF nowego czatu nadal niewykonany; kolejne P0 w kontrakcie AUTO_HANDOFF_P0_GATE_2026-10-24.md. Real worker PARTIAL E2E SHA OK; worker FINAL pending.

@@ -1082,6 +1082,13 @@ internal sealed partial class ChatGptLiteForm
                     // threshold; normal wake safety and answer fencing remain.
                     bool isLead = LiteProjectRegistry.OpenDefault().Projects.Any(p =>
                         p.Chats.Any(c => c.Role == "lead" && c.Url == due.Url));
+                    if (LiteChatHandoff.NeedsRotation(due, isLead,
+                        preflight.ObservedTurns) &&
+                        !LiteChatHandoff.AutonomousSuccessorReady)
+                        LiteEventLog.Write("project_handoff_auto_gated", new {
+                            wakeSequence = due.WakeSequence,
+                            reason = "unattended_successor_not_verified"
+                        });
                     if (LiteChatHandoff.Request(due, manual: false,
                         isRegisteredProjectLead: isLead,
                         observedTurns: preflight.ObservedTurns))
