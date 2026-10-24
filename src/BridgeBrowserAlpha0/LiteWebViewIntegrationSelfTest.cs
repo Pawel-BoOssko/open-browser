@@ -142,13 +142,13 @@ internal static class LiteWebViewIntegrationSelfTest
                         "WinForms report timer can arm on deliberate owner opt-in");
                     Ensure(await EvaluateAsync(core,
                         "window.__OPENBROWSER_HARD_PRUNE__?.status().enabled") ==
-                        "false", "hard DOM pruning defaults OFF in real WebView2");
+                        "true", "hard DOM pruning defaults ON with archive gate in real WebView2");
                     Ensure(await EvaluateAsync(core,
                         "window.__OPENBROWSER_HARD_PRUNE__?.status().lastCheckedAt === null") ==
-                        "true", "disabled hard DOM script never performs startup pruning");
+                        "true", "startup prune runs only after its initial delay");
                     Ensure(await EvaluateAsync(core,
                         "window.__OPENBROWSER_HARD_PRUNE__.enable(true).enabled") ==
-                        "true", "hard prune can still be deliberately enabled");
+                        "true", "hard prune remains enabled after repeated owner opt-in");
                     Ensure(await EvaluateAsync(core,
                         "window.__OPENBROWSER_HARD_PRUNE__.enable(false).enabled") ==
                         "false", "owner can turn hard prune back OFF");
@@ -971,6 +971,35 @@ internal static class LiteWebViewIntegrationSelfTest
                     Ensure(await EvaluateAsync(core,
                         "document.querySelectorAll('[data-ob-lite-offscreen]').length") == "0",
                         "soft CSS pilot is fully reversible");
+
+                    // Real offline WebView2 check for the 10-turn bound, with a
+                    // mandatory durable-archive acknowledgement before deletion.
+                    phase = "hard_dom_archive_gate_10_turns";
+                    Ensure(await EvaluateAsync(core,
+                        "window.__OPENBROWSER_HARD_PRUNE__.enable(true).enabled") ==
+                        "true", "owner can enable 10-turn hard pruning");
+                    Ensure(await EvaluateAsync(core,
+                        "window.__OPENBROWSER_HARD_PRUNE__.prune().skipped") ==
+                        "awaiting_archive",
+                        "WebView2 may not prune assistant text without archive proof");
+                    Ensure(await EvaluateAsync(core,
+                        "document.querySelectorAll('main [data-user-message-bubble],main [data-chatgpt-selection-message-id]').length > 10") ==
+                        "true", "unarchived messages remain visible");
+                    await core.ExecuteScriptAsync("""
+                        window.__OPENBROWSER_HARD_PRUNE__.ackSaved(
+                          Array.from(document.querySelectorAll(
+                            'main [data-chatgpt-selection-message-id]'))
+                          .map(n => n.getAttribute('data-chatgpt-selection-message-id')))
+                        """);
+                    Ensure(await EvaluateAsync(core,
+                        "window.__OPENBROWSER_HARD_PRUNE__.prune().visibleTurns") ==
+                        "10", "offline WebView2 leaves exactly ten messages after archive proof");
+                    Ensure(await EvaluateAsync(core,
+                        "document.querySelectorAll('main [data-user-message-bubble],main [data-chatgpt-selection-message-id]').length") ==
+                        "10", "actual DOM contains ten retained messages");
+                    Ensure(await EvaluateAsync(core,
+                        "document.querySelector('#prompt-textarea') !== null") ==
+                        "true", "10-turn prune never removes composer");
 
                     // The same WebView2 worker must isolate two different
                     // chat histories after real document navigations.

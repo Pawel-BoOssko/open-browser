@@ -15,7 +15,15 @@ function element(tag, attrs = {}) {
     contains(node) {
       return node === this || this.children.some(child => child.contains(node));
     },
-    querySelector() { return null; },
+    querySelector(sel) {
+      if (sel.includes('data-message-author-role="assistant"'))
+        return this.children.find(c =>
+          c.attrs["data-message-author-role"] === "assistant") || null;
+      if (sel.includes('data-message-author-role="user"'))
+        return this.children.find(c =>
+          c.attrs["data-message-author-role"] === "user") || null;
+      return null;
+    },
     remove() {
       if (this.parentNode) {
         this.parentNode.children = this.parentNode.children.filter(c => c !== this);
@@ -51,7 +59,9 @@ function setup(count, opts = {}) {
   function append(i) {
     const wrapper = element("DIV");
     if (opts.legacy) wrapper.attrs["data-testid"] = "conversation-turn-" + i;
-    const marker = element("DIV", opts.legacy ? {} : i % 2 === 0 ?
+    const marker = element("DIV", opts.legacy ?
+      {"data-message-author-role": i % 2 === 0 ? "user" : "assistant"} :
+      i % 2 === 0 ?
       {"data-user-message-bubble": ""} :
       {"data-chatgpt-selection-message-id": "assistant-" + i});
     wrapper.appendChild(marker); main.appendChild(wrapper);
@@ -68,6 +78,10 @@ function setup(count, opts = {}) {
     getSelection() {return opts.selection || ""}
   };
   vm.runInNewContext(code, {window:win,Date});
+  if (opts.archived !== false && win.__OPENBROWSER_HARD_PRUNE__)
+    win.__OPENBROWSER_HARD_PRUNE__.ackSaved(
+      Array.from({length:count}, (_,i) => opts.legacy ?
+        "conversation-turn-" + i : "assistant-" + i));
   return {win,doc,main,append,api:win.__OPENBROWSER_HARD_PRUNE__};
 }
 {
@@ -138,4 +152,15 @@ function setup(count, opts = {}) {
   // New tail IDs change, so this must NOT trigger the loop guard.
   assert.ok(x.api.prune().enabled);
 }
-console.log("LiteDomHardPrune: DIL and legacy 11 test scenarios PASS");
+{
+  const x = setup(15,{archived:false});
+  const result = x.api.prune();
+  assert.equal(result.skipped,"awaiting_archive",
+    "cannot remove an unarchived assistant answer");
+  assert.ok(x.main.children.length > 10);
+  x.api.ackSaved(["assistant-1","assistant-3"]);
+  const after = x.api.prune();
+  assert.equal(after.lastRemoved, 4);
+  assert.equal(x.main.children.length,10);
+}
+console.log("LiteDomHardPrune: DIL and legacy 12 test scenarios PASS");

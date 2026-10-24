@@ -42,5 +42,37 @@
     }
   }
 
-  global.__OPENBROWSER_LITE_SNAPSHOT__ = { collect };
+
+  // Before pruning, persist the oldest answers as well as the newest ones.
+  // Limit each scan to 64 historical answers to avoid a large payload.
+  function collectForArchive() {
+    const recent = collect();
+    if (recent.some(item => item.partial)) return recent;
+    if (!/^\/(c|g)\//.test(global.location.pathname)) return [];
+    const main = global.document.querySelector('main,[role="main"]');
+    if (!main) return [];
+    const modern = Array.from(main.querySelectorAll(
+      '[data-chatgpt-selection-message-id]'));
+    const nodes = modern.length ? modern : Array.from(main.querySelectorAll(
+      '[data-message-author-role="assistant"]'));
+    const known = new Set(recent.map(item => item.turnId));
+    const history = [];
+    for (let i = 0; i < nodes.length && history.length < 64; i++) {
+      const node = nodes[i];
+      const text = typeof node.innerText === "string" ? node.innerText : "";
+      if (text.trim().length < 5 || text.length > 200000) continue;
+      const parent = modern.length ? null :
+        node.closest?.('[data-testid^="conversation-turn-"]');
+      const id = (modern.length ?
+        node.getAttribute?.("data-chatgpt-selection-message-id") :
+        parent?.getAttribute?.("data-testid")) || "assistant-" + i;
+      if (!known.has(id)) {
+        history.push({ turnId: id, text, partial: false });
+        known.add(id);
+      }
+    }
+    return history.concat(recent);
+  }
+
+  global.__OPENBROWSER_LITE_SNAPSHOT__ = { collect, collectForArchive };
 })(window);

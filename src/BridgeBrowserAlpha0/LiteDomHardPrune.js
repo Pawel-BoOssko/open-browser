@@ -11,6 +11,8 @@
     lastPrunedAt: 0, lastTailKey: null, reinsertions: 0
   };
   const doc = global.document;
+  // Only a successful, durable Markdown write in the host may acknowledge an answer.
+  const savedAnswers = new Set();
   const modernSelector = '[data-user-message-bubble],[data-chatgpt-selection-message-id]';
   const legacySelector = '[data-testid^="conversation-turn-"]';
 
@@ -63,7 +65,7 @@
     if (legacy.length && modern.length)
       return { reason: "mixed_dom", turns: [], type: "mixed", tailKey: "" };
     if (legacy.length)
-      return { turns: legacy, type: "legacy",
+      return { turns: legacy, markers: legacy, type: "legacy",
         tailKey: legacy.at(-1)?.getAttribute?.("data-testid") || "" };
     if (!modern.length)
       return { reason: "no_messages", turns: [], type: "unknown", tailKey: "" };
@@ -78,7 +80,7 @@
       for (let j = i + 1; j < turns.length; j++)
         if (turns[i].contains?.(turns[j]) || turns[j].contains?.(turns[i]))
           return { reason: "overlapping_wrappers", turns: [], type: "dil", tailKey: "" };
-    return { turns, type: "dil", tailKey: ids.at(-1) || "" };
+    return { turns, markers: modern, type: "dil", tailKey: ids.at(-1) || "" };
   }
 
   let timer = null;
@@ -99,6 +101,36 @@
       skipped: state.skipped, failures: state.failures,
       reinsertions: state.reinsertions
     };
+  }
+
+  function ackSaved(ids) {
+    if (!Array.isArray(ids)) return status();
+    for (const id of ids) {
+      if (typeof id === "string" && id.length > 0 && id.length < 512)
+        savedAnswers.add(id);
+    }
+    return status();
+  }
+
+  function isPersistedOrUser(result, index) {
+    const marker = result.markers[index];
+    if (!marker) return false;
+    if (result.type === "dil") {
+      // A user bubble has no model response to archive.
+      if (typeof marker.getAttribute === "function" &&
+          marker.getAttribute("data-user-message-bubble") !== null)
+        return true;
+      const id = marker.getAttribute?.("data-chatgpt-selection-message-id");
+      return typeof id === "string" && savedAnswers.has(id);
+    }
+    // Legacy wrappers are accepted only with a known author role.
+    if (marker.querySelector?.('[data-message-author-role="user"]'))
+      return true;
+    if (marker.querySelector?.('[data-message-author-role="assistant"]')) {
+      const id = marker.getAttribute?.("data-testid");
+      return !!id && savedAnswers.has(id);
+    }
+    return false;
   }
 
   function prune() {
@@ -129,8 +161,15 @@
       }
     } else state.reinsertions = 0;
     let removed = 0;
+    let waitingForArchive = false;
     const limit = turns.length - config.keepNewest;
     for (let i = 0; i < limit; i++) {
+      // Never delete an assistant answer not verified on disk.
+      // Preserve chronological sequence if any historic answer is missing.
+      if (!isPersistedOrUser(result, i)) {
+        waitingForArchive = true;
+        break;
+      }
       const node = turns[i];
       if (!node || !node.parentNode ||
           (doc.activeElement && node.contains?.(doc.activeElement))) {
@@ -145,7 +184,8 @@
     state.lastPrunedAt = now;
     state.lastTailKey = result.tailKey;
     state.lastVisibleTurns = turns.length - removed;
-    state.skipped = removed ? "pruned" : "nothing_removable";
+    state.skipped = waitingForArchive ? "awaiting_archive" :
+      removed ? "pruned" : "nothing_removable";
     return status();
   }
 
@@ -164,6 +204,6 @@
     return status();
   }
 
-  global.__OPENBROWSER_HARD_PRUNE__ = { prune, status, enable };
+  global.__OPENBROWSER_HARD_PRUNE__ = { prune, status, enable, ackSaved };
   start();
 })(window);

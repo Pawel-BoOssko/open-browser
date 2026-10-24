@@ -100,4 +100,22 @@ function init(opts = {}) {
   assert.equal(parts[0].partial, true);
   assert.ok(a.reads > 0, "one bounded snapshot during generation");
 }
-console.log("LiteConversationSnapshot: 9 PASS");
+{
+  const a = init({ modernTexts: [
+    "Pierwsza odpowiedź", "Druga odpowiedź",
+    "Trzecia odpowiedź", "Czwarta odpowiedź"
+  ] });
+  const all = a.api.collectForArchive();
+  assert.equal(all.length, 4, "archive historical and latest answers");
+  assert.equal(all[0].turnId, "dil-0", "archive oldest first");
+  assert.equal(all[3].turnId, "dil-2", "latest reply remains captured");
+}
+{
+  const a = init({ modernTexts: ["Streaming partial answer"],
+    generating: true });
+  const all = a.api.collectForArchive();
+  assert.equal(all.length, 1);
+  assert.equal(all[0].partial, true,
+    "never mark an active partial answer as completed");
+}
+console.log("LiteConversationSnapshot: 11 PASS");

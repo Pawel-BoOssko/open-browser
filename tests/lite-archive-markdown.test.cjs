@@ -46,5 +46,8 @@ assert.match(captureCs, /_markdownArchive\.Save\(chatUrl, turnId, text, partial\
 assert.match(captureCs, /!partial && _archive\.Save\(chatUrl, turnId, text\)/);
 const md = fs.readFileSync(path.join(root,"LiteResponseMarkdownArchive.cs"),"utf8");
 assert.match(md, /index\.jsonl/);
+assert.match(md, /IsPersisted\(/);
+assert.match(captureCs, /collectForArchive\(\)/);
+assert.match(captureCs, /ackSaved\(/);
 assert.match(md, /File\.Move\(temp, file, true\)/);
 console.log("LiteArchiveMarkdown: 10 assertions PASS");

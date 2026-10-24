@@ -1,14 +1,15 @@
 # Open Browser Lite: checkpoint roboczy
-Aktualizacja: 2026-10-24 12:39 CEST. Host pracy: SATANAMD.
-- PLAN: MASTER_PLAN_MIGRACJI_I_ROZWOJU_2026-10-24.md zapisany na SATANAMD i PBOX1.
-- PBOX1: Lite zatrzymany, Keepalive Disabled; dane oryginalne zachowane.
-- SATANAMD LIVE: Lite v1.72.85, PID 11904, okno odpowiada; Keepalive co 5 min.
-- SATANAMD SOURCE: v1.72.86. Nie mylić z LIVE v1.72.85.
-- MIGRACJA: 22 pliki rejestrów/stanu przeniesione i zweryfikowane po ponownym DPAPI. Historyczne archiwum 84 plików na PBOX1 nieprzeniesione.
-- HARMONOGRAM: z 6 zapisanych czatów aktywny tylko Networking Radar; projekt Open Browser Lite wstrzymany. Nie aktywować pochopnie.
-- ODPOWIEDZI: v1.72.85 zapisuje Markdown; 2 prawdziwe pliki odpowiedzi + index.jsonl na SATANAMD.
-- DOM <=10: kod SOURCE i testy przerobione, 24/24 Node PASS. NIE wdrożono jeszcze tej zmiany do LIVE; brak długiego E2E DIL.
-- OSTATNI KROK: poprawiono fixture testu legacy/modern; pełny zestaw Node 24/24 PASS.
-- NASTĘPNE: sprawdzić bieżące modyfikacje SOURCE (v1.72.86), zbudować izolowany release, wykonać EXE selftest, potem realny test React/DIL >10 tur bez utraty odpowiedzi.
-- WAŻNE: bez niepotwierdzonych retransmisji; nie kasować DPAPI/profilu/archiwum PBOX1.
-- ZASADA DALSZEJ PRACY: aktualizować TEN plik po każdym istotnym kroku i PRZED restartem, zmianą wersji, migracją stanu; wpis: LIVE, SOURCE, wynik testów, ostatnie działanie, następne działanie i blokada. Maks. kilkanaście krótkich wierszy. Odczytać go jako pierwszy po każdej utracie kontekstu.
+Aktualizacja: 2026-10-24 13:00 CEST. Host: SATANAMD.
+- PLAN: docs/OPENBROWSER_LITE_MASTER_PLAN_MIGRACJI_I_ROZWOJU_2026-10-24.md.
+- PBOX1: Lite = 0, Keepalive Disabled; stare DPAPI/Profile/logi zachowane.
+- SATANAMD LIVE: v1.72.85, PID 11904; Keepalive co 5 min celuje jeszcze w 1.72.85.
+- SATANAMD SOURCE/STAGED: v1.72.88. EXE: D:\Apps\OpenBrowserLite\releases\v1.72.88_20261024\BridgeBrowserAlpha0.exe.
+- v1.72.88 SHA256: 3E12AC0B5B9811DF5CC4E23D57FB97C29D31E8D44432E2B9EA3E8E92D7DB7C7C.
+- TESTY: Node 24/24, EXE 10/10, dotnet publish 0 errors. Offline real WebView2: >10 tur, nie usuwa bez ACK archiwum, po ACK 10 tur, composer zachowany.
+- ARCHIWIZACJA: czytelne Markdown w %LOCALAPPDATA%\OpenBrowser\ChatGPT-Lite\responses, zapis PARTIAL/FINAL; pierwszy test LIVE v1.72.85 zapisał 2 pliki.
+- MIGRACJA: 22 pliki danych PBOX1 zaimportowane na SATANAMD i sprawdzone; stare 84 pliki archive na PBOX1 pozostają nienaruszone.
+- HARMONOGRAM: 6 czatów zapisanych, tylko Networking Radar enabled, Open Browser Lite paused. Ostatnie due seq14 zostało odroczone same_answer_already_woken; brak automatycznej retransmisji.
+- PRZED RESTARTEM: ostatni preflight 24.10 12:47:49 CEST: generating=false, draft=false; NIE utożsamiać starego pomiaru z aktualnym.
+- TERAZ: przejście v1.72.85 -> 1.72.88 wyłącznie jeśli świeże warunki bezpieczne; zmienić Keepalive na 1.72.88, graceful close, uruchomić 1 proces, sprawdzić nowy JS i zachowanie profilu.
+- NAJWAŻNIEJSZY BRAK: jeszcze niezweryfikowano realnego ChatGPT React z >10 turami ani 8h/24h stabilności. Nie ogłaszać zadania ukończonym.
+- PO AWARII: najpierw odczytać ten checkpoint, stan procesu, najnowszy lite-events JSONL, wake-lifecycle JSONL. Nie powtarzać niepewnych wiadomości. Aktualizować plik po każdym istotnym kroku.

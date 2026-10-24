@@ -72,7 +72,7 @@ internal sealed partial class ChatGptLiteForm
         try
         {
             var call = core.ExecuteScriptAsync(
-                "window.__OPENBROWSER_LITE_SNAPSHOT__ ? JSON.stringify(window.__OPENBROWSER_LITE_SNAPSHOT__.collect()) : null");
+                "window.__OPENBROWSER_LITE_SNAPSHOT__ ? JSON.stringify(window.__OPENBROWSER_LITE_SNAPSHOT__.collectForArchive()) : null");
             _captureTask = call;
             if (await Task.WhenAny(call, Task.Delay(7000)) != call)
             {
@@ -93,6 +93,7 @@ internal sealed partial class ChatGptLiteForm
             using var document = JsonDocument.Parse(json);
             if (document.RootElement.ValueKind != JsonValueKind.Array) return;
             int snapshots = 0;
+            var persistedIds = new List<string>();
             foreach (var item in document.RootElement.EnumerateArray())
             {
                 if (!item.TryGetProperty("turnId", out var idElement) ||
@@ -105,8 +106,21 @@ internal sealed partial class ChatGptLiteForm
                 string chatUrl = uri.GetLeftPart(UriPartial.Path);
                 if (_markdownArchive.Save(chatUrl, turnId, text, partial))
                     snapshots++;
+                if (!partial && _markdownArchive.IsPersisted(chatUrl, turnId, text))
+                    persistedIds.Add(turnId);
                 if (!partial && _archive.Save(chatUrl, turnId, text))
                     snapshots++;
+            }
+            if (persistedIds.Count > 0 && _archiveEnabled &&
+                IsArchiveResultCurrent(epoch, _captureEpoch, uri, core.Source))
+            {
+                string idsJson = JsonSerializer.Serialize(persistedIds.Distinct().ToArray());
+                var acknowledgement = core.ExecuteScriptAsync(
+                    "window.__OPENBROWSER_HARD_PRUNE__?.ackSaved(" + idsJson + ")");
+                if (await Task.WhenAny(acknowledgement, Task.Delay(6000)) == acknowledgement)
+                    await acknowledgement;
+                else
+                    LiteEventLog.Write("hard_dom_archive_ack_delayed");
             }
             if (snapshots > 0)
                 _archiveToggle.Text = "Kopie: zapisano";

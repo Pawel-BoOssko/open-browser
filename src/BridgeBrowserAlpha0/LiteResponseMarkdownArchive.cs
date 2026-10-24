@@ -82,6 +82,20 @@ internal sealed class LiteResponseMarkdownArchive
         return true;
     }
 
+    internal bool IsPersisted(string conversationUrl, string turnId,
+        string displayedText)
+    {
+        if (string.IsNullOrWhiteSpace(conversationUrl) ||
+            string.IsNullOrWhiteSpace(turnId)) return false;
+        string cleaned = Clean(displayedText);
+        if (cleaned.Length < 5 || cleaned.Length > 200_000) return false;
+        string path = Path.Combine(_root, Hash(conversationUrl),
+            Hash(turnId)[..16] + "_" + Hash(cleaned)[..16] + ".md");
+        return File.Exists(path) &&
+            string.Equals(File.ReadAllText(path, Encoding.UTF8),
+                cleaned + "\n", StringComparison.Ordinal);
+    }
+
     internal static int SelfTest()
     {
         string dir = Path.Combine(Path.GetTempPath(),
@@ -95,6 +109,8 @@ internal sealed class LiteResponseMarkdownArchive
             if (!store.Save(url, "turn1", "Pierwszy fragment", true)) return 2;
             if (!store.Save(url, "turn1", "Zakończona odpowiedź", false)) return 3;
             if (store.Save(url, "turn1", "Zakończona odpowiedź", false)) return 4;
+            if (!store.IsPersisted(url, "turn1", "Zakończona odpowiedź")) return 8;
+            if (store.IsPersisted(url, "turn1", "Nieistniejąca odpowiedź")) return 9;
             string[] files = Directory.GetFiles(dir, "*.md", SearchOption.AllDirectories);
             if (files.Length != 2 ||
                 !files.Any(x => File.ReadAllText(x).Contains("Zakończona odpowiedź")))
