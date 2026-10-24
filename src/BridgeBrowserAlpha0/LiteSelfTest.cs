@@ -21,7 +21,7 @@ internal static class LiteSelfTest
             var c1 = store.AddChat(extra.Id, "A", "https://chatgpt.com/c/11111111-1111-1111-1111-111111111111");
             var c2 = store.AddChat(extra.Id, "B", "https://chatgpt.com/c/22222222-2222-2222-2222-222222222222");
             store.PromoteLead(extra.Id, c2.Id);
-            Require(c1.Role == "worker" && c2.Role == "lead", "single lead");
+            Require(c1.Role == "archive" && c2.Role == "lead", "single lead");
             var second = LiteProjectRegistry.Open(file);
             var saved = second.Projects.Single(p => p.Id == extra.Id);
             Require(saved.Chats.Count == 2, "chat persistence");
