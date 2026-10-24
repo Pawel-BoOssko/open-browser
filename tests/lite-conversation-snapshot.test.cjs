@@ -27,11 +27,13 @@ function init(opts = {}) {
     document: {
       querySelectorAll(sel) {
         reads++;
+        if (sel.includes('[data-testid="stop-button"]')) return opts.generating ? [{}] : [];
         if (sel === '[data-chatgpt-selection-message-id]') return modern;
         if (sel === '[data-message-author-role="assistant"]') return legacy;
         throw new Error("unknown selector " + sel);
       },
       querySelector(sel) {
+        if (sel === 'main,[role="main"]') return this;
         if (sel.includes('aria-label="Zatrzymaj"')) return opts.generating ? {} : null;
         return null;
       }
@@ -92,8 +94,10 @@ function init(opts = {}) {
 {
   const a = init({ modernTexts: ["Streaming partial answer"],
     generating: true });
-  assert.equal(a.api.collect().length, 0,
-    "never archive partial output while Stop is visible");
-  assert.equal(a.reads, 0, "do not read long DOM while generating");
+  const parts = a.api.collect();
+  assert.equal(parts.length, 1,
+    "archive newest partial answer while Stop is visible");
+  assert.equal(parts[0].partial, true);
+  assert.ok(a.reads > 0, "one bounded snapshot during generation");
 }
 console.log("LiteConversationSnapshot: 9 PASS");

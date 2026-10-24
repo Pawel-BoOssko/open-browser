@@ -6,20 +6,25 @@
   function collect() {
     try {
       if (!/^\/(c|g)\//.test(global.location.pathname)) return [];
-      const doc = global.document;
-      // Capture completed replies only. Streaming innerText every few seconds
-      // forces layout work and stores a long sequence of partial revisions.
-      if (doc.querySelector('[data-testid="stop-button"],button[aria-label="Zatrzymaj"],button[aria-label="Stop generating"]'))
-        return [];
-      const modern = Array.from(doc.querySelectorAll(
+      const main = global.document.querySelector('main,[role="main"]');
+      if (!main) return [];
+      const stopping = Array.from(main.querySelectorAll(
+        '[data-testid="stop-button"],button[aria-label="Zatrzymaj"],' +
+        'button[aria-label="Stop generating"],button[aria-label="Przerwij generowanie"]'));
+      const generating = stopping.some(n => !n.hidden && !n.disabled &&
+        n.getAttribute?.("aria-hidden") !== "true" &&
+        (typeof n.getClientRects !== "function" || n.getClientRects().length > 0));
+      const modern = Array.from(main.querySelectorAll(
         '[data-chatgpt-selection-message-id]'));
-      const nodes = modern.length ? modern : Array.from(doc.querySelectorAll(
+      const nodes = modern.length ? modern : Array.from(main.querySelectorAll(
         '[data-message-author-role="assistant"]'));
       const results = [];
       const ids = new Set();
-      for (let index = nodes.length - 1; index >= 0 && results.length < 2; index--) {
+      // Streaming: capture the newest assistant only. Completed: latest two.
+      // Capturing a partial every 30s is needed for recovery of long work.
+      const cap = generating ? 1 : 2;
+      for (let index = nodes.length - 1; index >= 0 && results.length < cap; index--) {
         const node = nodes[index];
-        // Read only displayed text, not hidden app state or raw React data.
         const text = typeof node.innerText === "string" ? node.innerText : "";
         if (text.trim().length < 5 || text.length > 200000) continue;
         const parent = modern.length ? null :
@@ -29,7 +34,7 @@
           parent?.getAttribute?.("data-testid")) || "assistant-" + index;
         if (ids.has(id)) continue;
         ids.add(id);
-        results.push({ turnId: id, text });
+        results.push({ turnId: id, text, partial: generating });
       }
       return results;
     } catch (_) {

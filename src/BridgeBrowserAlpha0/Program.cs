@@ -239,6 +239,11 @@ internal static class Program
             Environment.ExitCode = LiteBrandIcon.SelfTest();
             return;
         }
+        if (args.Any(arg => string.Equals(arg, "--lite-markdown-selftest", StringComparison.OrdinalIgnoreCase)))
+        {
+            Environment.ExitCode = LiteResponseMarkdownArchive.SelfTest();
+            return;
+        }
         if (args.Any(arg => string.Equals(arg, "--lite-webview-integration-selftest", StringComparison.OrdinalIgnoreCase)))
         {
             ApplicationConfiguration.Initialize();

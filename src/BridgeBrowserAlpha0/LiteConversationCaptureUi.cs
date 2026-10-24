@@ -6,6 +6,7 @@ namespace BridgeBrowserAlpha0;
 internal sealed partial class ChatGptLiteForm
 {
     private readonly LiteSecureArchive _archive = new();
+    private readonly LiteResponseMarkdownArchive _markdownArchive = new();
     // Completed-answer snapshots only. Avoid a full DOM read every 12 seconds.
     private readonly System.Windows.Forms.Timer _captureTimer = new() { Interval = 30000 };
     private readonly Button _archiveToggle = new()
@@ -99,7 +100,12 @@ internal sealed partial class ChatGptLiteForm
                 string? turnId = idElement.GetString();
                 string? text = textElement.GetString();
                 if (turnId is null || text is null) continue;
-                if (_archive.Save(uri.GetLeftPart(UriPartial.Path), turnId, text))
+                bool partial = item.TryGetProperty("partial", out var phase) &&
+                    phase.ValueKind == JsonValueKind.True;
+                string chatUrl = uri.GetLeftPart(UriPartial.Path);
+                if (_markdownArchive.Save(chatUrl, turnId, text, partial))
+                    snapshots++;
+                if (!partial && _archive.Save(chatUrl, turnId, text))
                     snapshots++;
             }
             if (snapshots > 0)
