@@ -223,7 +223,15 @@ internal static class LiteChatWakeRegistry
                 "Nie dopisuj fałszywego ACK ani nie uznawaj próby za wysłaną. " +
                 "Jeśli zapis do dziennika SATANAMD się nie uda, wskaż to " +
                 "w checkpointcie; nie udawaj sukcesu. " +
-                "Nie używaj ChatGPT Tasks ani wewnętrznych automatyzacji.";
+                "Nie używaj ChatGPT Tasks ani wewnętrznych automatyzacji. " +
+                "Gdy JEDNA operacja lub narzędzie odmówi zapisu, " +
+                "odnotuj fakt i kontynuuj inne dozwolone zadania P0. " +
+                "Nie obchodź odmowy innym kanałem. " +
+                "Nie kończ CAŁEJ autonomicznej pracy statusem BLOCKED " +
+                "wyłącznie z powodu jednej odrzuconej operacji; " +
+                "BLOCKED oznacza, że naprawdę nie da się już wykonać " +
+                "żadnego dalszego dozwolonego kroku. " +
+                "Błędy konkretnego narzędzia umieść w checkpointcie.";
         // Radar models sometimes mix the displayed [OB-...] marker and
         // [OB-WAKE-...] into one receipt value in chat-side journal entries.
         // Keep the engine's mechanical evidence untouched; make the optional

@@ -55,6 +55,15 @@ internal static class LiteModelStatus
         return status.Code;
     }
 
+    internal static bool ShouldRecoverBlock(string? decision, bool obLead) =>
+        obLead && decision == "BLOCKED";
+
+    internal static bool IsBlockedRetryDue(string? lastState,
+        string? lastKey, string currentKey) =>
+        lastState == "status_blocked_recovering" &&
+        !string.IsNullOrEmpty(currentKey) &&
+        string.Equals(lastKey, currentKey, StringComparison.Ordinal);
+
     internal static int SelfTest()
     {
         var t = DateTimeOffset.Parse("2026-10-22T17:00:00Z");
@@ -79,6 +88,14 @@ internal static class LiteModelStatus
         if (ApplyDecision(hold, DateTimeOffset.Parse("2026-11-24T00:00:00Z"), "ready")
             is not null) return 5;
         if (ApplyDecision(hold, t, "wrong_chat") is not null) return 6;
+        if (!ShouldRecoverBlock("BLOCKED", true) ||
+            ShouldRecoverBlock("BLOCKED", false) ||
+            ShouldRecoverBlock("WAIT_USER", true) ||
+            ShouldRecoverBlock("DONE", true)) return 7;
+        if (IsBlockedRetryDue("status_blocked", "a", "a") ||
+            IsBlockedRetryDue("status_blocked_recovering", "a", "b") ||
+            !IsBlockedRetryDue("status_blocked_recovering", "a", "a"))
+            return 8;
         return 0;
     }
 }

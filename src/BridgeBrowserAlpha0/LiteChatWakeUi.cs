@@ -720,6 +720,37 @@ internal sealed partial class ChatGptLiteForm
         string? decision = LiteModelStatus.ApplyDecision(parsed, now, reason);
         if (decision is null or "CONTINUE") return false;
         if (answerHash.Length != 64) return false;
+        // Owner explicitly requires autonomous continuation of Open Browser
+        // Lite. A tool rejecting ONE action must not disable this project
+        // indefinitely: retain the durable answer fence and retry the next
+        // safe wake after a short cooldown. Never bypass a tool refusal.
+        bool obLead = LiteProjectRegistry.OpenDefault().Projects.Any(p =>
+            p.Title == "Open Browser Lite" &&
+            p.Chats.Any(c => c.Url == due.Url && c.Role == "lead"));
+        if (LiteModelStatus.ShouldRecoverBlock(decision, obLead))
+        {
+            string blockKey = LiteOwnerInterventions.EventKey(
+                due.Url, decision, answerHash);
+            if (LiteModelStatus.IsBlockedRetryDue(
+                    due.LastState, due.LastInterventionKey, blockKey))
+            {
+                // The previously blocked answer was already acknowledged
+                // and cooled down; allow the normal route/preflight/receipt
+                // gate to send ONE new wake. No immediate resend.
+                LiteEventLog.Write("multi_wake_model_block_recovery_ready");
+                return false;
+            }
+            due.LastState = "status_blocked_recovering";
+            due.LastInterventionKey = blockKey;
+            due.DueUtc = now.AddMinutes(2);
+            LiteChatWakeRegistry.Write(entries);
+            LiteWakeJournal.Write("deferred", due.WakeSequence + 1,
+                result: "recoverable_model_block");
+            LiteEventLog.Write("multi_wake_model_block_recoverable",
+                new { retryMinutes = 2, scheduleEnabled = due.Enabled });
+            UpdateMultiWakeStatus();
+            return true;
+        }
         if (decision == "WAIT_UNTIL")
         {
             due.DueUtc = parsed!.UntilUtc!.Value;
