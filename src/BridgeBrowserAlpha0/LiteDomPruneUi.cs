@@ -7,13 +7,13 @@ internal sealed partial class ChatGptLiteForm
 {
     private readonly Button _hardPruneToggle = new()
     {
-        Text = "DOM mocne: NIE", Width = 128
+        Text = "DOM mocne: TAK", Width = 128
     };
     private readonly System.Windows.Forms.Timer _pruneReportTimer = new()
     {
         Interval = 60000
     };
-    private bool _hardPruneEnabled = false;
+    private bool _hardPruneEnabled = true;
     private bool _pruneProbePending;
     private Task<string>? _pruneProbeTask;
     private int _lastReportedPruned;
@@ -32,6 +32,7 @@ internal sealed partial class ChatGptLiteForm
             await ApplyHardPruneModeAsync();
         };
         _pruneReportTimer.Tick += async (_, _) => await PollHardPruneStatusAsync();
+        UpdateHardPruneReportTimer();
     }
 
     internal static bool ShouldPollHardPrune(bool ownerEnabled) => ownerEnabled;
@@ -49,8 +50,8 @@ internal sealed partial class ChatGptLiteForm
         string script = await File.ReadAllTextAsync(
             Path.Combine(AppContext.BaseDirectory, "LiteDomHardPrune.js"));
         await core.AddScriptToExecuteOnDocumentCreatedAsync(script);
-        LiteEventLog.Write("hard_dom_script_installed", new { defaultEnabled = false,
-            keepNewest = 24, threshold = 90 });
+        LiteEventLog.Write("hard_dom_script_installed", new { defaultEnabled = true,
+            keepNewest = 10, threshold = 11 });
     }
 
     private async Task ApplyHardPruneModeAsync()
@@ -100,6 +101,16 @@ internal sealed partial class ChatGptLiteForm
             if (string.IsNullOrWhiteSpace(json)) return;
             using var doc = JsonDocument.Parse(json);
             var root = doc.RootElement;
+            if (root.TryGetProperty("enabled", out var enabled) &&
+                enabled.ValueKind == JsonValueKind.False && _hardPruneEnabled)
+            {
+                _hardPruneEnabled = false;
+                _hardPruneToggle.Text = "DOM mocne: wstrzymano";
+                LiteEventLog.Write("hard_dom_auto_disabled", new {
+                    reason = root.GetProperty("skipped").GetString()
+                });
+                UpdateHardPruneReportTimer();
+            }
             int count = root.GetProperty("removedTotal").GetInt32();
             if (count != _lastReportedPruned)
             {

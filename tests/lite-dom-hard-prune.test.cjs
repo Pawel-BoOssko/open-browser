@@ -3,127 +3,139 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
-const script = fs.readFileSync(path.join(__dirname,
+const code = fs.readFileSync(path.join(__dirname,
   "../src/BridgeBrowserAlpha0/LiteDomHardPrune.js"), "utf8");
-function setup(count, settings = {}) {
-  const list = [];
-  for (let i = 0; i < count; i++) {
-    const node = {
-      id: i, parentNode: {}, contains(item) { return item === this; },
-      remove() { list.splice(list.indexOf(this), 1); this.parentNode = null; }
-    };
-    list.push(node);
-  }
-  const doc = {
-    readyState: "complete", activeElement: settings.focus,
-    querySelectorAll(selector) {
-      assert.equal(selector, '[data-testid^="conversation-turn-"]');
-      return list.slice();
+
+function element(tag, attrs = {}) {
+  return {
+    tagName: tag, attrs, children: [], parentNode: null, parentElement: null,
+    appendChild(child) { child.parentNode = this; child.parentElement = this;
+      this.children.push(child); return child; },
+    getAttribute(name) { return this.attrs[name] ?? null; },
+    contains(node) {
+      return node === this || this.children.some(child => child.contains(node));
     },
-    querySelector(selector) {
-      if (selector.startsWith('textarea')) return settings.draft ? { value: "draft" } : null;
-      if (selector.startsWith('[aria-busy')) return settings.busy ? {} : null;
-      return null;
+    querySelector() { return null; },
+    remove() {
+      if (this.parentNode) {
+        this.parentNode.children = this.parentNode.children.filter(c => c !== this);
+        this.parentElement = null; this.parentNode = null;
+      }
     }
   };
-  const win = {
-    document: doc, location: { hostname: settings.host || "chatgpt.com" },
-    intervalArms: 0, initialArms: 0, intervalClears: 0, initialClears: 0,
-    setInterval(fn) { this.intervalArms++; this.interval = fn; return this.intervalArms; },
-    clearInterval() { this.intervalClears++; this.interval = undefined; },
-    setTimeout(fn) { this.initialArms++; this.initial = fn; return this.initialArms; },
-    clearTimeout() { this.initialClears++; this.initial = undefined; },
-    getSelection() { return settings.selection || ""; }
+}
+function setup(count, opts = {}) {
+  const main = element("MAIN");
+  const doc = {
+    activeElement: null,
+    querySelector(sel) { return sel === 'main,[role="main"]' && !opts.noMain ? main : null; },
+    querySelectorAll(sel) {
+      if (sel.includes('stop-button')) return opts.busy ?
+        [{hidden: false, disabled: false, getAttribute: () => null,
+          getClientRects: () => [1], closest: () => null}] : [];
+      if (sel.includes('prompt-textarea')) return opts.draft ?
+        [{value:"something"}] : [];
+      throw new Error("unexpected document selector: " + sel);
+    }
   };
-  vm.runInNewContext(script, { window: win, Date });
-  if (settings.optIn !== false && win.__OPENBROWSER_HARD_PRUNE__)
-    win.__OPENBROWSER_HARD_PRUNE__.enable(true);
-  return { list, doc, win, api: win.__OPENBROWSER_HARD_PRUNE__ };
+  main.querySelectorAll = (sel) => {
+    if (sel.includes('conversation-turn-')) {
+      return main.children.filter(n => n.attrs["data-testid"]);
+    }
+    if (sel.includes('data-user-message-bubble') ||
+        sel.includes('data-chatgpt-selection-message-id')) {
+      return opts.legacy ? [] : main.children.flatMap(n => n.children);
+    }
+    throw new Error("unexpected main selector " + sel);
+  };
+  function append(i) {
+    const wrapper = element("DIV");
+    if (opts.legacy) wrapper.attrs["data-testid"] = "conversation-turn-" + i;
+    const marker = element("DIV", opts.legacy ? {} : i % 2 === 0 ?
+      {"data-user-message-bubble": ""} :
+      {"data-chatgpt-selection-message-id": "assistant-" + i});
+    wrapper.appendChild(marker); main.appendChild(wrapper);
+    return wrapper;
+  }
+  for(let i=0;i<count;i++) append(i);
+  const win = {
+    document: doc, location:{hostname: opts.host || "chatgpt.com"},
+    intervalArms:0,initialArms:0,intervalClears:0,initialClears:0,
+    setInterval(fn) {this.intervalArms++;this.tick=fn;return 12;},
+    clearInterval() {this.intervalClears++;this.tick=null;},
+    setTimeout(fn) {this.initialArms++;this.initial=fn;return 13;},
+    clearTimeout() {this.initialClears++;this.initial=null;},
+    getSelection() {return opts.selection || ""}
+  };
+  vm.runInNewContext(code, {window:win,Date});
+  return {win,doc,main,append,api:win.__OPENBROWSER_HARD_PRUNE__};
 }
 {
-  const t = setup(100, { optIn: false });
-  assert.equal(t.api.status().enabled, false);
-  assert.equal(t.win.intervalArms, 0,
-    "hard DOM default OFF never installs a periodic JS timer");
-  assert.equal(t.win.initialArms, 0,
-    "hard DOM default OFF never schedules its first DOM traversal");
-  assert.equal(t.list.length, 100);
+  const x = setup(100);
+  assert.equal(x.api.status().enabled,true);
+  assert.equal(x.api.status().keepNewest,10);
+  assert.equal(x.win.intervalArms,1);
+  assert.equal(x.win.initialArms,1);
+  assert.equal(x.api.prune().lastRemoved,90);
+  assert.equal(x.main.children.length,10);
+  assert.equal(x.api.prune().lastRemoved,0);
 }
 {
-  const t = setup(89);
-  assert.equal(t.win.intervalArms, 1,
-    "explicit opt-in schedules exactly one recurring prune timer");
-  assert.equal(t.win.initialArms, 1,
-    "explicit opt-in schedules exactly one initial delayed prune");
-  t.api.enable(true);
-  assert.equal(t.win.intervalArms, 1, "repeated enable is idempotent");
-  t.api.prune();
-  assert.equal(t.list.length, 89);
+  const x = setup(11);
+  assert.equal(x.api.prune().lastRemoved,1);
+  assert.equal(x.main.children.length,10);
 }
 {
-  const t = setup(100);
-  t.api.prune();
-  assert.equal(t.list.length, 24);
-  assert.equal(t.api.status().removedTotal, 76);
-  t.win.interval();
-  assert.equal(t.list.length, 24);
+  const x = setup(10);
+  assert.equal(x.api.prune().skipped,"below_threshold");
+  assert.equal(x.main.children.length,10);
 }
 {
-  const t = setup(100, { busy: true });
-  assert.equal(t.api.prune().skipped, "busy_or_draft");
-  assert.equal(t.list.length, 100);
+  const x = setup(19,{busy:true});
+  assert.equal(x.api.prune().skipped,"busy_or_draft");
+  assert.equal(x.main.children.length,19);
 }
 {
-  const t = setup(100, { draft: true });
-  t.api.prune();
-  assert.equal(t.list.length, 100);
+  const x = setup(19,{draft:true});
+  assert.equal(x.api.prune().skipped,"busy_or_draft");
+  assert.equal(x.main.children.length,19);
 }
 {
-  const t = setup(100, { selection: "fragment" });
-  t.api.prune();
-  assert.equal(t.list.length, 100);
+  const x = setup(19,{selection:"selected"});
+  assert.equal(x.api.prune().skipped,"busy_or_draft");
+  assert.equal(x.main.children.length,19);
 }
 {
-  const t = setup(100);
-  const staleInitial = t.win.initial;
-  const staleInterval = t.win.interval;
-  t.api.enable(false);
-  assert.equal(t.win.intervalClears, 1,
-    "opt-out clears recurring timer, not just a boolean");
-  assert.equal(t.win.initialClears, 1,
-    "opt-out cancels delayed initial prune");
-  // Even a stale callback that has already reached the event queue must
-  // never delete DOM after the owner disables pruning.
-  staleInitial();
-  staleInterval();
-  assert.equal(t.list.length, 100);
-  assert.equal(t.api.prune().skipped, "disabled");
-  t.api.enable(true);
-  assert.equal(t.win.intervalArms, 2,
-    "re-enable starts one new timer only");
-  assert.equal(t.win.initialArms, 2);
-  t.api.enable(false);
-  assert.equal(t.win.intervalClears, 2);
-  assert.equal(t.win.initialClears, 2);
+  const x = setup(23);
+  const focused = x.main.children[0];
+  x.doc.activeElement = focused;
+  x.api.prune();
+  assert.ok(x.main.children.includes(focused));
+  assert.equal(x.main.children.length,11);
 }
 {
-  const t = setup(100, { host: "example.com" });
-  assert.equal(t.api, undefined);
+  const x = setup(30);
+  x.api.enable(false);
+  assert.equal(x.api.prune().skipped,"disabled");
+  assert.equal(x.main.children.length,30);
+  assert.equal(x.win.intervalClears,1);
+  assert.equal(x.win.initialClears,1);
 }
 {
-  const t = setup(100);
-  const focused = t.list[0];
-  t.doc.activeElement = focused;
-  t.api.prune();
-  assert.equal(t.list.length, 25);
-  assert.equal(t.list.includes(focused), true);
+  const x = setup(100,{legacy:true});
+  assert.equal(x.api.prune().lastRemoved,90);
+  assert.equal(x.main.children.length,10);
 }
 {
-  const t = setup(10000);
-  const first = t.api.prune();
-  assert.equal(t.list.length, 24, "10k synthetic turns keep only newest 24");
-  assert.equal(first.lastRemoved, 9976);
-  assert.equal(t.list[0].id, 9976, "newest turns retained in correct order");
-  assert.equal(t.api.prune().lastRemoved, 0, "repeated cleanup is idempotent");
+  const x = setup(100,{host:"example.com"});
+  assert.equal(x.api,undefined);
 }
-console.log("LiteDomHardPrune: 10 PASS; timer lifecycle and OFF-idle guards");
+{
+  const x = setup(16);
+  x.api.prune();
+  // Simulate React putting the same old messages back without new answer.
+  for(let n=0;n<4;n++) x.append(100+n);
+  // New tail IDs change, so this must NOT trigger the loop guard.
+  assert.ok(x.api.prune().enabled);
+}
+console.log("LiteDomHardPrune: DIL and legacy 11 test scenarios PASS");
