@@ -246,3 +246,38 @@ a6f323b0a69dd9750b7893394af32d425faca7933d94d1923ade29e91262aefd
 - wake-lifecycle.jsonl seq5 receipt ebc9ca717b574d06a2d6b2b55dbe9b5e: 1 chat_started, 1 chat_finished (aktualny UTC, widoczny ponizej), 1 silnikowy receipt_confirmed visible_ack. Bez wlasnych ACK i resend.
 - SOURCE/STAGED v1.72.93, LIVE v1.72.92 PID30604, release queued newest1.72.93 rollback1.72.92. Nie wdrozono LIVE 1.72.93, nie zamknieto aplikacji.
 - PBOX1 bez zmian na polecenie wlasciciela. Auto HANDOFF nowego czatu nadal niewykonany; kolejne P0 w kontrakcie AUTO_HANDOFF_P0_GATE_2026-10-24.md. Real worker PARTIAL E2E SHA OK; worker FINAL pending.
+
+## 2026-10-24 16:51 CEST [OB-WAKE-000006] K01
+- Odczyt checkpoint, master plan 2.1, WORK_STATUS i AUTO_HANDOFF_P0_GATE; nowsza decyzja wlasciciela 15:45 SATA only, PBOX1 bez zmian.
+- LIVE SATA 1.72.92 PID30604, odpowiada. SOURCE/STAGED 1.72.93 testy Node24/24 EXE11/11 z poprzedniego wake, release phase=queued candidate1.72.93 rollback LIVE1.72.92.
+- Engine seq6 receipt08011f2ad1a94ace9ee773c6bdeeb3dd, reserved UTC14:49:25, submission_attempted14:49:26, visible_ack14:49:26; chat_started actor=chat14:50:01 zapisany/zweryfikowany. Brak recznego resendu lub fake ACK.
+- Produkcja LIVE1.72.92 real worker archive: UTC14:48:13 saved FINAL 4183 i492 chars (worker_archive_saved snapshots=2). To uzupelnia poprzednie PARTIAL, ale hash final nalezy osobno potwierdzic.
+- P0 NEXT: przygotowac fail-closed niezalezny dowod pliku HANDOFF (sha, czas, lead i seq), bez tworzenia drugiego czatu i bez WAIT_USER przed E2E.
+
+## 2026-10-24 16:53 CEST [OB-WAKE-000006] K02
+- SOURCE z nowa klasa LiteHandoffEvidence.cs (nie LIVE): niezalezne SHA256 pliku HANDOFF, ograniczenie lokalizacji do dozwolonego katalogu, kontrola wieku (3h), rozmiaru 300B-2MiB, bez symlink/junction, wykrywanie modyfikacji podczas czytania, ProjectId/oldUrl/sequence/fingerprint i UUID ownerEpoch.
+- PersistOnce zapisuje proof JSON atomowo tylko do nowego pliku, bez nadpisania w razie restartu/dubla. Nie otwiera nowego czatu i nie dokonuje wysylek; przyszla integracja wymaga testow A-G.
+- LiteChatWakeRegistry.SelfTest wywoluje LiteHandoffEvidence.SelfTest, testy: good SHA, bad SHA, stale, outside root, duplicate ledger, mutated file; kompilacja i realny EXE test dopiero nastepny etap.
+- LIVE SATA1.72.92 PID30604; staged1.72.93 queued fallback1.72.92; PBOX1 poza zakresem, brak zmian w procesie, harmonogramie lub repo Git.
+- NEXT: podniesc SOURCE 1.72.94, zbudowac i przetestowac samodzielny dowod HANDOFF, przygotowac manifest; E2E sukcesji nadal brak.
+
+## 2026-10-24 16:54 CEST [OB-WAKE-000006] K03
+- SOURCE+STAGED v1.72.94: dodano LiteHandoffEvidence.cs, niezalezny HANDOFF md SHA256/sciezka/age/size, stale/reparse/mutation check, proof json one-shot/ownerEpoch i selftest w --lite-chat-wake-selftest. Brak integracji z realnym UI / handoff.
+- Node24/24 PASS, dotnet publish0 errors (known WindowsBase warning), EXE11/11 EXIT0 including real isolated proof selftest + WebView2 fixture.
+- STAGED D:\Apps\OpenBrowserLite\releases\v1.72.94_20261024 SHA256 
+76430f788ad060ac003690a5bea3f43306635d6dc2fc4d7628cdbe5da41b9eec
+. Manifest STAGED_NOT_LIVE zapisany i odczytany.
+- LIVE 1.72.92 PID30604 bez zmian na tym etapie; existing candidate 1.72.93 nadal queued, next safely supersede after latest live identity SHA check. PBOX1 nietkniety.
+
+## 2026-10-24 16:56 CEST [OB-WAKE-000006] K04
+- LIVE SATA 1.72.92 PID30604 nie restartowany; SOURCE/STAGED 1.72.94: LiteHandoffEvidence.cs dowod dokumentu (SHA/age/root/size/ownerEpoch) z one-shot zapisem.
+- Testy Source Node24/24; Publish0 errors (known WindowsBase warning); staged EXE11/11 exit0 z --lite-chat-wake-selftest, WebView2. Manifest SHA76430f788ad060ac003690a5bea3f43306635d6dc2fc4d7628cdbe5da41b9eec.
+- Release SATA po atomowej zmianie queued v1.72.93->1.72.94: phase=queued candidate1.72.94, previous=LIVE1.72.92, previousPid30604, bez restartu i zadnych wysylek ChatGPT.
+- Worker LIVE 1.72.92: FINAL chars 4183 oraz 492 o UTC14:48:13, obydwa pliki sprawdzone SHA z index.jsonl. Prawdziwy E2E PARTIAL+FINAL archiwizacji worker potwierdzony dla tego przebiegu.
+- Problem niekrytyczny: odczyt podsumowania rejestru DPAPI nie powiodl sie, bo Remote PowerShell nie zaladowal typu Security.Cryptography.ProtectedData; nie zmodyfikowano pliku, nie deklarowac liczby aktywnych harmonogramow na podstawie tego odczytu.
+- USER decision 15:45: PBOX1 poza zakresem. Auto chat rotation nieukończona; dowod HANDOFF na razie niepodlaczony do nowego czatu/promocji, E2E A-G NOT VERIFIED. NEXT: durable state/lease pomiedzy utworzeniem nowego chatu a ACK, draft fencing, atomowa promocja po checkpoint, testy pilot.
+
+## 2026-10-24 16:58 CEST [OB-WAKE-000006] FINAL READBACK
+- wake-lifecycle.jsonl: 1 actor=chat started i 1 actor=chat finished dla seq6 receipt08011f2ad1a94ace9ee773c6bdeeb3dd, silnik visible_ack istnieje. Nie dodawano fake ACK.
+- FINAL state LIVE1.72.92 PID30604, RELEASE queued candidate1.72.94 fallback1.72.92; bez restartu, wysylki lub manipulacji PBOX1.
+- Auto rotation gate nadal NIEWDROZONY: Proof class staged and tested but not connected; next work must implement new-chat URL and seed state machine with crash fencing.

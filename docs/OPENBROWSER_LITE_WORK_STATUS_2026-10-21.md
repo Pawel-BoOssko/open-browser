@@ -1270,3 +1270,9 @@
 - SOURCE/STAGED1.72.93 SHA54bfe589..., queued fallback LIVE1.72.92, Node24/24 EXE11/11 PASS. Mitigacja: przy 14 wybudzeniach bez automatycznego sukcesora nie wysylamy przez auto RequestText konczacego WAIT_USER. Automatyczna sukcesja wciaz NOT IMPLEMENTED.
 - SATAN release-manager po rollback wybiera previousExe faktycznego stanu, nie hardcoded1.72.89; AST0 SelfTest18/18 PASS; runtime/source SHAa6f323b0a69dd9750b7893394af32d425faca7933d94d1923ade29e91262aefd.
 - Prawdziwy WebView2 worker zapisal dwa PARTIAL, latest 492 znaki, plik i indeks SHA zweryfikowane. Brak testu FINAL z worker. Bezpieczne przelaczenie dopiero po idle, PBOX1 nietkniety.
+
+## 2026-10-24 16:56 CEST [OB-WAKE-000006] HANDOFF EVIDENCE STAGED
+- LIVE SATA1.72.92 PID30604; stage/source1.72.94 SHA76430f..., Node24/24, publish0err, exe11/11, queued fallback1.72.92, brak restartu i zmian PBOX1.
+- P0 dodano LiteHandoffEvidence.cs, niezalezny dokument HANDOFF SHA+mtime+sciezka+length, lead url/seq/fingerprint/ownerEpoch i one-shot proof JSON, test deterministyczny incl wrong SHA, traversal, stale, duplicate, mutation. Wymaga jeszcze integracji ze stanami handoff UI (nie wysyla nic).
+- Worker archive LIVE: FINAL dwa pliki 4183 i 492 znakow UTC14:48:13, hash SHA obu zgodny z indeksem (osobny realny odczyt). Seq6 engine receipt 08011f2ad1a94ace9ee773c6bdeeb3dd visible_ack 14:49:26Z, actor chat_started14:50:01Z.
+- Nastepny P0: bezpieczna sukcesja nowego chatu i pilot A-G z testowym projektem; nie twierdzic DONE i nie tworzyc drugiego leada.
