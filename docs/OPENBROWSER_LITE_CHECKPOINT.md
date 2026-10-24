@@ -177,3 +177,16 @@ D:\Apps\OpenBrowserLite\releases\v1.72.89_20261024\BridgeBrowserAlpha0.exe
 - SATANAMD wake-lifecycle.jsonl seq3 receipt b60d5845ef0b44b283e9dd63dc330592: dokładnie jeden actor=chat chat_started i jeden actor=chat chat_finished (UTC13:33:54.498Z) sprawdzone read-back, bez dopisywania engine ACK.
 - LIVE nadal 1.72.89 PID34832, release state queued v1.72.91; bez restartu, PBOX1 offline.
 - Real candidate switching/rollback, worker E2E i DOM hard limit10 jeszcze NIE zaliczone; nie twierdzic DONE.
+
+## 2026-10-24 15:45 CEST, decyzja właściciela: autonomiczna praca bez zatrzymywania
+- Priorytet: kontynuować rozwój OBL na SATANAMD. NIE zajmować się PBOX1, dopóki właściciel nie odwoła tej decyzji.
+- Jedyne zewnętrzne wybudzanie: aktualny nowy LEAD OBL co15min; Keepalive5min, Resource Monitor2min. Nie tworzyć wewnętrznych ChatGPT Tasks, nie włączać starego leada, nie uruchamiać drugiego czatu wykonawczego.
+- Potwierdzono seq4: 2026-10-24 15:38:24 CEST engine receipt_confirmed visible_ack, 15:38:55 chat_started. Registry seq4, kolejne DueUtc 2026-10-24T13:53:21Z (15:53 CEST).
+- Najpilniejszy blokujący pełną autonomię P0: nie dopuścić, by próg 14 wybudzeń z LiteChatHandoff kończył projekt na WAIT_USER. Szczegółowy kontrakt rotacji i testy: D:\projects\open-browser\docs\OPENBROWSER_LITE_AUTO_HANDOFF_P0_GATE_2026-10-24.md.
+- Kod SOURCE/STAGED v1.72.91, produkcja LIVE v1.72.89. Jedyny aktywny lead obecnie pracuje nad release managerem. Nie nadpisywać jego zmienianych plików ani nie restartować generowania z innego czatu.
+- Podczas każdego wake: odczyt checkpointu na początku; po istotnych krokach zapis 5-10 linii z SOURCE/LIVE, testami, blokadami, next. Warunki END_TO_END, nie tylko deklaracja. Kontynuuj następne zależne zadanie P0 automatycznie.
+
+## 2026-10-24 15:48 CEST, kontrola zasobów po wznowieniu harmonogramu
+- Monitor SATA resources-2026-10-24.jsonl: 63 próbki od 13:44:45 do 15:47:46 CEST. WebView2 suma PrivateMiB przypisana Lite: 696,2 -> 1308,7; zakres min692,8 max1406,2. Liczba WebView2 PID 7 -> 8, dlatego sama różnica nie dowodzi pojedynczego wycieku. Host procesów Lite cały czas 1, ostatnie dostępne RAM ok. 48678 MiB.
+- W katalogu lokalnych odpowiedzi SATA 27 plików Markdown i 2 index.jsonl; automatyczne archiwum realnie przyrasta.
+- Po wake seq4 ostatnia obserwacja response_generation_transition 2026-10-24T13:42:21Z generating=false. Przyszły DOM>10/soak musi rozdzielić wzrost z liczbą PID oraz prawdziwe odchudzanie w React. Nie wyłączać harmonogramu ani nie restartować aktywnego wykonawcy.
