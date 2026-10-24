@@ -281,3 +281,10 @@ a6f323b0a69dd9750b7893394af32d425faca7933d94d1923ade29e91262aefd
 - wake-lifecycle.jsonl: 1 actor=chat started i 1 actor=chat finished dla seq6 receipt08011f2ad1a94ace9ee773c6bdeeb3dd, silnik visible_ack istnieje. Nie dodawano fake ACK.
 - FINAL state LIVE1.72.92 PID30604, RELEASE queued candidate1.72.94 fallback1.72.92; bez restartu, wysylki lub manipulacji PBOX1.
 - Auto rotation gate nadal NIEWDROZONY: Proof class staged and tested but not connected; next work must implement new-chat URL and seed state machine with crash fencing.
+
+## 2026-10-24 17:06 CEST [OB-WAKE-000007] K01
+- Odczytano checkpoint, master plan v2.1, WORK_STATUS, P0 AUTO_HANDOFF_GATE. Decyzja z 15:45 PBOX1 poza zakresem, tylko SATA.
+- LIVE v1.72.92 PID30604 Responding=True; SOURCE/STAGED1.72.94 SHA76430f788ad060ac003690a5bea3f43306635d6dc2fc4d7628cdbe5da41b9eec, manager release phase=queued candidate1.72.94 previous=1.72.92. Brak restartu.
+- Engine wake7 reserved UTC15:04:25, submitted15:04:27 i receipt_confirmed visible_ack15:04:27 receipt20e1319e997e42b5a7c3b6631fa32df9; actor=chat chat_started15:05:02 zapisany/zweryfikowany.
+- Worker LIVE archiwizowal FINAL 3305 chars UTC14:58:43 (event worker_archive_saved snapshots1), wartosc SHA nalezy jeszcze potwierdzic w index.jsonl.
+- P0: przygotowac trwaly crash-safe rejestr etapow HANDOFF new URL/seed reserved/uncertain/ACK/checkpoint; bez realnej wysylki i bez dodatkowego aktywnego leada.
