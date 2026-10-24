@@ -40,3 +40,37 @@ Aktualizacja: 2026-10-24 13:58 CEST, host SATANAMD.
 - STAGED D:\Apps\OpenBrowserLite\releases\v1.72.90_20261024\BridgeBrowserAlpha0.exe SHA256 944450b37f101c44ef9bf55f29696e584f70cbbbfde3150715eea50194ce7c5d
 - LIVE niezamieniony, nadal PID 34832 v1.72.89. Brak real E2E zapisu odpowiedzi workera w LIVE; nie deklarować wdrożenia.
 - Następny krok: test prawdziwego wybudzenia nowego leada (seq1, po 14:53 CEST), weryfikacja UI ACK / response archive, następnie bezpieczne przełączenie release po wygaszeniu aktywnej generacji.
+
+## 2026-10-24 14:50 CEST: WAŻNY WNIOSEK DLA AUTO-ROTACJI
+- Przy ręcznym kliknięciu „Rozpocznij nowy czat” (ekran po komunikacie o maksymalnej długości), nowa strona ChatGPT pokazała w composerze POZOSTAŁY szkic poprzedniego wybudzenia Networking Radar [OB-WAKE-000016], pomimo przejścia do nowego czatu.
+- To GROŹNY PRZYPADEK: nowy czat może odziedziczyć niesłuszny draft po starej rozmowie. Przy automatycznej rotacji nie wolno używać przycisku Wyślij, dopóki nie zweryfikowano/wyczyszczono edytora i nowej tożsamości chatu. Bez pewnego wykrycia prywatnego szkicu użytkownika STOP, a nie nadpisanie.
+- Jednorazowy seed nowego Lite leada został świadomie wklejony w miejsce tego OSIEROCONEGO draftu i wysłany; potwierdzony user bubble i generowanie asystenta. E2E automatycznego wake nadal oczekuje na DONE.
+
+## 2026-10-24 14:54 CEST: PIERWSZE PRAWDZIWE WYBUDZENIE NOWEGO LEADA, PASS
+- Nowy LEAD Open Browser Lite: https://chatgpt.com/c/6adca60a-9980-83ed-943b-fff6ef7fcdfd; jedyny aktywny schedule; stary lead zachowany jako archiwum, disabled.
+- Dziennik wake-lifecycle: 2026-10-24T12:53:20Z due seq1; 12:53:22Z attempt_reserved; 12:53:23Z submission_attempted click_invoked; 12:53:23.732Z receipt_confirmed visible_ack, receipt=4efbadfc239840349818157c8fbbab84.
+- UI telemetry: 12:53:23Z multi_wake_send visibleUserBubble=true, interval=15 min; 12:53:40Z response_generation_transition generating=true. To potwierdza dostarczenie nowego wybudzenia i ROZPOCZĘCIE odpowiedzi asystenta. Ukończenie tej odpowiedzi jeszcze do weryfikacji.
+- Registry: WakeSequence=1, LastState=visible_ack, następne DueUtc=2026-10-24T13:08:20Z (15:08 CEST / 16:08 Kenia).
+- LIVE v1.72.89 PID34832. SOURCE/STAGED v1.72.90 z nowym worker Markdown capture nie jest jeszcze wdrożone. Nie restartować aktywnej generacji.
+- UWAGA: Networking Radar pozostaje wstrzymany po maksimum długości starego czatu, wymaga osobnej bezpiecznej rotacji. Następny P0 po odpowiedzi: automatyczny handoff przed limitem serwera, testy i staging, żeby ręczna naprawa nie była potrzebna za kilka godzin.
+
+## 2026-10-24 14:55:31 +02:00 [OB-WAKE-000001], krok W01
+- Potwierdzono samoczynne foreground wybudzenie NOWEGO leada seq1, receipt=4efbadfc239840349818157c8fbbab84. Engine due 12:53:20Z, attempt_reserved12:53:22Z, submission_attempted12:53:23Z i receipt_confirmed=visible_ack12:53:23Z.
+- LIVE SATANAMD nadal v1.72.89 PID34832 Responding=True; o12:53:40Z model rozpoczął generating. Nie restartować ani nie deployować podczas generowania.
+- Wspólny wake-lifecycle.jsonl: actor=chat stage=chat_started seq1 receipt zapisany i zweryfikowany UTC12:54:09Z. Nie dodano ACK.
+- SOURCE/STAGED v1.72.90 z poprzedniego kroku; testy Node24/24, dotnet publish 0 errors, EXE markdown/WebView2 RC0. LIVE niezmieniony.
+- PBOX1 offline, brak bezpiecznego wdrożenia/rollback na PBOX1; główny host zgodnie z master planem SATANAMD.
+- NEXT: wprowadzić i testować klasyfikację terminalnego limitu długości czatu, bez powtarzania prób wybudzenia; następnie ocenić archiwizację z worker i idle release.
+
+## 2026-10-24 14:59:10 +02:00 [OB-WAKE-000001], krok W02
+- P0 REAL BUG: w nowym leadzie odpowiedz turn be826... zapisano 14:52:30 CEST jako FINAL 4056 znakow, a 14:53:30 ponownie jako PARTIAL z identycznym SHA, poniewaz przy nowym USER turn poprzedni ASSISTANT byl blednie uznany za streaming.
+- SOURCE LiteConversationSnapshot.js: przy aktywnym Stop i ostatnim USER turn nie nadaje PARTIAL staremu asystentowi; collectForArchive nie skanuje FINAL w trakcie nowego generowania.
+- TEST: lite-conversation-snapshot dodatkowe 3 asercje DIL/legacy, cala Node suite 24/24 PASS. SOURCE nadal v1.72.90 na tym etapie, STAGED v1.72.90 jest starszy od tej zmiany, LIVE v1.72.89 nietkniety.
+- NEXT: publish nowej 1.72.91 + manifest, EXE selftests, potwierdzenie archiwum z nowego wake i brak aktywnego generowania przed ewentualnym graceful promotion.
+
+## 2026-10-24 15:00:43 +02:00 [OB-WAKE-000001], krok W03
+- SOURCE v1.72.91 i STAGED v1.72.91: D:\Apps\OpenBrowserLite\releases\v1.72.91_20261024\BridgeBrowserAlpha0.exe, SHA256 8efbef6b00fbed7f0ecaf9731ebf682581552f1caaf4d1d747cc40542071dffa.
+- Zmiany: worker Markdown capture z 1.72.90 + korekta false PARTIAL przy USER-last i nowym generowaniu. Node 24/24 PASS, dotnet publish 0 errors, selftest EXE 10/10 exit0 (incl WebView2 fixture).
+- LIVE jeszcze v1.72.89 PID34832. W trakcie tego wybudzenia generowanie bylo aktywne, dlatego nie restartowano programu.
+- Dziennik wake zawiera seq1 receipt potwierdzone przez engine, chat_started i chat_checkpoint; bez dopisania fake ACK.
+- PBOX1 nadal offline, wdrozenie tam niedostepne. NEXT: ocena idle/rollback SATA i ewentualne bezpieczne przygotowanie promocji release, bez przerywania aktywnego leada.

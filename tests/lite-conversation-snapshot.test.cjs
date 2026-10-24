@@ -11,8 +11,12 @@ function init(opts = {}) {
   const make = (text, n, modern) => ({
     innerText: text,
     getAttribute(name) {
+      if (!modern && name === "data-message-author-role") return "assistant";
       return modern && name === "data-chatgpt-selection-message-id"
         ? (opts.ids?.[n] ?? "dil-" + n) : null;
+    },
+    hasAttribute(name) {
+      return modern && name === "data-chatgpt-selection-message-id";
     },
     closest() { return {
       getAttribute() { return "conversation-turn-" + n; }
@@ -28,6 +32,13 @@ function init(opts = {}) {
       querySelectorAll(sel) {
         reads++;
         if (sel.includes('[data-testid="stop-button"]')) return opts.generating ? [{}] : [];
+        if (sel === '[data-user-message-bubble],[data-chatgpt-selection-message-id],[data-message-author-role]') {
+          const messages = modern.length ? modern : legacy;
+          return opts.newestRole === "user" ? [...messages, {
+            hasAttribute(name) { return name === 'data-user-message-bubble'; },
+            getAttribute(name) { return name === 'data-message-author-role' ? 'user' : null; }
+          }] : messages;
+        }
         if (sel === '[data-chatgpt-selection-message-id]') return modern;
         if (sel === '[data-message-author-role="assistant"]') return legacy;
         throw new Error("unknown selector " + sel);
@@ -118,4 +129,18 @@ function init(opts = {}) {
   assert.equal(all[0].partial, true,
     "never mark an active partial answer as completed");
 }
-console.log("LiteConversationSnapshot: 11 PASS");
+{
+  const a = init({ modernTexts: ["Previous completed assistant reply"],
+    generating: true, newestRole: "user" });
+  assert.equal(a.api.collect().length, 0,
+    "new user turn with Stop does not make prior FINAL a PARTIAL");
+  assert.equal(a.api.collectForArchive().length, 0,
+    "no previous FINAL history sweep while awaiting new assistant");
+}
+{
+  const a = init({ texts: ["Previous completed assistant reply"],
+    generating: true, newestRole: "user" });
+  assert.equal(a.api.collect().length, 0,
+    "legacy user-last turn also prevents false PARTIAL");
+}
+console.log("LiteConversationSnapshot: 14 PASS");

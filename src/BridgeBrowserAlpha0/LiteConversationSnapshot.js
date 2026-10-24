@@ -3,17 +3,32 @@
   if (global.__OPENBROWSER_LITE_SNAPSHOT__) return;
   if (!global.document || global.location.hostname !== "chatgpt.com") return;
 
+  function isGenerating(main) {
+    const controls = main.querySelectorAll(
+      '[data-testid="stop-button"],button[aria-label="Zatrzymaj"],' +
+      'button[aria-label="Stop generating"],button[aria-label="Przerwij generowanie"]');
+    return Array.from(controls).some(n => !n.hidden && !n.disabled &&
+      n.getAttribute?.("aria-hidden") !== "true" &&
+      (typeof n.getClientRects !== "function" || n.getClientRects().length > 0));
+  }
+
   function collect() {
     try {
       if (!/^\/(c|g)\//.test(global.location.pathname)) return [];
       const main = global.document.querySelector('main,[role="main"]');
       if (!main) return [];
-      const stopping = Array.from(main.querySelectorAll(
-        '[data-testid="stop-button"],button[aria-label="Zatrzymaj"],' +
-        'button[aria-label="Stop generating"],button[aria-label="Przerwij generowanie"]'));
-      const generating = stopping.some(n => !n.hidden && !n.disabled &&
-        n.getAttribute?.("aria-hidden") !== "true" &&
-        (typeof n.getClientRects !== "function" || n.getClientRects().length > 0));
+      const generating = isGenerating(main);
+      if (generating) {
+        // Never classify a previously FINISHED assistant as a new PARTIAL
+        // while the newest USER message still awaits its assistant turn.
+        const turns = main.querySelectorAll(
+          '[data-user-message-bubble],[data-chatgpt-selection-message-id],' +
+          '[data-message-author-role]');
+        const latest = turns[turns.length - 1];
+        if (!latest || latest.hasAttribute?.('data-user-message-bubble') ||
+            latest.getAttribute?.('data-message-author-role') === 'user')
+          return [];
+      }
       const modern = Array.from(main.querySelectorAll(
         '[data-chatgpt-selection-message-id]'));
       const nodes = modern.length ? modern : Array.from(main.querySelectorAll(
@@ -47,7 +62,11 @@
   // Limit each scan to 64 historical answers to avoid a large payload.
   function collectForArchive() {
     const recent = collect();
-    if (recent.some(item => item.partial)) return recent;
+    // While generating with no assistant turn yet, do NOT perform a
+    // historical FINAL sweep either: the old answer is not the new one.
+    const activeMain = global.document.querySelector('main,[role="main"]');
+    if (recent.some(item => item.partial) ||
+        (activeMain && isGenerating(activeMain))) return recent;
     if (!/^\/(c|g)\//.test(global.location.pathname)) return [];
     const main = global.document.querySelector('main,[role="main"]');
     if (!main) return [];
