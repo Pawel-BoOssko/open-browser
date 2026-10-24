@@ -190,3 +190,38 @@ D:\Apps\OpenBrowserLite\releases\v1.72.89_20261024\BridgeBrowserAlpha0.exe
 - Monitor SATA resources-2026-10-24.jsonl: 63 próbki od 13:44:45 do 15:47:46 CEST. WebView2 suma PrivateMiB przypisana Lite: 696,2 -> 1308,7; zakres min692,8 max1406,2. Liczba WebView2 PID 7 -> 8, dlatego sama różnica nie dowodzi pojedynczego wycieku. Host procesów Lite cały czas 1, ostatnie dostępne RAM ok. 48678 MiB.
 - W katalogu lokalnych odpowiedzi SATA 27 plików Markdown i 2 index.jsonl; automatyczne archiwum realnie przyrasta.
 - Po wake seq4 ostatnia obserwacja response_generation_transition 2026-10-24T13:42:21Z generating=false. Przyszły DOM>10/soak musi rozdzielić wzrost z liczbą PID oraz prawdziwe odchudzanie w React. Nie wyłączać harmonogramu ani nie restartować aktywnego wykonawcy.
+
+## 2026-10-24 16:31 CEST: P0 wybudzanie, przyczyna potwierdzona
+- LIVE v1.72.89 PID34832, ostatni skuteczny wake seq4. Przy due seq5 UTC13:53:21 preflight wykrył realny [OB-STATUS: BLOCKED] w odpowiedzi seq4 (Markdown file 9e69094b13aa2b2d_e94c13405907c280.md): pojedynczy zapis pliku odmówiony przez narzędzie, więc model zgłosił BLOCKED.
+- LiteChatWakeUi.HandleVerifiedModelStatus wyłączył harmonogram Enabled=false LastState=status_blocked. Outbox queued, emailDelivered=false, owner_email_not_configured. Windows Keepalive wyłącznie nadzoruje EXE, nie harmonogram. Dlatego nic się nie wybudza mimo procesu ACTIVE.
+- SOURCE 1.72.92: dla LEAD projektu OBL blokada modelu nie wyłącza całej pracy; 2-minutowy cooldown, trwały klucz blokady i zwykły gate kolejnego wake, bez retransmisji/omijania odmów. Prompt nakazuje kontynuować inne dozwolone kroki gdy pojedyncze narzędzie odmówi.
+- JS Node 24/24 PASS, .NET publish PASS, EXE selftest 10/10 PASS (w tym WebView2). Kandidat D:\Apps\OpenBrowserLite\releases\v1.72.92_20261024\BridgeBrowserAlpha0.exe, SHA C8B305BE01B2B998E2DE9C9B4294BC25821F1E38AF9568C9642D216205573BCF.
+- LIVE ostatni generating=false UTC13:42:21, okno odpowiada, należy jeszcze wykonać bezpieczny rollout przez release-manager, re-arm seq4 zachowując fingerprint i udowodnić receipt seq5/ACK.
+- PBOX1 poza zakresem tego zadania. Nie ruszać innych prac, tylko naprawa wybudzania.
+
+## 2026-10-24 16:35 CEST: P0 WYBUDZANIE NAPRAWIONE, REAL ACK SEQ5
+- Przyczyna: odpowiedz seq4 zakonczyla sie [OB-STATUS: BLOCKED] z powodu odmowy pojedynczego zapisu przez narzedzie; LIVE 1.72.89 wylaczyl harmonogram Enabled=false, status_blocked, a email nie byl skonfigurowany. Keepalive nadzorowal tylko proces. Nie byla to awaria Windows TaskScheduler.
+- SOURCE/LIVE 1.72.92 na SATANAMD. Dla OBL lead pojedynczy BLOCKED daje 2-min cooldown, potem kolejny NORMALNY preflight i ewentualny nowy wake, bez obchodzenia odmowy lub retransmisji niepewnego kliku. Prompt kontynuuje dozwolone kroki przy odmowie jednego narzedzia.
+- Niezalezny blad release-manager-satanamd.ps1: przypisanie do zarezerwowanego $PID. Poprawiono na $startedPid w scripts/ i D:\Apps\; AST0. Menedzer potwierdzil v1.72.92 w phase=trial, PID30604, jeden proces.
+- Walidacja wydania: Node 24/24, EXE 10/10 (w tym WebView2), dotnet publish PASS; SHA256 C8B305BE01B2B998E2DE9C9B4294BC25821F1E38AF9568C9642D216205573BCF.
+- Re-arm tylko nowego lead OBL, preserved seq4/fingerprint/LastAttempt/LastInterventionKey, backup diagnostics/chat-wakes-before-block-recovery-20261024_163344.dpapi. ACTIVE_TOTAL=1.
+- REALNE WYBUDZENIE: seq5 due 16:34:23 CEST, attempt_reserved 16:34:30, submission_attempted 16:34:31, receipt_confirmed visible_ack 16:34:31, receipt ebc9ca717b574d06a2d6b2b55dbe9b5e. LastState=visible_ack, Enabled=true, WakeSequence=5, nastepne DueUtc=2026-10-24T14:49:23.7969517Z (16:49:23 CEST).
+- P0 nastepny gate: obserwacja seq6 za okolo 15 minut, ewentualna obsluga ponownego BLOCKED przez nowy mechanizm; nie uruchamiac dodatkowych chat executorow, nie dotykac PBOX1, nie zmieniac innych funkcji.
+## 2026-10-24 16:36:35 +02:00 [OB-WAKE-000005] K01
+- Odczytane checkpoint/MASTER PLAN v2.1/WORK_STATUS. Aktualna decyzja wlasciciela 15:45: NIE zajmowac sie PBOX1; mimo dostepu zdalnego PBOX1 jest poza zakresem, bez zmian.
+- [OB-WAKE-000004] W POPRZEDNIM czacie zapis checkpointu i chat_finished zostal odrzucony przez zabezpieczenia narzedzia; obecnie dopisany jeden POZNY wpis actor=chat stage=chat_blocked seq4 receipt c8e1cf63454b4a91b46600342b8e1c75 z rzeczywistym UTC, bez falszywego ACK.
+- SATANAMD SOURCE=LIVE 1.72.92, LIVE PID30604 od 16:31:45 CEST, responds, Keepalive 5min, release-manager phase=trial with previous v1.72.89. Manifest SHA C8B305BE01B2B998E2DE9C9B4294BC25821F1E38AF9568C9642D216205573BCF.
+- Wersja 1.72.92 obejmuje P0 naprawe false global BLOCKED: cooldown 2min i dalsze probe/wake po jednej lokalnej odmowie, bez wysylek UNCERTAIN.
+- Engine seq5: due UTC14:34:23, receipt eb c9ca... reserved 14:34:30, click 14:34:31, visible_ack 14:34:31. Chat_started actor=chat seq5 UTC14:35:18 verified. Nie wywolano manualnego wake i nie dopisano engine ACK.
+- Przyszly P0: niezalezny dowod i bezpieczna sukcesja nowego czatu przed 14 wybudzeniami; kontrakt docs/OPENBROWSER_LITE_AUTO_HANDOFF_P0_GATE_2026-10-24.md. Nie wywolywac WAIT_USER bez przejecia i weryfikacji.
+- LIVE v1.72.92 aktywny (OK), nie restartowac i nie dotykac harmonogramu, DPAPI czy notatek bez dowodow. PBOX1 bez zmian.
+
+## 2026-10-24 16:40:06 +02:00 [OB-WAKE-000005] K02
+- SATANAMD LIVE 1.72.92 PID30604 trial, fallback 1.72.89, jeden proces, generating nie przerwano. PBOX1 poza zakresem zgodnie z decyzja 15:45.
+- Release manager P0: naprawione PreviousForQueue po phase=rolled_back; nowa kolejka wybiera rzeczywiscie uruchomiony previousExe, nie hardcoded 1.72.89. Bezpieczne takze trial i queued.
+- Tests: PowerShell AST 0 errors, SelfTest 18/18 PASS, Audit trial1 running1, Keepalive running PID30604; brak nowej kolejki, restartu lub manualnej wysylki.
+- Runtime D:\Apps\OpenBrowserLite\release-manager-satanamd.ps1, SOURCE scripts/release-manager-satanamd.ps1 identyczne SHA256 
+a6f323b0a69dd9750b7893394af32d425faca7933d94d1923ade29e91262aefd
+. Wersja app SOURCE/LIVE 1.72.92, EXE candidate 1.72.93 nie tworzony w tym kroku.
+- Wstepny backup runtime: release-manager-satanamd.backup_20261024_1637.ps1 (pierwszy test markera nie przeszedl przez interpolacje PowerShell, backup identyczny; poprawka i testy przeszly).
+- NEXT P0: ochrona przed automatycznym WAIT_USER przy progu 14 wake, dopoki brak faktycznie przetestowanej sukcesji; testy i osobna wersja staged.

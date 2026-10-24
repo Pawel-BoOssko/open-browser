@@ -81,6 +81,12 @@ function StartSafe([string]$file) {
 function CanQueue([int]$count,[bool]$same,[bool]$hashOk) {
  return $count -eq 1 -and $same -and $hashOk
 }
+function PreviousForQueue($state,[string]$defaultExe) {
+ if($null -eq $state){return $defaultExe}
+ if($state.phase -eq 'trial'){return [string]$state.candidateExe}
+ if($state.phase -in @('queued','rolled_back')){return [string]$state.previousExe}
+ return $defaultExe
+}
 function CanSupersede([string]$phase,[int]$currentPid,[int]$previousPid,[bool]$matchingPreviousExe) {
  # Changing the queued candidate is safe only while the ORIGINAL browser
  # with the ORIGINAL PID still runs. Never overwrite an in-progress launch.
@@ -98,6 +104,13 @@ if($Mode -eq 'SelfTest'){
     (CanSupersede 'queued' 4321 4321 $false)){
    throw 'Queued replacement invariant selftest failed'
  }
+ $fixture=[pscustomobject]@{phase='rolled_back';previousExe='v1.72.92';candidateExe='v1.72.93'}
+ if((PreviousForQueue $null 'baseline') -ne 'baseline' -or
+    (PreviousForQueue $fixture 'baseline') -ne 'v1.72.92'){throw 'Rolled back predecessor selftest failed'}
+ $fixture.phase='trial'
+ if((PreviousForQueue $fixture 'baseline') -ne 'v1.72.93'){throw 'Trial predecessor selftest failed'}
+ $fixture.phase='queued'
+ if((PreviousForQueue $fixture 'baseline') -ne 'v1.72.92'){throw 'Queued predecessor selftest failed'}
  $before=[DateTimeOffset]::UtcNow.AddSeconds(-2)
  $tmp=Join-Path $diag ('obl-close-fixture-'+[guid]::NewGuid().ToString('N')+'.jsonl')
  $realEvents=$events
@@ -126,7 +139,7 @@ if($Mode -eq 'SelfTest'){
   $events=$realEvents
   if(Test-Path $tempDir){Remove-Item -LiteralPath $tempDir -Recurse -Force}
  }
- Write-Output 'SATANAMD_RELEASE_SELFTEST_PASS_14'
+ Write-Output 'SATANAMD_RELEASE_SELFTEST_PASS_18'
  return
 }
 $mutex=[Threading.Mutex]::new($false,'Local\OBLiteSatanReleaseGuard_v1')
@@ -153,9 +166,9 @@ try{
   }
   if($state -and $state.phase -notin @('queued','trial','rolled_back','cancelled')){throw 'Unresolved previous release state'}
   $processes=@(Running)
-  $previous=if($state -and $state.phase -eq 'trial'){$state.candidateExe}else{
-    if($state -and $state.phase -eq 'queued'){$state.previousExe}else{$legacy}
-  }
+  # After a rollback, previousExe is the last ACTUALLY RUNNING version.
+  # Do not fall back to the hardcoded 1.72.89 when previous was 1.72.92.
+  $previous=PreviousForQueue $state $legacy
   if(-not(Test-Path -LiteralPath $previous)){throw 'Previous binary absent'}
   if(-not(CanQueue $processes.Count ($processes.Count -eq 1 -and $processes[0].ExecutablePath -eq $previous) $true)){throw 'Exactly one expected live browser required'}
   if($state -and $state.phase -eq 'queued'){
@@ -260,29 +273,29 @@ try{
    $target=$state.previousExe
   }else{Report 'blocked_unknown_release_phase' $state.phase;return}
  }
- $pid=StartSafe $target
+ $startedPid=StartSafe $target
  $ps=@(Running)
  if($ps.Count -ne 1 -or $ps[0].ExecutablePath -ne $target){
-  Report 'blocked_startup_not_verified' ('pid='+$pid)
+  Report 'blocked_startup_not_verified' ('pid='+$startedPid)
   return
  }
- $healthy=Get-Process -Id $pid -ErrorAction SilentlyContinue
+ $healthy=Get-Process -Id $startedPid -ErrorAction SilentlyContinue
  if(-not $healthy -or -not $healthy.Responding -or $healthy.MainWindowHandle -eq 0){
   # Leave the launch phase durable. A later successful health check may
   # transition to trial; a vanished candidate rolls back on the next check.
-  Report 'startup_unverified_no_force' ('pid='+$pid)
+  Report 'startup_unverified_no_force' ('pid='+$startedPid)
   return
  }
  if($state -and $target -eq $state.candidateExe){
-  $state.phase='trial';$state.candidatePid=$pid
+  $state.phase='trial';$state.candidatePid=$startedPid
   $state.activatedUtc=[DateTimeOffset]::UtcNow.ToString('o')
   $state.lastHealthyUtc=$state.activatedUtc
   WriteState $state
-  AuditEvent 'candidate_trial_started' @{pid=$pid;sha=$state.candidateSha}
+  AuditEvent 'candidate_trial_started' @{pid=$startedPid;sha=$state.candidateSha}
  }else{
-  AuditEvent 'previous_binary_started' @{pid=$pid}
+  AuditEvent 'previous_binary_started' @{pid=$startedPid}
  }
- Report 'launched' ('pid='+$pid+' release='+[IO.Path]::GetFileName((Split-Path $target -Parent)))
+ Report 'launched' ('pid='+$startedPid+' release='+[IO.Path]::GetFileName((Split-Path $target -Parent)))
 }catch{
  try{Report 'error' $_.Exception.GetType().Name}catch{}
  throw
