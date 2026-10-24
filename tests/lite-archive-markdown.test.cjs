@@ -43,7 +43,7 @@ assert.equal(snapshot({hydrated:false}).length, 0);
 assert.equal(snapshot({pathname:"/"}).length, 0);
 const captureCs = fs.readFileSync(path.join(root, "LiteConversationCaptureUi.cs"), "utf8");
 assert.match(captureCs, /_markdownArchive\.Save\(chatUrl, turnId, text, partial\)/);
-assert.match(captureCs, /!partial && _archive\.Save\(chatUrl, turnId, text\)/);
+assert.doesNotMatch(captureCs, /_archive\.Save\(/);
 const md = fs.readFileSync(path.join(root,"LiteResponseMarkdownArchive.cs"),"utf8");
 assert.match(md, /index\.jsonl/);
 assert.match(md, /IsPersisted\(/);

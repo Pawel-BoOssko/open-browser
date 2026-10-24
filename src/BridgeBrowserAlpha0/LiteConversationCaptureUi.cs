@@ -5,7 +5,8 @@ namespace BridgeBrowserAlpha0;
 
 internal sealed partial class ChatGptLiteForm
 {
-    private readonly LiteSecureArchive _archive = new();
+    // Readable Markdown is the primary archive. Existing encrypted historical
+    // copies remain on disk but are no longer duplicated for new answers.
     private readonly LiteResponseMarkdownArchive _markdownArchive = new();
     // Completed-answer snapshots only. Avoid a full DOM read every 12 seconds.
     private readonly System.Windows.Forms.Timer _captureTimer = new() { Interval = 30000 };
@@ -108,8 +109,8 @@ internal sealed partial class ChatGptLiteForm
                     snapshots++;
                 if (!partial && _markdownArchive.IsPersisted(chatUrl, turnId, text))
                     persistedIds.Add(turnId);
-                if (!partial && _archive.Save(chatUrl, turnId, text))
-                    snapshots++;
+                // No new DPAPI duplicate: the durable Markdown file is verified
+                // before JS is permitted to remove the response from the DOM.
             }
             if (persistedIds.Count > 0 && _archiveEnabled &&
                 IsArchiveResultCurrent(epoch, _captureEpoch, uri, core.Source))

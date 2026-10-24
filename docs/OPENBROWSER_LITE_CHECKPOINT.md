@@ -1,16 +1,14 @@
 # Open Browser Lite: checkpoint roboczy
-Aktualizacja: 2026-10-24 13:07 CEST. Host: SATANAMD.
-- PLAN: docs/OPENBROWSER_LITE_MASTER_PLAN_MIGRACJI_I_ROZWOJU_2026-10-24.md.
-- PBOX1: Lite 0 procesów, Keepalive Disabled; stare DPAPI/Profile i 84 historyczne pliki archive zachowane.
-- SATANAMD LIVE=SOURCE: v1.72.88, PID 55996, Responding=True; jedyny proces Lite.
-- EXE: D:\Apps\OpenBrowserLite\releases\v1.72.88_20261024\BridgeBrowserAlpha0.exe
-- SHA256: 3E12AC0B5B9811DF5CC4E23D57FB97C29D31E8D44432E2B9EA3E8E92D7DB7C7C.
-- TESTY: Node 24/24, EXE 10/10, publish 0 błędów; realne izolowane WebView2: >10 tur, brak usuwania bez archiwum, po ACK 10 tur i zachowany composer.
-- DOM: defaultEnabled=true, keepNewest=10, threshold=11, JS archiwizuje najstarsze odpowiedzi partiami, C# potwierdza trwały Markdown przez ackSaved, bez ACK starsza odpowiedź nie jest kasowana.
-- LIVE po przełączeniu: start13:04 CEST, poprawna nawigacja ChatGPT, 7 tur, 4 lokalne pliki odpowiedzi Markdown (PARTIAL/FINAL) i index.jsonl, heartbeat co30s.
-- UWAGA: log 13:05:08 CEST generating=true; kolejne próbki do13:06:28 bez przejścia generating=false. NIE restartować, dopóki nie potwierdzono idle oraz braku szkicu.
-- KEEPALIVE: zadanie SatanAMD co5min, ścieżka wskazuje v1.72.88, test ręczny status running existingProcesses=1.
-- MIGRACJA: 22 pliki stanu przeniesione z PBOX1 i sprawdzone, 6 czatów z czego 1 enabled Networking Radar; projekt Lite paused, brak double-lead i nowych retransmisji.
-- OTWARTE: nieprzetestowane cięcie >10 tur na rzeczywistym React ChatGPT, brak soak8/24h, auto HANDOFF niedokończony, stare archive PBOX1 pozostawione.
-- NEXT: obserwować generation i DOM na 1.72.88, test >10 na osobnym długim czacie bez ingerencji w obecny lead; ewentualnie rozszerzyć testy reset/reload/React.
-- ODTWARZANIE: odczytać checkpoint, bieżący EXE/PID, diagnostics/lite-events-YYYY-MM-DD.jsonl i wake-lifecycle.jsonl. Nie powtarzać niepewnych wiadomości; aktualizować checkpoint po etapach.
+Aktualizacja: 2026-10-24 13:35 CEST. Główny host: SATANAMD.
+- PLAN: docs/OPENBROWSER_LITE_MASTER_PLAN_MIGRACJI_I_ROZWOJU_2026-10-24.md. Przed wznowieniem odczytać ten plik.
+- LIVE: v1.72.88, PID 55996, Keepalive SATA co 5 minut. PBOX1 Lite OFF, Keepalive Disabled.
+- WŁĄCZONO 24.10 13:33 CEST harmonogram Open Browser Lite wyłącznie dla roli lead, 15 min, zachowano WakeSequence=22, fingerprint, prompt, LastAttempt. Pierwsze DueUtc 2026-10-24T11:48:04Z (13:48 CEST).
+- NETWORKING RADAR: dotychczasowy drugi aktywny harmonogram bez zmian. Jeden wspólny worker.
+- Backup rejestru: %LOCALAPPDATA%\OpenBrowser\ChatGPT-Lite\diagnostics\chat-wakes-pre-enable-20261024_133304.dpapi. Walidacja other schedules unchanged.
+- SOURCE przygotowywane pod v1.72.89: poprawka instrukcji modelu (checkpoint i dziennik na SATANAMD zamiast PBOX1), Markdown jako jedyne miejsce nowych odpowiedzi bez dodatkowych zaszyfrowanych duplikatów.
+- TESTY SOURCE: Node 24/24 PASS, dotnet build Release PASS. Do zrobienia publish + EXE 10/10, następnie bezpieczny rollout tylko gdy no-draft/no-generation.
+- DOM LIVE 1.72.88: hard prune enabled keep10, wstępnie 10 tur; prawdziwy React >10, soak8/24h jeszcze niepotwierdzony.
+- WAŻNE: seq=22 przekracza próg Handoff 14 i pierwszy następny udany wake może wysłać jednorazową prośbę o HANDOFF, po czym zatrzymać starego leada. Auto nowy-chat takeover nadal NIE zaimplementowany. Nie fałszować ukończenia.
+- MIGRACJA: 22 pliki stanu zaimportowane na SATA, 84 stare pliki archive na PBOX1 nietknięte. Odpowiedzi Markdown zapisują się lokalnie na SATA.
+- NEXT: publish/test/rollout v1.72.89, obserwować pierwszy wake i status handoff; nie powtarzać UNCERTAIN. Następnie rozwijać auto-sukcesję i uzupełniać E2E czyszczenia DOM.
+- Aktualizować ten plik w 10-15 wierszach po każdym ważnym kroku oraz przed restartem. Logi: diagnostics/lite-events-YYYY-MM-DD.jsonl i diagnostics/wake-lifecycle.jsonl na SATANAMD.

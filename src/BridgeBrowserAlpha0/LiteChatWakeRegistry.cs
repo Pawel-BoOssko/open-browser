@@ -203,13 +203,14 @@ internal static class LiteChatWakeRegistry
             body += "\n\nOBOWIĄZKOWY CHECKPOINT [OB-WAKE-" +
                 entry.WakeSequence.ToString("D6") +
                 "]: zapisuj regularnie krótkie, konkretne postępy do " +
+                @"D:\projects\open-browser\docs\OPENBROWSER_LITE_CHECKPOINT.md" +
+                " na SatanAMD. PRZED rozpoczęciem pracy odczytaj ten plik, " +
+                "a po każdej istotnej czynności, przed restartem i przed końcem " +
+                "zaktualizuj maksymalnie kilkanaście krótkich wierszy: " +
+                "LIVE/SOURCE, zmiany, testy, blokady i następny krok. " +
+                "Ważne zdarzenia możesz dopisać także do " +
                 @"D:\projects\open-browser\docs\OPENBROWSER_LITE_WORK_STATUS_2026-10-21.md" +
-                " na SatanAMD, także przed ryzykownym wdrożeniem i przed końcem tego " +
-                "przebiegu. Dopisz numer wywołania, czas, wersję SOURCE i LIVE, " +
-                "zmiany, wyniki testów, przeszkody oraz następny krok; " +
-                "5-10 krótkich linii wystarczy. Dzięki temu kolejny czat " +
-                "ma odzyskać pracę nawet po awarii interfejsu. " +
-                "DODATKOWO prowadź wspólny dziennik z silnikiem na PBOX1: " +
+                ". DODATKOWO prowadź wspólny dziennik z silnikiem na SatanAMD: " +
                 @"%LOCALAPPDATA%\OpenBrowser\ChatGPT-Lite\diagnostics\wake-lifecycle.jsonl" +
                 ". Na POCZĄTKU dopisz jedną linię JSONL z polami schema=1, " +
                 "utc (ISO UTC), actor=chat, stage=chat_started, wakeSequence=" +
@@ -220,8 +221,8 @@ internal static class LiteChatWakeRegistry
                 "Możesz dodać stage=chat_checkpoint w czasie pracy. " +
                 "To jest TEN SAM PLIK co wpisy silnika due/attempt/ACK. " +
                 "Nie dopisuj fałszywego ACK ani nie uznawaj próby za wysłaną. " +
-                "Jeśli zapis do PBOX1 się nie uda, wskaż to w checkpointcie " +
-                "na SatanAMD, nie udawaj sukcesu. " +
+                "Jeśli zapis do dziennika SATANAMD się nie uda, wskaż to " +
+                "w checkpointcie; nie udawaj sukcesu. " +
                 "Nie używaj ChatGPT Tasks ani wewnętrznych automatyzacji.";
         // Radar models sometimes mix the displayed [OB-...] marker and
         // [OB-WAKE-...] into one receipt value in chat-side journal entries.
@@ -289,6 +290,7 @@ internal static class LiteChatWakeRegistry
                 "0123456789abcdef0123456789abcdef");
             if (!numbered.Contains("[OB-WAKE-000027]") ||
                 !numbered.Contains("OBOWIĄZKOWY CHECKPOINT") ||
+                !numbered.Contains("OPENBROWSER_LITE_CHECKPOINT.md") ||
                 !numbered.Contains("OPENBROWSER_LITE_WORK_STATUS_2026-10-21.md"))
                 return 9;
             list[1].WakeSequence = 2;
