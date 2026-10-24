@@ -270,6 +270,10 @@ internal sealed partial class ChatGptLiteForm
             ?? throw new InvalidOperationException("Background WebView2 not initialized");
         await core.AddScriptToExecuteOnDocumentCreatedAsync(script);
         await core.AddScriptToExecuteOnDocumentCreatedAsync(probeScript);
+        await InstallCaptureScriptAsync(core);
+        string pruneScript = await File.ReadAllTextAsync(
+            Path.Combine(AppContext.BaseDirectory, "LiteDomHardPrune.js"));
+        await core.AddScriptToExecuteOnDocumentCreatedAsync(pruneScript);
         // Capture safe metadata for hidden-worker failures too. Main WebView
         // telemetry alone cannot identify which route triggered HTTP 429.
         core.WebResourceResponseReceived += (_, e) =>

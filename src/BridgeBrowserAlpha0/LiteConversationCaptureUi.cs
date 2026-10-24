@@ -47,7 +47,11 @@ internal sealed partial class ChatGptLiteForm
             _archiveToggle.Text = _archiveEnabled ? "Kopie: włączone" : "Kopie: wyłączone";
             LiteEventLog.Write("archive_mode_changed", new { enabled = _archiveEnabled });
         };
-        _captureTimer.Tick += async (_, _) => await CaptureVisibleAnswersAsync();
+        _captureTimer.Tick += async (_, _) =>
+        {
+            await CaptureVisibleAnswersAsync();
+            await CaptureWorkerAnswersAsync();
+        };
     }
 
     private async Task InstallCaptureScriptAsync(CoreWebView2 core)

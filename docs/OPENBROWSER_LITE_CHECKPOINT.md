@@ -27,3 +27,16 @@ Aktualizacja: 2026-10-24 13:58 CEST, host SATANAMD.
 - Networking Radar ma stary LEAD w stanie paused_chat_max_length_recovery (nie aktywny), wymaga osobnej rotacji; nie włączać go na starym URL.
 - Backup tuż przed promocją: diagnostics/before-promote-new-lead-20261024_143810. Nie usuwać starych chatów, danych ani journal.
 - P0: potwierdzić rzeczywiste wybudzenie nowego LEAD i potem WDROŻYĆ AUTOMATYCZNĄ ROTACJĘ przed limitem, bo sama naprawa preflight nie rozwiąże osiągania limitu rozmów.
+
+## 2026-10-24 14:42 CEST, etap D02 (odczyt rejestru i migracji leada)
+- Aktualna prawda REGISTRY różni się od 13:58: stary Lite chat 6ada0128 Enabled=false, seq22, LastState=paused_chat_max_length_recovery; Networking Radar 6ace5b29 Enabled=false, seq16, LastState=paused_chat_max_length_recovery; NOWY Lite lead 6adca60a Enabled=true, seq0, LastState=armed_new_lead, DueUtc=2026-10-24T12:53:10Z. Projekty i harmonogram zapisane ok. 14:38:10 CEST przez inny wykonawczy kontekst, a nie przez ten czat.
+- Nie dotykano rejestru, nie wysyłano wiadomości ani nie restarowano procesu. Nie wybudzać 6ada0128. Chronić nowego leada przed duplikatem i potwierdzić jego pierwszą pełną turę E2E.
+- Stan LIVE PID 34832, SOURCE/LIVE nadal wg checkpointu 1.72.89, brak nowego publish. Przy dalszych zmianach nie nadpisywać równoległych zmian konfiguracji.
+- Kolejny etap: bezpieczna telemetria topologii ostatnich wiadomości oraz testy SOURCE; wyłącznie read-only diagnostyka podczas pierwszego nowego wake.
+`n## 2026-10-24 14:47 CEST, etap D03 (worker archive SOURCE, STAGED)
+- SOURCE v1.72.90: nowy LiteWorkerCaptureUi.cs; timer co 30 s zapisuje worker PARTIAL/FINAL; kontrola URL/epoch/draft, brak równoległego zapisu tego samego czatu, hard-prune worker tylko po zweryfikowanym pliku.
+- Zmienione LiteChatWakeUi.cs (instalacja JS capture i hard-prune dla worker), LiteConversationCaptureUi.cs (timer oba WebView2), csproj Version 1.72.90. Nie wysyłano żadnych wiadomości.
+- Node 24/24 PASS; dotnet build/publish 0 errors, 1 warning WindowsBase; staged EXE --lite-markdown-selftest RC0 i --lite-webview-integration-selftest RC0. Fixture nie jest realnym testem ChatGPT.
+- STAGED D:\Apps\OpenBrowserLite\releases\v1.72.90_20261024\BridgeBrowserAlpha0.exe SHA256 944450b37f101c44ef9bf55f29696e584f70cbbbfde3150715eea50194ce7c5d
+- LIVE niezamieniony, nadal PID 34832 v1.72.89. Brak real E2E zapisu odpowiedzi workera w LIVE; nie deklarować wdrożenia.
+- Następny krok: test prawdziwego wybudzenia nowego leada (seq1, po 14:53 CEST), weryfikacja UI ACK / response archive, następnie bezpieczne przełączenie release po wygaszeniu aktywnej generacji.
