@@ -74,3 +74,32 @@ Aktualizacja: 2026-10-24 13:58 CEST, host SATANAMD.
 - LIVE jeszcze v1.72.89 PID34832. W trakcie tego wybudzenia generowanie bylo aktywne, dlatego nie restartowano programu.
 - Dziennik wake zawiera seq1 receipt potwierdzone przez engine, chat_started i chat_checkpoint; bez dopisania fake ACK.
 - PBOX1 nadal offline, wdrozenie tam niedostepne. NEXT: ocena idle/rollback SATA i ewentualne bezpieczne przygotowanie promocji release, bez przerywania aktywnego leada.
+
+## 2026-10-24 15:02:30 +02:00 [OB-WAKE-000001], FINAL / W04
+- Rezultat: pierwsze automatyczne wybudzenie nowego LEAD seq1 engine receipt_confirmed=visible_ack, reply generating od 14:53:40 CEST. Nie ma dubli, prob retry ani recznego POST.
+- P0 poprawka: nowe USER+generating nie kopiuje poprzedniej odpowiedzi FINAL jako PARTIAL; fixture DIL/legacy. Sprawdzone SOURCE JS SHA 
+927745b162d018baac3cd19afb7f1264ce5cee745c613a57507c027737c557ae
+ = STAGED JS SHA.
+- SOURCE=STAGED v1.72.91, EXE SHA256 
+8efbef6b00fbed7f0ecaf9731ebf682581552f1caaf4d1d747cc40542071dffa
+, Node24/24 PASS, .NET publish 0 errors (WindowsBase warning), EXE 10/10 selftests exit0.
+- LIVE SATA v1.72.89 PID 
+34832
+ 
+D:\Apps\OpenBrowserLite\releases\v1.72.89_20261024\BridgeBrowserAlpha0.exe
+. Bez restartu, bez przerwania generowania i bez aktywacji STAGED.
+- PBOX1 offline; PBOX deployment i rollback NOT DONE. Release-manager PBOX nie ma gotowego skrotu/stanu na SATA; lokalny keepalive SATA ma hardcoded EXE 1.72.89, dlatego nie kolejkujemy 1.72.91 bez testu rollback.
+- Obowiazkowy wake-lifecycle actor=chat chat_finished seq1 receipt=
+4efbadfc239840349818157c8fbbab84
+ zapisany 1x i zweryfikowany. NEXT P0: zbudowac bezpieczna promocje/rollback SATA, testowac real E2E Markdown worker i DOM>10, automatyczna rotacje tylko po potwierdzeniu pliku handoff.
+- Po domknieciu odpowiedzi monitor powinien zapisac FINAL dla aktualnego turn; tego jeszcze nie mozna zweryfikowac w biezacym generowaniu.
+
+## 
+2026-10-24 15:10:59 +02:00
+ [OB-WAKE-000002] K01
+- LIVE SatanAMD 1.72.89 PID34832 Responding; tytul Generowanie, start 13:41 CEST; PBOX1 Remote offline.
+- Engine seq2 due UTC13:08:20, attempt_reserved13:08:22, submission_attempted13:08:24, receipt_confirmed visible_ack13:08:24, receipt 8203386c88ad4822ae095765353d1afe.
+- Model: transition generating=true UTC13:08:40, now LIVE working. No restart, no resend.
+- SOURCE/STAGED 1.72.91: Node24/24, EXE10/10 prior PASS; SHA 8efbef6b00fbed7f0ecaf9731ebf682581552f1caaf4d1d747cc40542071dffa.
+- P0: keepalive SATA hard-coded 1.72.89, brak release-state; przygotowac bezpieczny release manager z kolejka, clean-close gate i automatycznym rollback po braku procesu. Bez wymuszonego zamkniecia.
+- NEXT: naprawa procesu promocji SATA, testy headless i pilot queue bez ruszania aktywnego PID.
