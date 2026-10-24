@@ -10,3 +10,20 @@ Aktualizacja: 2026-10-24 13:58 CEST, host SATANAMD.
 - Networking Radar: drugi aktywny harmonogram seq15 state=visible_ack, HandoffPhase=requested; nie zmieniać.
 - Dane 22 pliki stanu PBOX1 -> SATANAMD; 84 historyczne archiwa zostały na PBOX1. MASTER PLAN: D:\projects\open-browser\docs\OPENBROWSER_LITE_MASTER_PLAN_MIGRACJI_I_ROZWOJU_2026-10-24.md.
 - Po wznowieniu czytać TEN plik, diagnostics/wake-lifecycle.jsonl i lite-events-2026-10-24.jsonl; nie powtarzać UNCERTAIN ani nie fałszować ACK.
+
+## 2026-10-24 14:38 CEST, nowy lead, etap D01 (odczyt i inspekcja, BEZ zmiany SOURCE/LIVE)
+- SatanAMD dostępny przez Remote Desktop Commander; proces LIVE PID 34832 nadal uruchomiony z D:\Apps\OpenBrowserLite\releases\v1.72.89_20261024\BridgeBrowserAlpha0.exe (start 13:41 CEST).
+- Wake journal: Open Browser Lite seq23 odroczone assistant_not_complete także 14:03, 14:18 i 14:33 CEST; drugi projekt Networking Radar seq17 także odroczony 14:28. BRAK prób send dla tych odroczeń.
+- Log LIVE do 14:37 CEST: UI heartbeat i DOM_status turns=7, elements=774; nie stanowi dowodu poprawnego domknięcia ostatniej wiadomości danego czatu.
+- SOURCE: LiteResumeProbe.js bierze ostatni węzeł z selektora obejmującego DIL i stary DOM; LiteChatWakePreflight.Eligibility prawidłowo blokuje ostatnią rolę user. W tej chwili nie rozstrzygnięto, czy to trwały nieobsłużony USER czy fałszywy odczyt struktury.
+- Archiwum lokalne responses istnieje, zawiera .md PARTIAL/FINAL; ukończenie całego E2E niepotwierdzone. Nie wykonano wysyłki, restartu ani aktualizacji LIVE.
+- Następny krok: sprawdzić strukturę DIL, sposób sondowania i rzeczywisty stan ChatGPT, dodać bezpieczne odzyskiwanie bez dubli, testy regresji.
+
+## 2026-10-24 14:40 CEST: KOREKTA OPERACYJNA (drugi agent; fakt z ekranu)
+- Zrzut rzeczywistego GUI Lite wykazał komunikat ChatGPT „Osiągnięto maksymalną długość dla tej konwersacji ... Rozpocznij nowy czat” w starym czacie. Przyczyna stałej blokady starych czatów = LIMIT SERWEROWY ROZMOWY, nie tylko błąd selektora DIL.
+- Zatrzymano dwa stare harmonogramy bez ponawiania USER wiadomości; zapisano backup w diagnostics/before-chat-rotation-20261024_143333.
+- Utworzono NOWY czat Open Browser Lite, wysłano seed z checkpointem i MASTER PLAN, trwa generowanie; NOWY URL: https://chatgpt.com/c/6adca60a-9980-83ed-943b-fff6ef7fcdfd.
+- NOWY czat przypięty do projektu i promowany do jedynej roli LEAD; stary lead archive, aktywna dokładnie 1 schedule nowego leada, WakeSequence=0, DueUtc=2026-10-24T12:53:10.6943258Z (14:53 CEST / 15:53 EAT), interwał skuteczny 15m.
+- Networking Radar ma stary LEAD w stanie paused_chat_max_length_recovery (nie aktywny), wymaga osobnej rotacji; nie włączać go na starym URL.
+- Backup tuż przed promocją: diagnostics/before-promote-new-lead-20261024_143810. Nie usuwać starych chatów, danych ani journal.
+- P0: potwierdzić rzeczywiste wybudzenie nowego LEAD i potem WDROŻYĆ AUTOMATYCZNĄ ROTACJĘ przed limitem, bo sama naprawa preflight nie rozwiąże osiągania limitu rozmów.
