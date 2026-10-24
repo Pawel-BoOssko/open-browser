@@ -103,3 +103,27 @@ D:\Apps\OpenBrowserLite\releases\v1.72.89_20261024\BridgeBrowserAlpha0.exe
 - SOURCE/STAGED 1.72.91: Node24/24, EXE10/10 prior PASS; SHA 8efbef6b00fbed7f0ecaf9731ebf682581552f1caaf4d1d747cc40542071dffa.
 - P0: keepalive SATA hard-coded 1.72.89, brak release-state; przygotowac bezpieczny release manager z kolejka, clean-close gate i automatycznym rollback po braku procesu. Bez wymuszonego zamkniecia.
 - NEXT: naprawa procesu promocji SATA, testy headless i pilot queue bez ruszania aktywnego PID.
+
+## 2026-10-24 15:14 CEST [OB-WAKE-000002] K02
+- Przygotowano nowy release-manager-satanamd.ps1 (poza SOURCE i LIVE), tylko lokalne pliki i istniejący harmonogram; bez restartu i nowego taska.
+- Gate: jeden PID, candidate SHA256, wskazana sciezka wersjonowana; przejscie queued->trial tylko po window_closing z wlasciwym PID po czasie zakolejkowania; przy niepewnej awarii rollback bez kill.
+- Testy PowerShell AST 0 errors, SelfTest 8/8 (predicate + clean-close PID/czas), Audit stan none/running1 i Keepalive dry live running1 PASS. Nie testowano jeszcze rzeczywistego relaunch.
+- LIVE 1.72.89 PID34832 Generowanie; SOURCE=STAGED 1.72.91 testy 24 Node i 10 EXE PASS, brak produkcyjnej zmiany wersji.
+- NEXT: backup starego keepalive SATANAMD, podpiecie managera, sprawdzenie wywolania TaskScheduler i dopiero idempotentne Queue 1.72.91.
+
+## 2026-10-24 15:15 CEST [OB-WAKE-000002] K03
+- LIVE PID34832 v1.72.89 pozostawiony bez zmian, nadal Generowanie. Podmieniono TYLKO skrypt keepalive-satanamd.ps1 na delegacje do release-manager-satanamd.ps1; backup keepalive-satanamd.backup_20261024_1514.ps1.
+- Keepalive nowa sciezka: AST 0 errors, reczne wywolanie read-only running existingProcesses=1 pid34832, proces i sciezka pozostaly identyczne.
+- Nowy manager lokalny w D:\Apps\OpenBrowserLite\release-manager-satanamd.ps1, SelfTest 8/8 i Audit PASS; queue next clean close/rollback. Zadnego kill/CloseMainWindow.
+- SOURCE=STAGED 1.72.91 PASS Node24/24 EXE10/10; brak zmiany aplikacji LIVE. NEXT: ustawic release Queue i wykonac kontrolne uruchomienie istniejacego Windows Task.
+
+## 2026-10-24 15:18:28 +02:00 [OB-WAKE-000002] K04 FINAL
+- LIVE SATANAMD v1.72.89 PID34832, Responding; proces pozostal nienaruszony. PBOX1 nadal offline: brak stage, deployment, rollback na PBOX1.
+- SOURCE=STAGED v1.72.91; EXE SHA256 8efbef6b00fbed7f0ecaf9731ebf682581552f1caaf4d1d747cc40542071dffa; Node 24/24, EXE 10/10, .NET publish 0 errors (WindowsBase warning).
+- SATANAMD Keepalive poprawiony: original backup keepalive-satanamd.backup_20261024_1514.ps1, nowy release-manager-satanamd.ps1; AST0, selftest 8/8, manual Keepalive running1 PID34832.
+- RELEASE SATA phase=queued: candidate 1.72.91, rollback 1.72.89, previousPid=34832, queueUtc=2026-10-24T13:15:43Z; nie zmieniono LIVE i nie uruchomiono drugiej instancji.
+- Real Windows ScheduledTask test: LastTaskResult=0, LastRun=10/24/2026 15:16:02, po tescie wciaz 1 proces PID 34832, release phase queued.
+- Warunek promocji: potwierdzony window_closing tego PID po queue, poprawny hash EXE i brak uruchomionego procesu; nie retry UNCERTAIN. Crash bez clean close uruchamia poprzednia wersje. Test rzeczywistego przelaczenia / rollback W TRAKCIE AWARII nadal PENDING.
+- E2E: engine seq2 receipt=8203386c88ad4822ae095765353d1afe verified visible_ack 15:08:24 CEST, generowanie 15:08:40. Aktualny LIVE archiwum FINAL SHA zweryfikowany dla seq1 3387 znakow; dla seq2 zapis PARTIAL 366 znakow; final seq2 jeszcze niepotwierdzony.
+- P0 BUG LIVE 1.72.89: ten sam stary FINAL 3387 znakow zapisany 15:08:30 jako PARTIAL po nowym wake. Fix w STAGED 1.72.91, nie przypisywac go LIVE.
+- NEXT: po REAL clean close potwierdzic trial v1.72.91, sha/GUI/ACK/response; potem DOM>10, worker archive E2E, 8h soak i pelna rotacja leada. Nie restartowac Generowania.
