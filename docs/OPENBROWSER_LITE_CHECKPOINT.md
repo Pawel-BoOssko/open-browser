@@ -127,3 +127,32 @@ D:\Apps\OpenBrowserLite\releases\v1.72.89_20261024\BridgeBrowserAlpha0.exe
 - E2E: engine seq2 receipt=8203386c88ad4822ae095765353d1afe verified visible_ack 15:08:24 CEST, generowanie 15:08:40. Aktualny LIVE archiwum FINAL SHA zweryfikowany dla seq1 3387 znakow; dla seq2 zapis PARTIAL 366 znakow; final seq2 jeszcze niepotwierdzony.
 - P0 BUG LIVE 1.72.89: ten sam stary FINAL 3387 znakow zapisany 15:08:30 jako PARTIAL po nowym wake. Fix w STAGED 1.72.91, nie przypisywac go LIVE.
 - NEXT: po REAL clean close potwierdzic trial v1.72.91, sha/GUI/ACK/response; potem DOM>10, worker archive E2E, 8h soak i pelna rotacja leada. Nie restartowac Generowania.
+
+## 2026-10-24 15:25 CEST [OB-WAKE-000003] K01
+- LIVE SatanAMD v1.72.89 PID34832 Responding=True Generowanie, SOURCE=STAGED v1.72.91, release phase=queued, rollback v1.72.89 PID34832, nie wykonano restartu.
+- Trzecie autonomiczne wake 15:23:22 receipt b60d5845ef0b44b283e9dd63dc330592. Silnik attempt_reserved 13:23:22Z, submission_attempted 13:23:24Z, receipt_confirmed visible_ack 13:23:24Z.
+- chat_started actor=chat dopisany i zweryfikowany w wspolnym JSONL o13:24:04Z.
+- Seq2 model complete at13:19Z i archiwum FINAL: 2769 znakow + 366; seq3 generowanie od13:23:40Z.
+- LIVE liczba widocznych tur: 9 potem 6 wskutek React; brak realnego testu hard prune >10.
+- PBOX1 offline. NEXT P0: release manager close-ack przez noc/migracja schematu rollback; brak fake ACK, no duplicate send.
+
+## 2026-10-24 15:27:49 +02:00 [OB-WAKE-000003] K02
+- P0 release-manager SATANAMD: HadCleanClose przeszukuje log dzisiejszy i wczorajszy; bez tej poprawki po polnocy clean-close mogl spowodowac false rollback.
+- Dwa dodatkowe izolowane testy akceptacji PID/czasu przez polnoc. Brak ingerencji w produkcyjny journal.
+- AST PowerShell 0 errors, SelfTest 10/10 PASS, Audit release queued running1, Keepalive running PID34832; LIVE v1.72.89, STAGED v1.72.91.
+- SOURCE scripts/release-manager-satanamd.ps1 identyczny z runtime script, SHA256=26ae7e200804cfc2c1b1a4c0b1ea205a141c6cfba67241401e4c3ccbec26eda3.
+- PBOX1 offline; real switching i fault rollback NOT VERIFIED; aktywne Generowanie nietkniete.
+- Mała uwaga narzedzia: pierwsza proba weryfikacji kopii nie przeszla z powodu kolizji nazwy funkcji H z aliasem PowerShell Get-History. Powtorzono poprawiona nazwa HashLocal i porownano SHA.
+
+## 2026-10-24 15:28 +02:00, audyt czy stary czat się obudził (inny czat operacyjny)
+- SatanAMD LIVE: dokładnie jeden BridgeBrowserAlpha0.exe, PID34832 v1.72.89. Nowy LEAD URL ...fff6ef7fcdfd: seq3 visible_ack po 15:23, chat_started 15:24, checkpoint 15:27. STARY lead URL ...d36167e301b6 ma Role=archive, Enabled=false, seq22 bez postępu i LastState=paused_chat_max_length_recovery. Testowy worker także Enabled=false seq0.
+- Rejestr SATA: 1 aktywny harmonogram, nowy LEAD. Networking Radar stary lead Enabled=false seq16. Wake journal od promocji ma seq1/2/3 nowego czatu, brak nowej próby starego seq23.
+- Windows task SATA OpenBrowser ChatGPT Lite: Settings.Enabled=true, ale 0 Enabled triggers, NextRunTime pusty, ostatni przebieg 2026-10-18 08:53. Poprzednia próba Disable-ScheduledTask zakończyła się odmową dostępu. Keepalive SATA co5min i Monitor co2min: LastTaskResult=0.
+- PBOX1: o 15:27 CEST niedostępny przez Remote Desktop Commander (offline, last seen ok. 2h), MultiHost list_targets i Lupus Commander: UNAVAILABLE. Nie wolno deklarować, że PBOX1 jest wyłączony TERAZ; nie można sprawdzić jego procesów, zadań, dziennika. Po powrocie online P0: zbadać procesy BridgeBrowserAlpha0, Keepalive, local chat-wakes.dpapi i wake-lifecycle.jsonl, porównać z SATA.
+- SOURCE v1.72.91 STAGED, LIVE v1.72.89, nowy lead pracuje nad release-manager; nie modyfikować SOURCE/LIVE równolegle, nie przerywać generowania.
+
+## 2026-10-24 15:30:14 +02:00 [OB-WAKE-000003] K03
+- Real Windows TaskScheduler Open Browser Lite SATANAMD Keepalive wywolany po poprawce z polnoca; LastTaskResult=0, LastRun 15:29:42, po tescie jeden LIVE proces PID34832 v1.72.89, release nadal queued.
+- SOURCE skrypt release manager scripts/release-manager-satanamd.ps1 identyczny bajtowo z runtime D:\Apps\OpenBrowserLite\release-manager-satanamd.ps1, SHA256 26ae7e200804cfc2c1b1a4c0b1ea205a141c6cfba67241401e4c3ccbec26eda3.
+- STAGED v1.72.91 candidate SHA 8efbef6b00fbed7f0ecaf9731ebf682581552f1caaf4d1d747cc40542071dffa, LIVE v1.72.89 PID34832 Generowanie, brak restartu.
+- PBOX1 offline. Next: realny test po naturalnym idle clean-close, nie wymuszac zamkniecia bez draft/generation proof, zebrac real worker archive i hard prune >10.
