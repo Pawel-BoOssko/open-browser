@@ -156,3 +156,24 @@ D:\Apps\OpenBrowserLite\releases\v1.72.89_20261024\BridgeBrowserAlpha0.exe
 - SOURCE skrypt release manager scripts/release-manager-satanamd.ps1 identyczny bajtowo z runtime D:\Apps\OpenBrowserLite\release-manager-satanamd.ps1, SHA256 26ae7e200804cfc2c1b1a4c0b1ea205a141c6cfba67241401e4c3ccbec26eda3.
 - STAGED v1.72.91 candidate SHA 8efbef6b00fbed7f0ecaf9731ebf682581552f1caaf4d1d747cc40542071dffa, LIVE v1.72.89 PID34832 Generowanie, brak restartu.
 - PBOX1 offline. Next: realny test po naturalnym idle clean-close, nie wymuszac zamkniecia bez draft/generation proof, zebrac real worker archive i hard prune >10.
+
+## 2026-10-24 15:32:05 +02:00 [OB-WAKE-000003] K04
+- P0 poprawka menedzera na SATA: bezpieczne zastapienie kandydatu w fazie queued nowa, lepiej sprawdzona wersja bez zamykania LIVE. Twardy warunek zgodnosci PID/EXE starego procesu, hash kandydata i poprzedniej wersji, backup poprzedniego pliku stanu.
+- Idempotentne Queue tego samego kandydata: ALREADY_QUEUED, queuedAtUtc pozostal 2026-10-24T13:15:43Z; nie zmieniono stanu/due/PID.
+- Tests release manager AST0, SelfTest14/14 PASS; Audit phase=queued running1; nadal SOURCE/STAGED aplikacji 1.72.91 i LIVE 1.72.89 PID34832.
+- SOURCE skrypt scripts/release-manager-satanamd.ps1 odpowiada bajtowo runtime, SHA256 
+9c5b0bf6f122e0c03cf05138c3b3431063ff1c303d007ad4a650c46020d2acf8
+.
+- PBOX1 nadal offline; naturalny clean-close, trial i fault rollback NOT VERIFIED. Nie restartowano procesu.
+
+## 2026-10-24 15:33:34 +02:00 [OB-WAKE-000003] K05 PRZED ZAMKNIECIEM
+- Weryfikacja LIVE archive FINAL SHA dla 5 ostatnich plikow PASS (191, 265, 3387, 2769, 366 znakow). To dowod realnego zapisu foreground, nie dowod worker E2E.
+- Negatywny test release Queue z blednym SHA: BAD_SHA_REJECTED=True, identyczny SHA pliku state przed/po, LIVE PID34832 niezmieniony.
+- Release manager AST0, selftest14/14, real Windows task LastTaskResult0; queued v1.72.91 przy LIVE1.72.89. Wydanie 1.72.91 nadal NOT LIVE.
+- Zapisano analogiczne podsumowanie do WORK_STATUS_2026-10-21.md. PBOX1 offline; 3 wake ACK dostarczone; seq3 answer still generating wedlug ostatniego odczytu 15:32:43 CEST.
+- NEXT: natural clean-close+Keepalive candidate trial; real worker archive, hard-prune >10 i rollback test na izolowanym wydaniu; zadnych niepewnych resendow, bez recznego Git i ChatGPT Tasks.
+
+## 2026-10-24 15:34 CEST [OB-WAKE-000003] FINAL JOURNAL VERIFIED
+- SATANAMD wake-lifecycle.jsonl seq3 receipt b60d5845ef0b44b283e9dd63dc330592: dokładnie jeden actor=chat chat_started i jeden actor=chat chat_finished (UTC13:33:54.498Z) sprawdzone read-back, bez dopisywania engine ACK.
+- LIVE nadal 1.72.89 PID34832, release state queued v1.72.91; bez restartu, PBOX1 offline.
+- Real candidate switching/rollback, worker E2E i DOM hard limit10 jeszcze NIE zaliczone; nie twierdzic DONE.

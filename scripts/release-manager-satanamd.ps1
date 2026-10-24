@@ -81,11 +81,23 @@ function StartSafe([string]$file) {
 function CanQueue([int]$count,[bool]$same,[bool]$hashOk) {
  return $count -eq 1 -and $same -and $hashOk
 }
+function CanSupersede([string]$phase,[int]$currentPid,[int]$previousPid,[bool]$matchingPreviousExe) {
+ # Changing the queued candidate is safe only while the ORIGINAL browser
+ # with the ORIGINAL PID still runs. Never overwrite an in-progress launch.
+ return $phase -eq 'queued' -and $currentPid -gt 0 -and
+   $currentPid -eq $previousPid -and $matchingPreviousExe
+}
 [IO.Directory]::CreateDirectory($diag)|Out-Null
 if($Mode -eq 'SelfTest'){
  if(-not(CanQueue 1 $true $true) -or (CanQueue 0 $true $true) -or
     (CanQueue 2 $true $true) -or (CanQueue 1 $false $true) -or
     (CanQueue 1 $true $false)){throw 'Queue predicate selftest failed'}
+ if(-not(CanSupersede 'queued' 4321 4321 $true) -or
+    (CanSupersede 'queued' 4322 4321 $true) -or
+    (CanSupersede 'trial' 4321 4321 $true) -or
+    (CanSupersede 'queued' 4321 4321 $false)){
+   throw 'Queued replacement invariant selftest failed'
+ }
  $before=[DateTimeOffset]::UtcNow.AddSeconds(-2)
  $tmp=Join-Path $diag ('obl-close-fixture-'+[guid]::NewGuid().ToString('N')+'.jsonl')
  $realEvents=$events
@@ -114,7 +126,7 @@ if($Mode -eq 'SelfTest'){
   $events=$realEvents
   if(Test-Path $tempDir){Remove-Item -LiteralPath $tempDir -Recurse -Force}
  }
- Write-Output 'SATANAMD_RELEASE_SELFTEST_PASS_10'
+ Write-Output 'SATANAMD_RELEASE_SELFTEST_PASS_14'
  return
 }
 $mutex=[Threading.Mutex]::new($false,'Local\OBLiteSatanReleaseGuard_v1')
@@ -139,11 +151,19 @@ try{
   if($state -and $state.phase -eq 'queued' -and $state.candidateExe -eq $candidate -and $state.candidateSha -eq $actual){
    Write-Output 'ALREADY_QUEUED';return
   }
-  if($state -and $state.phase -notin @('trial','rolled_back','cancelled')){throw 'Unresolved previous release state'}
+  if($state -and $state.phase -notin @('queued','trial','rolled_back','cancelled')){throw 'Unresolved previous release state'}
   $processes=@(Running)
-  $previous=if($state -and $state.phase -eq 'trial'){$state.candidateExe}else{$legacy}
+  $previous=if($state -and $state.phase -eq 'trial'){$state.candidateExe}else{
+    if($state -and $state.phase -eq 'queued'){$state.previousExe}else{$legacy}
+  }
   if(-not(Test-Path -LiteralPath $previous)){throw 'Previous binary absent'}
   if(-not(CanQueue $processes.Count ($processes.Count -eq 1 -and $processes[0].ExecutablePath -eq $previous) $true)){throw 'Exactly one expected live browser required'}
+  if($state -and $state.phase -eq 'queued'){
+   if(-not(CanSupersede $state.phase ([int]$processes[0].ProcessId) ([int]$state.previousPid) ($processes[0].ExecutablePath -eq $state.previousExe))){
+    throw 'Queued predecessor identity changed; no replacement allowed'
+   }
+   if((HashFile $state.previousExe) -ne $state.previousSha){throw 'Queued rollback binary changed'}
+  }
   if($candidate -eq $previous){throw 'Candidate equals previous'}
   $s=[pscustomobject]@{
    schema=1;phase='queued';queuedAtUtc=[DateTimeOffset]::UtcNow.ToString('o');
@@ -152,7 +172,7 @@ try{
    activatedUtc=''; lastHealthyUtc=''; notes='not_activated';
   }
   if($state){
-   Copy-Item -LiteralPath $statePath -Destination ($statePath+'.backup-'+(Get-Date -Format 'yyyyMMdd_HHmmss')) -ErrorAction Stop
+   Copy-Item -LiteralPath $statePath -Destination ($statePath+'.backup-'+(Get-Date -Format 'yyyyMMdd_HHmmss')+'-'+[guid]::NewGuid().ToString('N')) -ErrorAction Stop
   }
   WriteState $s
   AuditEvent 'release_queued' @{previousPid=$s.previousPid;candidateSha=$actual}
