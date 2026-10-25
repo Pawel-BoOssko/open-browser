@@ -269,6 +269,7 @@ internal static class LiteChatWakeRegistry
         {
             if (LiteChatHandoff.SelfTest() != 0) return 167;
             if (LiteHandoffEvidence.SelfTest() != 0) return 168;
+            if (LiteHandoffSuccession.SelfTest() != 0) return 169;
             var now = DateTimeOffset.UtcNow;
             string a = "https://chatgpt.com/c/11111111-1111-1111-1111-111111111111";
             string b = "https://chatgpt.com/c/22222222-2222-2222-2222-222222222222";

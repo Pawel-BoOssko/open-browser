@@ -76,7 +76,7 @@ internal static class LiteHandoffSuccession
     {
         Require(previous, Phase.Prepared);
         if (!composerEmpty || generating || !routeStable ||
-            !ValidUrl(observedUrl) || observedUrl == previous.OldChatUrl)
+            !notRegisteredElsewhere || !ValidUrl(observedUrl) || observedUrl == previous.OldChatUrl)
             throw new InvalidOperationException(
                 "New chat unverified or inherited draft/generation present");
         return Next(previous, Phase.NewChatObserved, now) with
@@ -267,14 +267,16 @@ internal static class LiteHandoffSuccession
             var initial = PersistOnce(ledger, Prepare(proof, now));
             try { PersistOnce(ledger, initial); return 1; }
             catch (IOException) { }
-            try { ObserveNewChat(initial, newer, false, false, true, now); return 2; }
+            try { ObserveNewChat(initial, newer, false, false, true, true, now); return 2; }
             catch (InvalidOperationException) { }
-            try { ObserveNewChat(initial, newer, true, true, true, now); return 3; }
+            try { ObserveNewChat(initial, newer, true, true, true, true, now); return 3; }
             catch (InvalidOperationException) { }
-            try { ObserveNewChat(initial, old, true, false, true, now); return 4; }
+            try { ObserveNewChat(initial, old, true, false, true, true, now); return 4; }
+            catch (InvalidOperationException) { }
+            try { ObserveNewChat(initial, newer, true, false, true, false, now); return 15; }
             catch (InvalidOperationException) { }
             var observed = Advance(ledger, 0, s =>
-                ObserveNewChat(s, newer, true, false, true, now));
+                ObserveNewChat(s, newer, true, false, true, true, now));
             if (observed.Step != Phase.NewChatObserved || observed.Revision != 1)
                 return 5;
             try { Advance(ledger, 0, s => ReserveSeed(s, new string('b', 32), now)); return 6; }
