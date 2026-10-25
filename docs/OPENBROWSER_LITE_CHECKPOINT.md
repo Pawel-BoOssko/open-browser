@@ -325,3 +325,9 @@ a6f323b0a69dd9750b7893394af32d425faca7933d94d1923ade29e91262aefd
 - Nowy log: hard_dom_script_installed keepNewest10 threshold11; dom_status 346 elementów vs poprzednio 2257, różne strony/stan -> nie uznawać tego za porównywalny benchmark.
 - OWNER RULE: poprawka -> test -> staged -> wdrożenie -> potwierdzenie LIVE -> praca nad kolejną poprawką na NOWYM LIVE. PBOX1 wykluczony. Regułę utrwalono w docs/OPENBROWSER_LITE_OPERATING_RULES_2026-10-25.md oraz AGENTS.md.
 - NEXT: poprawić stare PBOX1 w aktywnym promptcie DPAPI silnika bez naruszenia sekretnych danych; sprawdzić realny wake na v1.72.95, DOM/RAM w długiej pracy, rollback trial.
+
+## 2026-10-25 14:12 CET [OB-WAKE-000092] START
+- HOST: SATANAMD via LC MultiHost (COMPUTERNAME checked); PBOX1 out of scope.
+- LIVE: 1.72.95 PID 51892 from D:\Apps\OpenBrowserLite\releases\v1.72.95_20261025\BridgeBrowserAlpha0.exe (observed); SOURCE pending inspection.
+- Journal: chat_started seq92 receipt 3835f46ee069442dbd93d8f81f3fca13 append attempted; never engine ACK.
+- NEXT: inspect current SOURCE, engine ledger, active generation, tests and rollback before promoting a release.
