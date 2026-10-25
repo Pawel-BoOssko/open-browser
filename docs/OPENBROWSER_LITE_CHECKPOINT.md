@@ -316,3 +316,12 @@ a6f323b0a69dd9750b7893394af32d425faca7933d94d1923ade29e91262aefd
 - LIVE 1.72.92 PID30604, responsive; STAGED+QUEUED 1.72.95 SHA256 53f0dd51aa58434f1e54d66c59d03328c70add376ed7cde217e914a1d48c8897; rollback 1.72.92.
 - Engine seq91 visible_ack; seq92 deferred(generating). UI zdarzenia PARTIAL i heartbeat 12:43 UTC; nie zamykac w trakcie generacji bez kontroli.
 - Nie robic git commit/push/reset; brak duplikacji wysylek. NEXT: odczyt stanu idle, kontrolowane zamkniecie GUI i przejscie menedzerem wydan na 1.72.95, weryfikacja jednego PID, zapis polityki dogfooding.
+
+## 2026-10-25 13:52 CET — RELEASE v1.72.95 LIVE + zasada dogfooding
+- SATANAMD, LC MultiHost target=satamad. PBOX1 nietknięty.
+- Poprzednie LIVE v1.72.92 PID30604 zamknięte w sesji Windows 1 przez CloseMainWindow; event window_closing UTC12:50:28.
+- Release manager clean_close_gate_pass i candidate_trial_started. NOWE LIVE v1.72.95 PID51892, session=1, Responding=True; WebView2 initialized, navigation chatgpt.com successful.
+- QA pre-release: publish 0 errors, Node24/24, EXE20/20, WebView2 fixture222 (z wczesniejszego, zweryfikowanego checkpointu); rollback EXE1.72.92 SHA zachowany.
+- Nowy log: hard_dom_script_installed keepNewest10 threshold11; dom_status 346 elementów vs poprzednio 2257, różne strony/stan -> nie uznawać tego za porównywalny benchmark.
+- OWNER RULE: poprawka -> test -> staged -> wdrożenie -> potwierdzenie LIVE -> praca nad kolejną poprawką na NOWYM LIVE. PBOX1 wykluczony. Regułę utrwalono w docs/OPENBROWSER_LITE_OPERATING_RULES_2026-10-25.md oraz AGENTS.md.
+- NEXT: poprawić stare PBOX1 w aktywnym promptcie DPAPI silnika bez naruszenia sekretnych danych; sprawdzić realny wake na v1.72.95, DOM/RAM w długiej pracy, rollback trial.
