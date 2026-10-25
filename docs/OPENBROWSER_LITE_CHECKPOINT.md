@@ -377,3 +377,10 @@ a6f323b0a69dd9750b7893394af32d425faca7933d94d1923ade29e91262aefd
 - Engine seq93 receipt_uncertain click_invoked; human-visible request was received but not independent engine ACK. No resend or invented ACK.
 - FIRST NEXT P0: inspect fresh LIVE preflight for generating=false, toolBusy=false, draft=false; then safe clean close, run existing release-manager Keepalive, verify only one LIVE v1.72.96 PID, WebView2, queue/trial, rollback; measure real DOM/RAM.
 - No changes to PBOX1, schedule DPAPI, Git or ChatGPT Tasks.
+
+## 2026-10-25 14:56 CET [CHAT OBL SATANAMD RECOVERY] K01
+- LC standalone trafia na PBOX1: tylko odczyt hosta, bez zmian. Poprawny kanal LC MultiHost target=satamad potwierdzil SATANAMD.
+- LIVE SATANAMD v1.72.95 PID51892; SOURCE/STAGED/QUEUED wedlug checkpoint v1.72.96; PBOX1 poza zakresem.
+- Ostatni preflight UTC13:55:21 generating=true draft=true, 21 DOM turns vs cel <=10; NIE WOLNO restartowac w trakcie odpowiedzi.
+- NEXT: odczyt menedzera wydan i preflight idle; bezpieczna promocja v1.72.96 przy generating=false toolBusy=false draft=false, potem one PID/GUI/rollback.
+
