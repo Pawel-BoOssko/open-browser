@@ -181,8 +181,8 @@
     }
     state.removedTotal += removed;
     state.lastRemoved = removed;
-    state.lastPrunedAt = now;
-    state.lastTailKey = result.tailKey;
+    if (removed > 0) state.lastPrunedAt = now;
+    if (removed > 0) state.lastTailKey = result.tailKey;
     state.lastVisibleTurns = turns.length - removed;
     state.skipped = waitingForArchive ? "awaiting_archive" :
       removed ? "pruned" : "nothing_removable";

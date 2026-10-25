@@ -331,3 +331,9 @@ a6f323b0a69dd9750b7893394af32d425faca7933d94d1923ade29e91262aefd
 - LIVE: 1.72.95 PID 51892 from D:\Apps\OpenBrowserLite\releases\v1.72.95_20261025\BridgeBrowserAlpha0.exe (observed); SOURCE pending inspection.
 - Journal: chat_started seq92 receipt 3835f46ee069442dbd93d8f81f3fca13 append attempted; never engine ACK.
 - NEXT: inspect current SOURCE, engine ledger, active generation, tests and rollback before promoting a release.
+
+## 2026-10-25 14:24 CET [OB-WAKE-000092] P0 SOURCE
+- LIVE=1.72.95 PID51892 (running); SOURCE=1.72.96; only SATANAMD.
+- Reproduced pre-fix Node assertion failure: waiting_archive wrongly disabled hard prune after zero removals.
+- FIX: lastPrunedAt and lastTailKey set only when removed > 0; source backup in diagnostics.
+- Targeted Node test and node --check PASS; next dotnet publish, selftests, staged+safe queue with rollback.
