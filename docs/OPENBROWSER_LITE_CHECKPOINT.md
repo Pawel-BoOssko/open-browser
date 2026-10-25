@@ -360,3 +360,20 @@ a6f323b0a69dd9750b7893394af32d425faca7933d94d1923ade29e91262aefd
 - JSONL actor=chat chat_started seq93 receipt f7f3cc73... appended/read back UTC13:37:54Z.
 - Engine seq93 receipt_uncertain click_invoked — NOT ACK; DO NOT resend.
 - Next: assess SOURCE/release manager, active generation gate, fast rollback-safe P0 release.
+
+## 2026-10-25 14:44 CET [OB-WAKE-000093] K02
+- HOST SATANAMD LC MultiHost verified; PBOX1 excluded. LIVE=1.72.95 PID51892 Responding; SOURCE/STAGED/QUEUED=1.72.96.
+- Verified SATA release manager queued candidate sha094aa2f21d... previous 1.72.95 sha53f0dd51...; one LIVE, rollback preserved.
+- Staged EXE interactive WebView2 QA in Windows session1 EXIT=0 at UTC13:43:23; temporary QA Windows task removed.
+- Prior tests from seq92: publish 0 errors, Node targeted PASS, EXE19 flags PASS; candidate SHA verified in seq93.
+- Engine seq93 receipt_uncertain click_invoked; no resend and no fake ACK.
+- Next: verify app idle and draft-safe; promote staged v1.72.96 via release manager without disrupting active chat.
+
+## 2026-10-25 14:49 CET [OB-WAKE-000093] K03 FINAL
+- SATANAMD verified via LC MultiHost. LIVE v1.72.95 PID51892 Responding, one process; SOURCE/STAGED/QUEUED v1.72.96.
+- Candidate EXE SHA094aa2f21d... and manifest verified; prior CLI19 tests and dotnet publish from seq92, interactive session1 WebView2 test EXIT0 verified in seq93.
+- Temporary QA scheduled task removed and task LastTaskResult=0. Existing SATANAMD rollback to v1.72.95 SHA53f0dd51... preserved.
+- NO-GO instant restart: active model response_generation_transition generating=true UTC13:42:39Z and no fresh, trusted idle/draft-safe gate. Do not interrupt active generation.
+- Engine seq93 receipt_uncertain click_invoked; human-visible request was received but not independent engine ACK. No resend or invented ACK.
+- FIRST NEXT P0: inspect fresh LIVE preflight for generating=false, toolBusy=false, draft=false; then safe clean close, run existing release-manager Keepalive, verify only one LIVE v1.72.96 PID, WebView2, queue/trial, rollback; measure real DOM/RAM.
+- No changes to PBOX1, schedule DPAPI, Git or ChatGPT Tasks.
