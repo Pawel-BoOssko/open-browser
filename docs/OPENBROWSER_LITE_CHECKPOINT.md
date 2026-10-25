@@ -384,3 +384,14 @@ a6f323b0a69dd9750b7893394af32d425faca7933d94d1923ade29e91262aefd
 - Ostatni preflight UTC13:55:21 generating=true draft=true, 21 DOM turns vs cel <=10; NIE WOLNO restartowac w trakcie odpowiedzi.
 - NEXT: odczyt menedzera wydan i preflight idle; bezpieczna promocja v1.72.96 przy generating=false toolBusy=false draft=false, potem one PID/GUI/rollback.
 
+
+## 
+2026-10-25 17:12:34 +01:00
+ [LC MULTIHOST: reczna kontrola dostepu]
+- HOST=SATANAMD potwierdzony przez LC MultiHost target=satamad; PBOX1 poza zakresem.
+- LIVE: jeden proces PID67152 Responding=True, EXE ze sciezki src\bin\Release, ProductVersion 1.72.96 (nie z katalogu wydan).
+- RELEASE-MANAGER: candidate v1.72.96 queued; rollback v1.72.95, lecz previousPid=51892 nie jest juz aktywny. Nie dokonywano promocji.
+- PRE-FLIGHT: generating=true, draft=true, targetMatches=true, DOM15 tur / optimized0 (ostatni odczyt); restart obecnie NO-GO.
+- ENGINE: due/deferred seq94; nie potwierdzono nowego mechanicznego ACK. Nie wysylano nic ponownie.
+- Nie zmieniano SOURCE, DPAPI, harmonogramu, procesu ani PBOX1.
+- NEXT: po wiarygodnym idle/draft-safe skoordynowac odwracalne wdrozenie przez release-manager i zweryfikowac proces oraz DOM/RAM.
