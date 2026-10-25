@@ -337,3 +337,26 @@ a6f323b0a69dd9750b7893394af32d425faca7933d94d1923ade29e91262aefd
 - Reproduced pre-fix Node assertion failure: waiting_archive wrongly disabled hard prune after zero removals.
 - FIX: lastPrunedAt and lastTailKey set only when removed > 0; source backup in diagnostics.
 - Targeted Node test and node --check PASS; next dotnet publish, selftests, staged+safe queue with rollback.
+
+## 2026-10-25 14:32 CET [OB-WAKE-000092] STAGED 1.72.96
+- SOURCE/STAGED v1.72.96: dotnet publish0 errors (known WindowsBase warning), Node targeted+syntax PASS; 19/19 CLI EXE tests PASS.
+- Manifest EXE/JS SHA readback PASS, prior LIVE 1.72.95 PID51892 Responding, rollback v1.72.95.
+- GUI selftest v1.72.96 NOT RUN; do not claim full real WebView2 E2E until interactive test.
+- NEXT: queue via existing SATA release-manager (no forced exit), verify single LIVE and release state.
+
+## 2026-10-25 14:33:49 CET [OB-WAKE-000092] FINAL
+- HOST SATANAMD, single LIVE v1.72.95 PID51892; STAGED/QUEUED v1.72.96 EXE SHA094aa2f21dfc1c335e96b115c5d37980f08f64dfa135072e987a94cbcf6d0b88.
+- Rollback=LIVE v1.72.95, release-manager phase=queued and previousPid51892 VERIFIED; no restart, no changes PBOX1.
+- DOM regression: waiting_archive incorrectly auto-disabled pruning; P0 fix + Node PASS (was RED); staged JS SHA f1b1593f10965a3675dd1724a085acba5a2bad92037d082bebef5db071322979.
+- Tests: dotnet publish0 errors / known WindowsBase warning; 19 CLI EXE flags exit0; interactive WebView2 on candidate NOT VERIFIED.
+- Tool limits: first multiline source edit command hung/cancelled with no source change; manager SelfTest hung/cancelled; manager Audit+Queue succeeded.
+- Engine wake92 receipt_confirmed visible_ack verified in real journal; no fake ACK / retransmissions.
+- NEXT: after model genuinely idle and no draft/uncertain send, safe clean-close through release manager; verify LIVE v1.72.96 single PID, WebView2 UI and rollback; then DOM/RAM long-soak.
+
+## 2026-10-25 14:37 CET [OB-WAKE-000093] K01
+- LC MultiHost target=satamad, COMPUTERNAME=SATANAMD confirmed; PBOX1 excluded.
+- LIVE PID51892 v1.72.95 Responding=True; SOURCE last write 14:24:46, version needs inspection.
+- Read AGENTS.md, operating rules 2026-10-25 and checkpoint prior to changes.
+- JSONL actor=chat chat_started seq93 receipt f7f3cc73... appended/read back UTC13:37:54Z.
+- Engine seq93 receipt_uncertain click_invoked — NOT ACK; DO NOT resend.
+- Next: assess SOURCE/release manager, active generation gate, fast rollback-safe P0 release.
