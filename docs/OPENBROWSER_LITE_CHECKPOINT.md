@@ -309,3 +309,10 @@ a6f323b0a69dd9750b7893394af32d425faca7933d94d1923ade29e91262aefd
 - Blocker: active generating, safe release-manager requires natural clean close; may not force kill or duplicate lead/send.
 - NEXT: verify generation/draft clear, perform guarded clean-close and release-manager switch, verify one PID and rollback; then fix stale DPAPI wake prompt, measure DOM and memory.
 - No Git commit/push/reset, no ChatGPT Tasks; no PBOX1 changes.
+
+## 2026-10-25 13:44 CET — pilne wdrożenie SATANAMD
+- Decyzja właściciela: SATANAMD jedyne środowisko OBL; PBOX1 wyłączony. Priorytet: uruchomić najnowszą sprawdzoną wersję i korzystać z niej do dalszych poprawek.
+- Potwierdzony host: LC MultiHost target=satamad, COMPUTERNAME=SATANAMD, sesja GUI 1.
+- LIVE 1.72.92 PID30604, responsive; STAGED+QUEUED 1.72.95 SHA256 53f0dd51aa58434f1e54d66c59d03328c70add376ed7cde217e914a1d48c8897; rollback 1.72.92.
+- Engine seq91 visible_ack; seq92 deferred(generating). UI zdarzenia PARTIAL i heartbeat 12:43 UTC; nie zamykac w trakcie generacji bez kontroli.
+- Nie robic git commit/push/reset; brak duplikacji wysylek. NEXT: odczyt stanu idle, kontrolowane zamkniecie GUI i przejscie menedzerem wydan na 1.72.95, weryfikacja jednego PID, zapis polityki dogfooding.
