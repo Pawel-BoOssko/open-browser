@@ -395,3 +395,13 @@ a6f323b0a69dd9750b7893394af32d425faca7933d94d1923ade29e91262aefd
 - ENGINE: due/deferred seq94; nie potwierdzono nowego mechanicznego ACK. Nie wysylano nic ponownie.
 - Nie zmieniano SOURCE, DPAPI, harmonogramu, procesu ani PBOX1.
 - NEXT: po wiarygodnym idle/draft-safe skoordynowac odwracalne wdrozenie przez release-manager i zweryfikowac proces oraz DOM/RAM.
+
+## 
+2026-10-25 19:34:38 +01:00
+ [LC MULTIHOST: SATANAMD RECOVERY / current chat]
+- LC MultiHost target=satamad, COMPUTERNAME=SATANAMD verified; Lupus standalone is PBOX1 (read-only identification only).
+- LIVE one BridgeBrowserAlpha0 PID67152 from src\\bin\\Release\\net8.0-windows\\BridgeBrowserAlpha0.exe; WebView2 workers present; prior ProductVersion 1.72.96.
+- Prior checkpoint: release-manager v1.72.96 queued, rollback 1.72.95; stale previousPid51892; earlier generating=true/draft=true.
+- DO NOT kill/restart or resend without fresh safe-idle gate. PBOX1 out of scope.
+- Tool session resumed after transient connection error; checkpoint update on SatanAMD now.
+- NEXT: read operating rules, master plan, current release-manager, lifecycle and fresh UI state; safe promotion only if idle and rollback tested.
