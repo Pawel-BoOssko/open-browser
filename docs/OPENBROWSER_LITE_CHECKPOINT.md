@@ -288,3 +288,13 @@ a6f323b0a69dd9750b7893394af32d425faca7933d94d1923ade29e91262aefd
 - Engine wake7 reserved UTC15:04:25, submitted15:04:27 i receipt_confirmed visible_ack15:04:27 receipt20e1319e997e42b5a7c3b6631fa32df9; actor=chat chat_started15:05:02 zapisany/zweryfikowany.
 - Worker LIVE archiwizowal FINAL 3305 chars UTC14:58:43 (event worker_archive_saved snapshots1), wartosc SHA nalezy jeszcze potwierdzic w index.jsonl.
 - P0: przygotowac trwaly crash-safe rejestr etapow HANDOFF new URL/seed reserved/uncertain/ACK/checkpoint; bez realnej wysylki i bez dodatkowego aktywnego leada.
+
+## 2026-10-25: przejecie techniczne SATA, poprawka P0 sukcesji
+- SOURCE v1.72.95, SATANAMD. LiteHandoffSuccession.cs: usunieto 4 bledy kompilacji (brakujacy argument notRegisteredElsewhere); odrzucenie kolizji z istniejaca rejestracja nowego chatu; test negatywny; podpiecie selftest do LiteChatWakeRegistry.
+- Testy: dotnet publish 0 errors (1 known WindowsBase warning); Node 24/24 PASS; EXE 20/20 PASS. WebView2 offline 222 checks PASS w interaktywnej sesji Windows 1; uruchomienie z sesji 0 nie jest wiarygodnym testem GUI i zwracalo COM 0x80070578. Tymczasowe QA Task usuniete.
+- STAGED: D:\Apps\OpenBrowserLite\releases\v1.72.95_20261025, SHA256=53f0dd51aa58434f1e54d66c59d03328c70add376ed7cde217e914a1d48c8897, RELEASE_MANIFEST.json verified.
+- RELEASE MANAGER: phase=queued candidate 1.72.95, previous LIVE 1.72.92. LIVE PID30604 nienaruszony. Bez restartu i bez zmiany harmonogramow.
+- Real engine wake #73 2026-10-25 08:44:24 Warsaw: attempt_reserved, submission_attempted, receipt_confirmed visible_ack. 1 aktywny proces, Windows Keepalive sukces co 5m. UWAGA: widoczny ACK nie dowodzi pracy programistycznej.
+- Blokada przejecia wykonawcy: obecny harmonogram nadal celuje w STARY czat; nie znaleziono potwierdzonego URL tej nowej rozmowy. Nie rejestrowano kolejnego aktywnego leada, nie udawano auto-handoff. Do przeniesienia potrzebny rzeczywisty nowy /c/ i test E2E A-G. Samo wysylanie wake do starego czatu nie oznacza automatycznej kontynuacji rozwoju.
+- OBL-only wake, bez ChatGPT Tasks, PBOX1 nienaruszony. Repo dirty przed i po, bez git reset/commit/push.
+- NEXT P0: przejscie ze starego leada na nowy z ochronnym handoffem; pilotaż na testowej rozmowie, dowod bezpiecznego new URL / empty composer / durable reserved / visible ACK / checkpoint / single lead; dopiero produkcyjne przelaczenie. Nastepnie promocja queued 1.72.95 w potwierdzonym oknie idle.
