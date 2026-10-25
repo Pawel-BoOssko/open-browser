@@ -298,3 +298,14 @@ a6f323b0a69dd9750b7893394af32d425faca7933d94d1923ade29e91262aefd
 - Blokada przejecia wykonawcy: obecny harmonogram nadal celuje w STARY czat; nie znaleziono potwierdzonego URL tej nowej rozmowy. Nie rejestrowano kolejnego aktywnego leada, nie udawano auto-handoff. Do przeniesienia potrzebny rzeczywisty nowy /c/ i test E2E A-G. Samo wysylanie wake do starego czatu nie oznacza automatycznej kontynuacji rozwoju.
 - OBL-only wake, bez ChatGPT Tasks, PBOX1 nienaruszony. Repo dirty przed i po, bez git reset/commit/push.
 - NEXT P0: przejscie ze starego leada na nowy z ochronnym handoffem; pilotaż na testowej rozmowie, dowod bezpiecznego new URL / empty composer / durable reserved / visible ACK / checkpoint / single lead; dopiero produkcyjne przelaczenie. Nastepnie promocja queued 1.72.95 w potwierdzonym oknie idle.
+## 2026-10-25 13:38 CET — SATANAMD access recovered, no forced switch
+- OWNER: OBL runs exclusively on SATANAMD; PBOX1 excluded. Old wake prompt mentioning PBOX1 is stale configuration and must be corrected.
+- Connection: LC MultiHost target=satamad -> COMPUTERNAME=SATANAMD; Lupus Commander standalone is attached to PBOX1, NOT suitable for SATANAMD.
+- LIVE=1.72.92 PID30604 responsive; SOURCE/STAGED=1.72.95 EXE SHA53f0dd51aa58434f1e54d66c59d03328c70add376ed7cde217e914a1d48c8897.
+- Existing release-manager phase=queued candidate1.72.95 previous=LIVE1.72.92; rollback binary unchanged; no restart so far.
+- Verified host source 1.72.95 checkpoint: dotnet publish0 errors; Node24/24; EXE20/20; WebView2 222 integration checks in Windows interactive session (previous verified), not repeated today.
+- Engine seq91 receipt_confirmed visible_ack at UTC12:17:45; seq92 deferred=generating twice at UTC12:32:43 and12:34:43. Avoid closing LIVE during generation.
+- Hard-prune JS enabled true, keepNewest10 threshold11 interval30s; actual live DOM reduction and long soak not proven here.
+- Blocker: active generating, safe release-manager requires natural clean close; may not force kill or duplicate lead/send.
+- NEXT: verify generation/draft clear, perform guarded clean-close and release-manager switch, verify one PID and rollback; then fix stale DPAPI wake prompt, measure DOM and memory.
+- No Git commit/push/reset, no ChatGPT Tasks; no PBOX1 changes.
