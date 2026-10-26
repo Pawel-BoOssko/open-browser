@@ -454,3 +454,12 @@ D:\projects\open-browser\docs\OPENBROWSER_LITE_NEW_CHAT_TRANSFER_STATUS_2026-10-
 - Actual LIVE remains 1.72.96 PID67152. 1.72.97 queued and staged, rollback 1.72.96 retained. No production promotion claim until evidence of running candidate and WebView2.
 - New chat initial engine ACK NOT YET VERIFIED. Owner's original chat instruction served as handoff context; original automatic seed was not sent. Handoff transfer JSON records the distinction.
 - NEXT on local automatic promotion or next OBL wake: verify PID, v1.72.97, live-preflight.json URL/generation/draft, DOM limit, engine wake sequence+visible_ack, then release next small version. No changes to PBOX1.
+
+## 2026-10-26 14:16 CET [OB-WAKE-000001] K01 ACTUAL PRODUCTION
+- HOST SATANAMD LC MultiHost target=satamad verified. Current NEW lead chat url ...6adf463c-4b80-83eb-9a4c-777a89f74068.
+- REAL LIVE v1.72.97 PID7560 single process from D:\Apps\OpenBrowserLite\releases\v1.72.97_20261026\BridgeBrowserAlpha0.exe; release manager phase=trial, rollback 1.72.96.
+- Deployment watcher logs: safe idle 13:14:01Z, normal window_close PID67152 13:15:01Z, candidate_start PID7560 13:15:09Z. NOT just STAGED.
+- New live preflight actual WebView2 at 13:16:23Z: correct chat URL, generating=true, draft=false, DOM 6, error empty, toolBusy unknown.
+- Engine wake seq1 receipt 2429e5d0538f402dbc54824d055a0e7d due->attempt_reserved->submission_attempted->receipt_confirmed visible_ack at 13:15:25Z. CHAT_STARTED appended/readback 13:16:19Z; chat_checkpoint appended.
+- Watcher post-success Disable-ScheduledTask raised Access Denied; does NOT invalidate LIVE. 13:16 watchdog run deferred=release_state_changed; no extra launch. Investigate task cleanup within existing permitted operations; no forced restart/extra wake.
+- NEXT: inspect real resource/DOM/archive and release health; repair log/clean task management; second NATURAL wake for reliability, then next fast small release.

@@ -6,7 +6,7 @@ namespace BridgeBrowserAlpha0;
 // unless it has a fresh timestamp and the expected foreground route.
 internal static class LiteLivePreflight
 {
-    internal static void Store(string source, bool generating, bool draft, int turns, string error)
+    internal static void Store(string source, bool generating, bool draft, bool toolBusy, int turns, string error)
     {
         if (!Uri.TryCreate(source, UriKind.Absolute, out var uri) ||
             uri.Host != "chatgpt.com" || !uri.AbsolutePath.StartsWith("/c/", StringComparison.OrdinalIgnoreCase))
@@ -26,7 +26,7 @@ internal static class LiteLivePreflight
             draft,
             turns,
             error,
-            toolBusy = "unknown",
+            toolBusy,
             evidence = "webview_response_probe"
         };
         File.WriteAllText(temp, JsonSerializer.Serialize(record));

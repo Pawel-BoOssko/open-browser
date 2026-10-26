@@ -159,7 +159,7 @@ internal sealed partial class ChatGptLiteForm
                 ? variant.GetString() ?? "unknown" : "unknown";
             bool hasDraft = root.TryGetProperty("hasDraft", out var draftSignal) &&
                 draftSignal.ValueKind == JsonValueKind.True;
-            try { LiteLivePreflight.Store(core.Source, generating, hasDraft, activeTurns, failure); }
+            try { LiteLivePreflight.Store(core.Source, generating, hasDraft, root.GetProperty("toolBusySignal").GetBoolean(), activeTurns, failure); }
             catch (Exception ex) { LiteEventLog.Write("live_preflight_store_failed", new { errorType = ex.GetType().Name }); }
             // Quarantine per chat on EVERY observation, not just a failure
             // transition. The same error can be visible in two different chats.
