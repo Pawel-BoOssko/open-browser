@@ -14,6 +14,9 @@ internal static class LiteChatWakePreflight
         public bool Generating { get; set; }
         public bool ToolBusy { get; set; }
         public bool HasDraft { get; set; }
+        public int DraftChars { get; set; }
+        public string EditorSource { get; set; } = "none";
+        public bool EditorVisible { get; set; }
         public bool Error { get; set; }
         public bool ComposerReady { get; set; }
         public int TurnCount { get; set; }

@@ -80,7 +80,16 @@
       d.querySelector('[data-testid="composer-text-input"]') ||
       d.querySelector('textarea') ||
       d.querySelector('[contenteditable="true"]');
-    const draft = editor && String(editor.value || editor.innerText || "").trim().length > 0;
+    const draftChars = editor ? String(editor.value || editor.innerText || "").trim().length : 0;
+    const editorSource = !editor ? 'none' :
+      editor.id === 'prompt-textarea' ? 'prompt-textarea' :
+      editor.getAttribute?.('data-testid') === 'composer-text-input' ? 'composer-text-input' :
+      editor.tagName?.toLowerCase() === 'textarea' ? 'textarea' : 'contenteditable';
+    // Metadata only: do not record contents, keystrokes, or prompt text.
+    const editorVisible = !!editor && editor.hidden !== true &&
+      editor.getAttribute?.('aria-hidden') !== 'true' &&
+      (typeof editor.getClientRects !== 'function' || editor.getClientRects().length > 0);
+    const draft = draftChars > 0;
     // Hidden/sidebar alerts belong to other conversations. Preserve real
     // top-level toasts and active-chat alerts while rejecting nav previews.
     const errorText = Array.from(d.querySelectorAll(
@@ -112,6 +121,9 @@
       generating: stop,
       toolBusy: toolBusy,
       hasDraft: !!draft,
+      draftChars,
+      editorSource,
+      editorVisible,
       error: !!error,
       composerReady: !!editor,
       turnCount: parts.length,

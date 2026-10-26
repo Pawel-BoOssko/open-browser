@@ -629,6 +629,9 @@ internal sealed partial class ChatGptLiteForm
                 generating = second?.Generating,
                 toolBusy = second?.ToolBusy,
                 draft = second?.HasDraft,
+                draftChars = second?.DraftChars ?? 0,
+                editorSource = second?.EditorSource,
+                editorVisible = second?.EditorVisible,
                 error = second?.Error,
                 composer = second?.ComposerReady,
                 targetMatches = second?.Location == expectedPath

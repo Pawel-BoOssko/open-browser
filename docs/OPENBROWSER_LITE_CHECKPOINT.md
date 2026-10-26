@@ -489,3 +489,20 @@ D:\projects\open-browser\docs\OPENBROWSER_LITE_NEW_CHAT_TRANSFER_STATUS_2026-10-
 - ROOT WAKE: seq2 eventually ACK visible at 17:35:26, but engine was deferred 'no_composer' 273 events 01:50-11:43 UTC and 'draft_present' 81 events 13:30-16:24 UTC. This prevents 15m wake under stale state, now force watchdog restarts after bounded stall.
 - Owner 17:25 override appended to docs/OPENBROWSER_LITE_OPERATING_RULES_2026-10-25.md: no waiting on generating/draft/toolBusy when deploying; stop, install, launch, validate, rollback.
 - NEXT: verify next natural wake seq3 due approximately 17:50:23 Warsaw and timely ACK/chat_started; if stalled watchdog will restart. P0 follow-up: fix root no_composer/draft causes, soak DOM/archives; no PBOX1, no Git manual commit/push.
+
+## 2026-10-26 17:57 CET [OB-WAKE-000003] K01 NEW WAKE CONFIRMED + 1.72.99 CANDIDATE
+- HOST SATANAMD via LC MultiHost target=satamad. Engine seq3 receipt e15df0dad6a94e02bad06dc8bfe52666 visible_ack at 16:52:29Z; chat_started written 16:52:57Z. Timely natural wake (~17m after seq2), previous 1.72.98 LIVE PID52036 single process, WebView2 preflight actual chat URL/turns10/draft=false/toolBusy=false.
+- Autosupervisor OBL Force Recovery SATANAMD latest 17:49 scheduler result0, event healthy; next 17:54 etc check next. No PBOX1.
+- SOURCE/STAGED version 1.72.99: LiteResumeProbe adds metadata draftChars, editorSource enum, editorVisible; LiteChatWakePreflight.Observation + LiteChatWakeUi logs these metadata on preflight skips, never draft contents. Does not alter conservative sending policy.
+- Build dotnet publish EXIT0 (preexisting WindowsBase warning), Node syntax PASS, 7/7 EXE selftests exit0, focused 3/3 Node DOM editor metadata tests PASS.
+- v1.72.99 candidate SHA256 461546BA598351924CD4B7CF7DE5CFAC8110CB900CA7F53F9791CC78EA644116, STAGED D:\Apps\OpenBrowserLite\releases\v1.72.99_20261026\BridgeBrowserAlpha0.exe. Previous v1.72.98 SHA 43BD30050CD4C21AA013EB0A3440FFA60ACE458986F9D272FB2EFC244C61CCDB.
+- User ordered forcible process restart without waiting on generating/draft. NEXT queue candidate 1.72.99, use proven force deploy in interactive Windows session, check LIVE version/PID/preflight, rollback and watchdog after reboot.
+
+## 2026-10-26 17:59 CET [OB-WAKE-000003] K02 VERIFIED FORCED LIVE v1.72.99
+- HOST SATANAMD / LC MultiHost target=satamad; wake seq3 engine receipt e15df0dad6a94e02bad06dc8bfe52666 visible_ack 2026-10-26 16:52:29Z, chat_started logged.
+- v1.72.99 FORCE DEPLOY from queued release on interactive Windows: killed v1.72.98 PID52036 at 16:58:27Z, started v1.72.99 PID528 at 16:58:27Z, real GUI healthy by 16:58:28Z, task LastTaskResult=0.
+- LIVE ONE PID528, EXE SHA256 461546BA598351924CD4B7CF7DE5CFAC8110CB900CA7F53F9791CC78EA644116; release manager state=trial. Previous verified rollback v1.72.98 SHA 43BD30050CD4C21AA013EB0A3440FFA60ACE458986F9D272FB2EFC244C61CCDB.
+- WebView2 actual current /c/ URL, navigation healthy, atomic live-preflight latest: turns10, generating=true, draft=false, toolBusy=false, error empty. DOM status modeEnabled=true/errorCount0.
+- SOURCE change: LiteResumeProbe reports draftChars, editorSource, editorVisible (metadata only/no draft contents); typed Observation + log on preflight skips. Build dotnet publish PASS (preexisting MSB3277 warning), JS syntax PASS, 7/7 staged EXE CLI PASS, 3/3 synthetic JS editor tests PASS.
+- Keepalive sees exactly one running PID528, unchanged. Recovery task OBL Force Recovery SATANAMD 17:54 result=0 with healthy event; next scheduled 17:59. Local archive 417 files. No other host modified, no manual Git actions.
+- NEXT: confirm next natural seq4 and watchdog over next cycles; if draft_present recurs, use new draftChars/editorSource/editorVisible to distinguish real draft from hidden/stale editor; test long-term DOM/RAM and archive recovery.
