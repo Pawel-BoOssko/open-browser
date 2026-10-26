@@ -463,3 +463,13 @@ D:\projects\open-browser\docs\OPENBROWSER_LITE_NEW_CHAT_TRANSFER_STATUS_2026-10-
 - Engine wake seq1 receipt 2429e5d0538f402dbc54824d055a0e7d due->attempt_reserved->submission_attempted->receipt_confirmed visible_ack at 13:15:25Z. CHAT_STARTED appended/readback 13:16:19Z; chat_checkpoint appended.
 - Watcher post-success Disable-ScheduledTask raised Access Denied; does NOT invalidate LIVE. 13:16 watchdog run deferred=release_state_changed; no extra launch. Investigate task cleanup within existing permitted operations; no forced restart/extra wake.
 - NEXT: inspect real resource/DOM/archive and release health; repair log/clean task management; second NATURAL wake for reliability, then next fast small release.
+
+## 2026-10-26 14:25 CET [OB-WAKE-000001] K02 SOURCE/STAGED 1.72.98
+- LIVE v1.72.97 PID7560 verified one process/SHA; actual new lead engine seq1 visible_ack/chat_started and checkpoint verified. Only one active wake schedule, old lead paused. Next due 2026-10-26 14:30:23 Warsaw.
+- SOURCE/STAGED/QUEUED v1.72.98 (SHA 43BD30050CD4C21AA013EB0A3440FFA60ACE458986F9D272FB2EFC244C61CCDB); previous/rollback=LIVE v1.72.97.
+- P0 code: LiteResponseSignal.js now reports actual toolBusySignal; LiteResponseDiagnostics/LivePreflight write bool toolBusy instead of unknown to atomic preflight JSON.
+- Tests: Node syntax PASS, 2 focused Node VM toolBusy cases PASS, dotnet publish EXIT0 (known WindowsBase warning), 7/7 staged EXE CLI tests EXIT0.
+- NO-GO immediate v1.72.98 restart: this wake is still generating; v1.72.97 toolBusy telemetry is unknown, so no trustworthy safe restart gate now. No forced process kill.
+- Archive observed 404 files; WebView2 7 children, 0 orphan candidates, DOM6 /1193 elements; long soak not yet done.
+- MultiHost: attempted combined status/transfer update hung, task cancelled, shell replaced; files were unchanged. Split future updates into smaller operations. Previous scheduled-task disable denied access after successfully switching v1.72.97; watcher is fail-closed on changed release state.
+- NEXT: record journal chat_finished for seq1, update CURRENT_STATUS if possible; second natural wake seq2; verify idle and toolBusy before activating v1.72.98 via normal close/Keepalive; test actual DOM/archives.

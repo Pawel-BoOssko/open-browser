@@ -1,18 +1,18 @@
-{
+﻿{
     "schema":  1,
     "createdUtc":  "2026-10-26T12:09:05.0401342+00:00",
     "host":  "SATANAMD",
     "projectId":  "6e84929068ad4746983ce3b21d7e9088",
-    "phase":  "SUCCESSOR_LEAD_ARMED_WAITING_FOR_FIRST_ENGINE_WAKE",
+    "phase":  "SUCCESSOR_LEAD_FIRST_WAKE_VERIFIED",
     "newChatUrl":  "https://chatgpt.com/c/6adf463c-4b80-83eb-9a4c-777a89f74068",
     "seedStatus":  "OWNER_CREATED_CHAT_AND_INSTRUCTED_DIRECTLY",
-    "engineAck":  "NOT_YET_VERIFIED_FOR_NEW_LEAD",
+    "engineAck":  "seq1_visible_ack_verified",
     "handoffPath":  "D:\\projects\\open-browser\\docs\\OPENBROWSER_LITE_HANDOFF_2026-10-26_NEW_CHAT.md",
     "handoffSha256":  "FE59D203547C59E523810EB3FAF4A4EA0BBB9C96883887ABA1C46C313CFBE74B",
     "seedPath":  "D:\\projects\\open-browser\\docs\\OPENBROWSER_LITE_NEW_CHAT_SEED_2026-10-26.txt",
     "seedSha256":  "473A93F7D394019E215B736AE5F17DB8FEB9170289550AD29323DD5CBCD2A898",
-    "currentLivePid":  67152,
-    "lastVerifiedUtc":  "2026-10-26T13:06:07.1927108+00:00",
-    "blocker":  "LIVE v1.72.96 active generation; v1.72.97 queued; UIA idle-gated single-use production switch armed",
-    "next":  "Verify first new lead visible_ack/chat_started; verify clean close, single LIVE v1.72.97 and its live-preflight.json"
+    "currentLivePid":  7560,
+    "lastVerifiedUtc":  "2026-10-26T13:27:04.3697101+00:00",
+    "blocker":  "second natural wake not yet verified; next 1.72.98 queued",
+    "next":  "Verify seq2 and promote 1.72.98 when safe"
 }
