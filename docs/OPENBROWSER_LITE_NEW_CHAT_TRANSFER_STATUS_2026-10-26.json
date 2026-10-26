@@ -3,7 +3,7 @@
     "createdUtc":  "2026-10-26T12:09:05.0401342+00:00",
     "host":  "SATANAMD",
     "projectId":  "6e84929068ad4746983ce3b21d7e9088",
-    "phase":  "PREPARED",
+    "phase":  "PREPARED_WAITING_FOR_SAFE_IDLE",
     "newChatUrl":  null,
     "seedStatus":  "NOT_SENT",
     "engineAck":  "NOT_VERIFIED",
@@ -12,5 +12,7 @@
     "seedPath":  "D:\\projects\\open-browser\\docs\\OPENBROWSER_LITE_NEW_CHAT_SEED_2026-10-26.txt",
     "seedSha256":  "473A93F7D394019E215B736AE5F17DB8FEB9170289550AD29323DD5CBCD2A898",
     "currentLivePid":  67152,
-    "next":  "Check idle/draft and one-shot new chat before promotion"
+    "lastVerifiedUtc":  "2026-10-26T12:12:43.7815694+00:00",
+    "blocker":  "Current WebView2 preflight generating=true; no safe UI route switch; program v1.72.96 has no automatic new-chat/seed implementation.",
+    "next":  "After assistant finishes, run fresh idle/draft/route check; create verified new chat via session-1 UI once, seed once, confirm visible message/response/checkpoint, then switch single project lead."
 }
