@@ -1,4 +1,4 @@
-﻿$ErrorActionPreference='Stop'
+$ErrorActionPreference='Stop'
 $out='D:\projects\open-browser\diagnostics\obl-ui-preflight-session1.json'
 try {
  Add-Type -AssemblyName UIAutomationClient
@@ -15,9 +15,9 @@ try {
    if($type -eq 'ControlType.Edit'){
     $valueLength=$null;$pattern=$null
     if($element.TryGetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern,[ref]$pattern)){$valueLength=([string]([System.Windows.Automation.ValuePattern]$pattern).Current.Value).Length}
-    $edits+=@{name=$name;valueLength=$valueLength;enabled=$element.Current.IsEnabled}
+    $edits+=@{name=$name;valueLength=$valueLength;enabled=$element.Current.IsEnabled;automationId=$element.Current.AutomationId;className=$element.Current.ClassName;offscreen=$element.Current.IsOffscreen}
    }
-   if($type -eq 'ControlType.Button' -and $name -match 'stop|zatrzymaj|przerwij|send|wyślij'){$stops+=@{name=$name;enabled=$element.Current.IsEnabled}}
+   if($type -eq 'ControlType.Button' -and $name -match 'stop|zatrzymaj|przerwij|send|wyślij|ChatGPT|Nowy czat|Nowy chat'){$stops+=@{name=$name;enabled=$element.Current.IsEnabled}}
   }catch{}
  }
  $result=@{utc=[DateTimeOffset]::UtcNow.ToString('o');pid=$proc.Id;session=$proc.SessionId;hwnd=[long]$proc.MainWindowHandle;count=$all.Count;edits=$edits;actionButtons=$stops;error=$null}
