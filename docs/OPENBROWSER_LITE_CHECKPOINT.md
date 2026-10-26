@@ -435,3 +435,12 @@ D:\projects\open-browser\docs\OPENBROWSER_LITE_NEW_CHAT_TRANSFER_STATUS_2026-10-
 - Handoff and seed are written and SHA verified; transfer state updated to PREPARED_WAITING_FOR_SAFE_IDLE; newChatUrl=NULL; seed NOT_SENT; no ACK.
 - NO UI route switch, send, old-lead retirement, task registration, process restart, PBOX1 modification or Git changes.
 - NEXT next safe wake or operator with session1 UI: verify generation completed and empty draft; create distinct real new chat and send seed once; verify first checkpoint; only then promote one lead.
+
+## 2026-10-26 13:49 CET [NEW CHAT: RECOVERY + 1.72.97 QUEUED]
+- HOST SATANAMD via LC MultiHost target=satamad, write/read probe PASS; previous write error was transient invocation failure, not filesystem ACL.
+- LIVE v1.72.96 PID 67152, one process, WebView2 heartbeat observed. No premature restart; active foreground generation still observed at 12:38:46 UTC.
+- SOURCE/STAGED v1.72.97. Added atomic local diagnostics/live-preflight.json with PID, real chat URL, generating, draft, DOM turns, timestamp, evidence source; toolBusy left UNKNOWN (not fabricated).
+- SOURCE/STAGED compiled to immutable D:\Apps\OpenBrowserLite\releases\v1.72.97_20261026, SHA256 1B31E574EB3F1B36A25E0E20116863747A8022D752F4FB1158A68A4878C38124.
+- dotnet publish exit 0, preexisting WindowsBase reference warning; JS node --check exit 0; release PS parser 0 errors; release manager SelfTest PASS_18; seven staged CLI tests exit 0.
+- RELEASE-MANAGER: corrected cross-session MainWindowHandle=0 false negative by using actual UI heartbeat, reconciled LIVE SHA v1.72.96 PID 67152 from stale queued state, and queued 1.72.97 with rollback 1.72.96. No other host modified.
+- CURRENT: queued, not LIVE. Next: real safe-idle + no draft + no toolBusy proof, clean normal close, Keepalive startup, verify SINGLE PID v1.72.97, preflight JSON, DOM <=10 and wake/rollback. Old lead remains active until successor URL, reply, checkpoint confirmed. Do not duplicate wake prompts.

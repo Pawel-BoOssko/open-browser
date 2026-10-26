@@ -98,6 +98,7 @@
       domVariant: modern ? 'dil' : (legacyTurns.length ? 'legacy' : 'unhydrated'),
       assistantCount: assistants.length,
       generatingSignal: stop,
+      hasDraft: Array.from(doc.querySelectorAll('#prompt-textarea,[data-testid="composer-text-input"],textarea,[contenteditable="true"]')).some(e => String(e.value || e.innerText || "").trim().length > 0),
       visibleError: error,
       errorSource,
       ignoredHiddenAlerts,

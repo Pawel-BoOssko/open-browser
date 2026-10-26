@@ -1,7 +1,7 @@
 # SATANAMD Open Browser Lite release gate. Runs from existing Keepalive only.
 # Never kills a browser, never sends a ChatGPT message, no native ChatGPT tasks.
 param(
- [ValidateSet('SelfTest','Audit','Queue','Keepalive','Rollback')][string]$Mode='Audit',
+ [ValidateSet('SelfTest','Audit','Queue','Keepalive','Rollback','Reconcile')][string]$Mode='Audit',
  [string]$CandidateExe='',
  [string]$ExpectedSha=''
 )
@@ -148,7 +148,30 @@ try{
  $locked=$mutex.WaitOne(2000)
  if(-not $locked){Write-Output 'RELEASE_GUARD_BUSY';return}
  $state=ReadState
- if($Mode -eq 'Audit'){
+ if($Mode -eq 'Reconcile'){
+  if(-not $state -or $state.phase -ne 'queued'){throw 'Reconcile requires a queued release'}
+  $ps=@(Running)
+  if($ps.Count -ne 1){throw 'Reconcile requires one live process'}
+  $live=$ps[0]
+  $running=Get-Process -Id $live.ProcessId -ErrorAction Stop
+  if(-not $running.Responding){throw 'Live process not responding'}
+  $heartbeatOk=$false
+  foreach($line in @(Get-Content -LiteralPath $events -Tail 100 -Encoding UTF8)){
+   try{$x=$line | ConvertFrom-Json;if($x.eventName -eq 'ui_heartbeat' -and [int]$x.pid -eq [int]$live.ProcessId -and ([DateTimeOffset]::UtcNow-[DateTimeOffset]::Parse($x.utc)).TotalSeconds -lt 120){$heartbeatOk=$true;break}}catch{}
+  }
+  if(-not $heartbeatOk){throw 'No recent WebView2 UI heartbeat'}
+  if((HashFile $state.candidateExe) -ne $state.candidateSha -or
+     (HashFile $live.ExecutablePath) -ne $state.candidateSha){throw 'Candidate and LIVE hashes differ'}
+  Copy-Item -LiteralPath $statePath -Destination ($statePath+'.backup-'+(Get-Date -Format 'yyyyMMdd_HHmmss')+'-'+[guid]::NewGuid().ToString('N')) -ErrorAction Stop
+  $state.phase='trial';$state.candidatePid=[int]$live.ProcessId
+  $state.activatedUtc=[DateTimeOffset]::UtcNow.ToString('o')
+  $state.lastHealthyUtc=$state.activatedUtc
+  $state.notes='live_equivalent_sha_reconciled'
+  WriteState $state
+  AuditEvent 'live_sha_reconciled' @{pid=$live.ProcessId;candidateSha=$state.candidateSha}
+  Write-Output ('RECONCILED_TRIAL_PID='+$live.ProcessId)
+  return
+ } if($Mode -eq 'Audit'){
   $ps=@(Running)
   Write-Output ('STATE='+$(if($state){$state.phase}else{'none'})+' RUNNING='+$ps.Count)
   if($state){Write-Output ('CANDIDATE='+$state.candidateExe+' PREVIOUS='+$state.previousExe)}
@@ -170,9 +193,9 @@ try{
   # Do not fall back to the hardcoded 1.72.89 when previous was 1.72.92.
   $previous=PreviousForQueue $state $legacy
   if(-not(Test-Path -LiteralPath $previous)){throw 'Previous binary absent'}
-  if(-not(CanQueue $processes.Count ($processes.Count -eq 1 -and $processes[0].ExecutablePath -eq $previous) $true)){throw 'Exactly one expected live browser required'}
+  if(-not(CanQueue $processes.Count ($processes.Count -eq 1 -and (HashFile $processes[0].ExecutablePath) -eq (HashFile $previous)) $true)){throw 'Exactly one expected live browser required'}
   if($state -and $state.phase -eq 'queued'){
-   if(-not(CanSupersede $state.phase ([int]$processes[0].ProcessId) ([int]$state.previousPid) ($processes[0].ExecutablePath -eq $state.previousExe))){
+   if(-not(CanSupersede $state.phase ([int]$processes[0].ProcessId) ([int]$state.previousPid) ((HashFile $processes[0].ExecutablePath) -eq $state.previousSha))){
     throw 'Queued predecessor identity changed; no replacement allowed'
    }
    if((HashFile $state.previousExe) -ne $state.previousSha){throw 'Queued rollback binary changed'}
@@ -222,7 +245,7 @@ try{
    AuditEvent 'candidate_trial_confirmed_late' @{pid=$check.Id}
   }
   if($state -and $state.phase -eq 'trial'){
-   if($processes[0].ExecutablePath -ne $state.candidateExe){Report 'blocked_wrong_release' 'Trial PID/executable mismatch';return}
+   if((HashFile $processes[0].ExecutablePath) -ne $state.candidateSha){Report 'blocked_wrong_release' 'Trial binary hash mismatch';return}
    if([int]$processes[0].ProcessId -ne [int]$state.candidatePid){Report 'blocked_pid_mismatch' 'Trial identity changed';return}
    $p=Get-Process -Id $processes[0].ProcessId -ErrorAction SilentlyContinue
    if(-not $p.Responding){Report 'trial_unresponsive_no_force' 'Manual diagnosis needed';return}

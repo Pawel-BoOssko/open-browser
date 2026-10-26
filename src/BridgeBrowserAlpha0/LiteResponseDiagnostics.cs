@@ -157,6 +157,10 @@ internal sealed partial class ChatGptLiteForm
             int activeAssistants = root.GetProperty("assistantCount").GetInt32();
             string domVariant = root.TryGetProperty("domVariant", out var variant)
                 ? variant.GetString() ?? "unknown" : "unknown";
+            bool hasDraft = root.TryGetProperty("hasDraft", out var draftSignal) &&
+                draftSignal.ValueKind == JsonValueKind.True;
+            try { LiteLivePreflight.Store(core.Source, generating, hasDraft, activeTurns, failure); }
+            catch (Exception ex) { LiteEventLog.Write("live_preflight_store_failed", new { errorType = ex.GetType().Name }); }
             // Quarantine per chat on EVERY observation, not just a failure
             // transition. The same error can be visible in two different chats.
             if ((failure is "delivery_timeout" or "response_load_failed") &&
