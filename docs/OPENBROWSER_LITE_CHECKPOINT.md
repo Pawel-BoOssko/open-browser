@@ -444,3 +444,13 @@ D:\projects\open-browser\docs\OPENBROWSER_LITE_NEW_CHAT_TRANSFER_STATUS_2026-10-
 - dotnet publish exit 0, preexisting WindowsBase reference warning; JS node --check exit 0; release PS parser 0 errors; release manager SelfTest PASS_18; seven staged CLI tests exit 0.
 - RELEASE-MANAGER: corrected cross-session MainWindowHandle=0 false negative by using actual UI heartbeat, reconciled LIVE SHA v1.72.96 PID 67152 from stale queued state, and queued 1.72.97 with rollback 1.72.96. No other host modified.
 - CURRENT: queued, not LIVE. Next: real safe-idle + no draft + no toolBusy proof, clean normal close, Keepalive startup, verify SINGLE PID v1.72.97, preflight JSON, DOM <=10 and wake/rollback. Old lead remains active until successor URL, reply, checkpoint confirmed. Do not duplicate wake prompts.
+
+## 2026-10-26 14:08 CET [LEAD SUCCESSION + PRODUCTION WATCHER]
+- SATANAMD only. Verified current real chat URL from WebView2 Chrome History last_visit 2026-10-26 12:24:52 UTC; old lead last visit 11:45:57 UTC. Temporary private History copies deleted immediately after query.
+- Pre-change backups verified in diagnostics: projects-pre-succession-20261026_135848.json, wake-pre-succession-20261026_135848.dpapi.
+- OLD LEAD https://chatgpt.com/c/6adca60a-9980-83ed-943b-fff6ef7fcdfd wake disabled (CLI exit0, DPAPI readback Enabled=false), project role archive.
+- NEW LEAD https://chatgpt.com/c/6adf463c-4b80-83eb-9a4c-777a89f74068 is the only project lead, Enabled=true, EffectiveMinutes=15, WakeSequence=0; validated against DPAPI readback and projects.json role list. No double lead.
+- AUTO UPGRADE WATCHER interactive session1 installed as Windows scheduled task OBL Promote 17297 On Idle, once/minute for up to 2 hours. Reads UIA and actual generation events; refuses if visible Stop/Zatrzymaj or nonempty draft; requires two stable idle checks, normal WinForms CloseMainWindow; invokes SATA release manager Keepalive after clean exit, no kill. First test status deferred: generation_stop_visible (exit 0), protecting live response. Temporary UI probe scheduled task removed.
+- Actual LIVE remains 1.72.96 PID67152. 1.72.97 queued and staged, rollback 1.72.96 retained. No production promotion claim until evidence of running candidate and WebView2.
+- New chat initial engine ACK NOT YET VERIFIED. Owner's original chat instruction served as handoff context; original automatic seed was not sent. Handoff transfer JSON records the distinction.
+- NEXT on local automatic promotion or next OBL wake: verify PID, v1.72.97, live-preflight.json URL/generation/draft, DOM limit, engine wake sequence+visible_ack, then release next small version. No changes to PBOX1.

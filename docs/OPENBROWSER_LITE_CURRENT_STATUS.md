@@ -1,16 +1,12 @@
-# Open Browser Lite: CURRENT STATUS
-
-Updated: 
-2026-10-25 08:52:58 +01:00
- (Warsaw)
-Host: SATANAMD
-LIVE: v1.72.92, PID 30604, one instance
-SOURCE/STAGED: v1.72.95, build 2026-10-25, SHA256 
-53f0dd51aa58434f1e54d66c59d03328c70add376ed7cde217e914a1d48c8897
-RELEASE: queued 1.72.95, previous LIVE 1.72.92; no automatic promotion yet
-Wake: Windows Keepalive 5min, in-app per-chat wake 15min; #73 real visible_ack
-Tests: Node 24/24, .NET publish 0 errors, EXE 20/20 incl WebView2 offline 222 assertions in session1
-Chat succession: ledger compiled and tested, UI/owner promotion E2E NOT VERIFIED
-Bound wake recipient: old chat remains active; this chat URL NOT VERIFIED and NOT BOUND
-Next: complete safe pilot A-G; promote only after verified handoff and idle window
-PBOX1: unchanged. No ChatGPT Tasks.
+﻿# Open Browser Lite: CURRENT STATUS
+Updated: 2026-10-26 14:08 Europe/Warsaw
+Host: SATANAMD ONLY. LC MultiHost target=satamad. PBOX1 excluded.
+LIVE: v1.72.96, PID 67152, one responsive interactive WebView2 instance (not yet restarted).
+SOURCE/STAGED/QUEUED: v1.72.97, SHA256 1b31e574eb3f1b36a25e0e20116863747a8022d752f4fb1158a68a4878c38124.
+Candidate path: D:\Apps\OpenBrowserLite\releases\v1.72.97_20261026\BridgeBrowserAlpha0.exe
+Release manager: queued v1.72.97, previous immutable release v1.72.96. Stale release PID was reconciled by matching SHA and a fresh WebView2 heartbeat.
+Tests: dotnet publish 0 errors (preexisting WindowsBase conflict warning), JS syntax PASS, PS parser PASS, manager selftest 18, 7/7 staged EXE CLI tests EXIT0. Interactive WebView2 candidate E2E not yet verified.
+New lead: https://chatgpt.com/c/6adf463c-4b80-83eb-9a4c-777a89f74068. Scheduled every 15 minutes, Enabled=true; old lead ...fff6ef7fcdfd archived and wake Enabled=false. First NEW lead engine visible_ack still pending verification.
+Deployment watcher: Windows task OBL Promote 17297 On Idle, 1 minute intervals (up to 2h), interactive session1. Requires actual UIA stop-button absent, empty editor, no recent generation, two stable idle observations; normal UI close only. First run deferred: generation_stop_visible. No forced kill.
+DOM: recent real LIVE status <=10 turns with safe hard prune; renderer resources still monitored.
+Next: after normal close and promotion, verify single LIVE 1.72.97, live-preflight.json, UI, DOM and first new-lead wake/ACK. Rollback package v1.72.96 retained.

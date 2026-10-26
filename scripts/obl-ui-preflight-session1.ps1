@@ -13,13 +13,13 @@ try {
    $type=$element.Current.ControlType.ProgrammaticName
    $name=[string]$element.Current.Name
    if($type -eq 'ControlType.Edit'){
-    $valueLength=$null;$pattern=$null
-    if($element.TryGetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern,[ref]$pattern)){$valueLength=([string]([System.Windows.Automation.ValuePattern]$pattern).Current.Value).Length}
-    $edits+=@{name=$name;valueLength=$valueLength;enabled=$element.Current.IsEnabled;automationId=$element.Current.AutomationId;className=$element.Current.ClassName;offscreen=$element.Current.IsOffscreen}
+    $valueLength=$null;$pattern=$null;$value=""
+    if($element.TryGetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern,[ref]$pattern)){$value=[string]([System.Windows.Automation.ValuePattern]$pattern).Current.Value;$valueLength=$value.Length}
+    $edits+=@{name=$name;valueLength=$valueLength;enabled=$element.Current.IsEnabled;automationId=$element.Current.AutomationId;className=$element.Current.ClassName;offscreen=$element.Current.IsOffscreen;emptyOrPlaceholder=($value.Trim().Length -eq 0 -or $value.Trim() -in @("Zapytaj ChatGPT","Ask ChatGPT","Ask anything"))}
    }
    if($type -eq 'ControlType.Button' -and $name -match 'stop|zatrzymaj|przerwij|send|wyślij|ChatGPT|Nowy czat|Nowy chat'){$stops+=@{name=$name;enabled=$element.Current.IsEnabled}}
   }catch{}
  }
- $result=@{utc=[DateTimeOffset]::UtcNow.ToString('o');pid=$proc.Id;session=$proc.SessionId;hwnd=[long]$proc.MainWindowHandle;count=$all.Count;edits=$edits;actionButtons=$stops;error=$null}
+ $result=@{utc=[DateTimeOffset]::UtcNow.ToString('o');pid=$proc.Id;session=$proc.SessionId;hwnd=[long]$proc.MainWindowHandle;windowTitle=$proc.MainWindowTitle;count=$all.Count;edits=$edits;actionButtons=$stops;error=$null}
 }catch{$result=@{utc=[DateTimeOffset]::UtcNow.ToString('o');error=$_.Exception.Message}}
 $result|ConvertTo-Json -Depth 6|Set-Content -LiteralPath $out -Encoding UTF8
