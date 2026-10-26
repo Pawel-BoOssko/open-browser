@@ -33,3 +33,11 @@ Data decyzji: 2026-10-25. Właściciel: projekt Open Browser Lite.
 - Każda aktualizacja instrukcji wybudzeń musi wymieniać tylko SATANAMD. Błędne, starsze opisy hostów nie są wiążące.
 - Naprawić zapisany prompt harmonogramu OBL u źródła przez zweryfikowane API/serializację i odczyt po zapisie; nie edytować DPAPI jako zwykłego tekstu.
 - Przy każdym wydaniu sprawdzić, czy nowa instancja jest uruchomiona i nadaje się do dalszego własnego rozwoju; dopiero wtedy przejść do następnej poprawki.
+
+## 2026-10-26 17:25 CET — Nowsza decyzja właściciela: wymuszone wdrażanie i auto-recovery (NADRZĘDNE)
+- Właściciel jednoznacznie zmienił wcześniejszą zasadę czekania na idle: wdrożenie NIE czeka na zakończenie generowania, szkic, toolBusy ani stare odpowiedzi. Proces OBL należy wymuszenie zakończyć, potem uruchomić nowy sprawdzony EXE, zweryfikować jeden PID i GUI, a przy błędzie wykonać rollback.
+- Obowiązuje wyłącznie host SATANAMD, LC MultiHost target=satamad. Zakaz PBOX1, ChatGPT Tasks, ręcznego Git commit/push.
+- Kanoniczny skrypt wymuszonego wdrożenia: D:\projects\open-browser\scripts\obl-force-deploy-satanamd.ps1 -Mode Deploy. -Mode Restart dotyczy obecnego LIVE i napraw awarii. Skrypt używa wersjonowanego EXE/SHA, zabija wyłącznie BridgeBrowserAlpha0 z jego procesami potomnymi, stosuje blokadę Keepalive, sprawdza zdrowie GUI i atomowo zapisuje release state.
+- Windows Scheduled Task OBL Force Recovery SATANAMD co 5 minut uruchamia scripts\obl-watch-recover-satanamd.ps1. Wykrywa queued release >1min, brak procesu, brak świeżego preflight >5min, wybudzenie z ponad trzema odroczeniami i brakiem ACK >=25min. Wtedy wymusza procesowy restart; 10min cooldown ogranicza restart loop.
+- Zachowaj w dzienniku fakty, nie wymyślaj ACK. Przed restartem checkpoint, ale nie czekaj na stop/generating/draft/toolBusy. Użytkownik zaakceptował utratę trwającej niezapisanej odpowiedzi w zamian za brak wielogodzinnej blokady.
+- Pozostałe dotychczasowe instrukcje o bezwzględnym wymogu idle przed restartem są uchylone w zakresie wdrożeń i auto-recovery.

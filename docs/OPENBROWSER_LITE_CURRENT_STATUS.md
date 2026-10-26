@@ -1,9 +1,9 @@
-# Open Browser Lite CURRENT_STATUS
-2026-10-26 14:26 Warsaw, SATANAMD only.
-LIVE: v1.72.97, PID7560, EXE SHA256 1B31E574EB3F1B36A25E0E20116863747A8022D752F4FB1158A68A4878C38124; WebView2 active, real UI, correct URL.
-SOURCE/STAGED/QUEUED: v1.72.98 SHA256 43BD30050CD4C21AA013EB0A3440FFA60ACE458986F9D272FB2EFC244C61CCDB; previous rollback v1.72.97.
-New v1.72.98: preflight now reads and stores real toolBusy bool; JS syntax/Node toolBusy 2/2/.NET publish/7 EXE CLI tests PASS. v1.72.98 NOT YET LIVE.
-One project LEAD: this chat. Old lead archive and wake disabled. Natural wake seq1 at 14:15:24 Warsaw: engine visible_ack, chat_started, checkpoint verified. Next engine due 14:30:23; second wake not yet verified.
-DOM6/1193 nodes, archive 404 files, no orphan WebView2 in sample. Need long soak.
-P0: no forced restart during generation; complete seq1 journal, then verify seq2; next safe v1.72.98 promotion requires generating=false,draft=false,toolBusy=false and verified no uncertain send. Release-manager queued with rollback.
-One prior Windows task disable attempt Access Denied after successful v1.72.97 promotion. Separate status edit command hung/cancelled; no files changed. See CHECKPOINT.md for details.
+# Open Browser Lite — CURRENT STATUS
+2026-10-26 17:48 CET. Production HOST: SATANAMD. LC MultiHost target=satamad only.
+LIVE v1.72.98 PID52036, executable D:\Apps\OpenBrowserLite\releases\v1.72.98_20261026\BridgeBrowserAlpha0.exe, SHA256 43BD30050CD4C21AA013EB0A3440FFA60ACE458986F9D272FB2EFC244C61CCDB. ONE live process; healthy WebView2 and correct current chat URL. preflight: turns=10, draft=false, toolBusy=false, no page error.
+PREVIOUS/ROLLBACK v1.72.97 SHA 1B31E574EB3F1B36A25E0E20116863747A8022D752F4FB1158A68A4878C38124. Release state trial; candidatePid=52036, notes=forced_start_health_verified.
+Owner changed policy at 17:25: deploys/recoveries FORCE kill old process (including children), start new release, verify, fallback. No waiting for generating/draft/toolBusy. New owner override appended to docs/OPENBROWSER_LITE_OPERATING_RULES_2026-10-25.md.
+New scripts: scripts/obl-force-deploy-satanamd.ps1 Mode Deploy|Restart|SelfTest, PS parser PASS and staged SHA/rollback selftest PASS. Production deployment was initiated through interactive scheduled task OBL Force Deploy 17298 on SATANAMD. Actual logs: force_kill PID7560 at 16:40:44Z, start PID52036 at 16:40:44Z, GUI healthy 16:40:45Z, deploy_success trial 16:40:45Z. No duplicate.
+New recovery watchdog: scripts/obl-watch-recover-satanamd.ps1 scheduled in interactive Windows session via OBL Force Recovery SATANAMD every 5 min; started 17:43 and 17:44 with result 0. Watch logs healthy/no_overdue_wake; next scheduler 17:49. Detects pending queued deploy >1min, process missing, stale WebView preflight >5min, deferred wake >=3 attempts and >=25min without ACK, auto restarts with 10m cooldown. Native OBL engine is still responsible for actual chat wake submission; no ChatGPT Tasks.
+Wake seq2: due repeatedly deferred. 2026-10-26 no_composer 273 times between 01:50-11:43Z, draft_present 81 times between 13:30-16:24Z, generating 10 times overall. Eventually receipt=085133a22c134ce4bece03006a12d378 visible_ack 16:35:26Z. This chat recorded chat_started and checkpoint. Auto-stall watchdog addresses indefinite deferrals; second clean periodic wake after forced deploy NOT YET VERIFIED.
+P0 NEXT: verify next natural wake sequence3 and chat started/finished, audit watchdog recurring after 17:49. Evaluate root cause draft/no_composer via actual DOM/worker probes. Archive+DOM long-soak still pending. No PBOX1 modified, no manual Git commits.
