@@ -405,3 +405,26 @@ a6f323b0a69dd9750b7893394af32d425faca7933d94d1923ade29e91262aefd
 - DO NOT kill/restart or resend without fresh safe-idle gate. PBOX1 out of scope.
 - Tool session resumed after transient connection error; checkpoint update on SatanAMD now.
 - NEXT: read operating rules, master plan, current release-manager, lifecycle and fresh UI state; safe promotion only if idle and rollback tested.
+
+## 2026-10-26 13:05 CET [HANDOFF-NEW-CHAT] K01
+- HOST SATANAMD verified via LC MultiHost target=satamad; Lupus standalone points to PBOX1 (no modifications).
+- LIVE one BridgeBrowserAlpha0 PID67152 from SOURCE bin Release, WebView2 workers present; product version 1.72.96 per executable metadata, current responsiveness/draft still to verify.
+- Read AGENTS.md, operating rules, handoff gate, plan and previous checkpoint before any change.
+- Owner decision: OBL exclusively SATANAMD; priority is create NEW real chat and hand off through disk files without crash loss.
+- NO GUI interactions, no send, no switches yet. No PBOX1 changes.
+- NEXT: examine live UI/draft and project lead, write durable handoff and verified transfer, then one-shot new chat if safe.
+
+## 2026-10-26 13:07 CET [HANDOFF NEW CHAT] K02
+- HANDOFF written 
+D:\projects\open-browser\docs\OPENBROWSER_LITE_HANDOFF_2026-10-26_NEW_CHAT.md
+ SHA256 
+FE59D203547C59E523810EB3FAF4A4EA0BBB9C96883887ABA1C46C313CFBE74B
+- New chat seed written 
+D:\projects\open-browser\docs\OPENBROWSER_LITE_NEW_CHAT_SEED_2026-10-26.txt
+ SHA256 
+473A93F7D394019E215B736AE5F17DB8FEB9170289550AD29323DD5CBCD2A898
+- Durable transfer state 
+D:\projects\open-browser\docs\OPENBROWSER_LITE_NEW_CHAT_TRANSFER_STATUS_2026-10-26.json
+: PREPARED; NEW CHAT NOT VERIFIED; SEED NOT SENT; engine ACK NOT VERIFIED.
+- SATANAMD LIVE PID67152 v1.72.96 one main process; seq98 deferred=generating, so no route switch during active generation.
+- NEXT verify actual UI idle/draft, then new chat one-shot, real URL, visible user message and response, next checkpoint and owner promotion.

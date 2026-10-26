@@ -1,0 +1,16 @@
+{
+    "schema":  1,
+    "createdUtc":  "2026-10-26T12:09:05.0401342+00:00",
+    "host":  "SATANAMD",
+    "projectId":  "6e84929068ad4746983ce3b21d7e9088",
+    "phase":  "PREPARED",
+    "newChatUrl":  null,
+    "seedStatus":  "NOT_SENT",
+    "engineAck":  "NOT_VERIFIED",
+    "handoffPath":  "D:\\projects\\open-browser\\docs\\OPENBROWSER_LITE_HANDOFF_2026-10-26_NEW_CHAT.md",
+    "handoffSha256":  "FE59D203547C59E523810EB3FAF4A4EA0BBB9C96883887ABA1C46C313CFBE74B",
+    "seedPath":  "D:\\projects\\open-browser\\docs\\OPENBROWSER_LITE_NEW_CHAT_SEED_2026-10-26.txt",
+    "seedSha256":  "473A93F7D394019E215B736AE5F17DB8FEB9170289550AD29323DD5CBCD2A898",
+    "currentLivePid":  67152,
+    "next":  "Check idle/draft and one-shot new chat before promotion"
+}
