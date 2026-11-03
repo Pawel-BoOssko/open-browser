@@ -4,6 +4,12 @@ A local desktop runtime that gives an LLM controlled access to your system throu
 
 **LLM decides → executor executes → LLM receives the result.** No human in the loop. No cloud middleware. Everything runs locally.
 
+## Why it exists
+
+Agent loops normally need an API and a framework. Open Browser takes the opposite route: the agent is whatever chat model you already have open in a browser tab, and the host app is a thin, local executor that closes the loop. That makes the control plane small (an extractor, a router, a process runner) and keeps all execution, files and credentials on the machine. In the author's own use a single project ran for hundreds of scheduled wake-ups and about 100 hours of autonomous work, including edits to its own source.
+
+A companion project, [OpenFill](https://github.com/Pawel-BoOssko/OpenFill), takes the complementary direction: an MCP server that drives a real, signed-in browser for web tasks.
+
 ## How it works
 
 1. An LLM (ChatGPT, Claude, etc.) runs in a real browser session inside a WebView2 window

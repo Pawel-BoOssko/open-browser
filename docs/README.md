@@ -2,7 +2,7 @@
 
 **Purpose:** Documentation for the Open Browser / OpenBridge project.
 
-**Created by:** User (pboru), restructured 2026-05-18 by Claude Code.
+**Created by:** the project owner, restructured 2026-05-18 by Claude Code.
 
 **Rules:**
 1. When you create a folder, you must add a `README.md` inside it. The README must state: the folder's purpose, who created it, when, and what rules apply to its contents.
