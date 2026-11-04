@@ -87,6 +87,20 @@ Key properties:
 
 For developers working on the project, see [docs/development/](docs/development/).
 
+## Repository layout
+
+| Path | Contents |
+|------|----------|
+| `releases/BridgeBrowserAlpha0/` | The WebView2 desktop host (C#, .NET 8) |
+| `tools/` | Toolkits the model can call: n8n, GitHub, LinkedIn, Claude Code launcher, web |
+| `tests/` | Protocol and host smoke tests |
+| `docs/runtime/` | The contract the model sees: commands, envelope format, limits |
+| `docs/testing/` | Model-driven test plans and recorded results |
+| `docs/development/` | Decisions, rules and the development journal |
+
+## Built with AI assistance
+
+Most of this code was written with AI assistance (Claude Code and ChatGPT), directed and reviewed by the author, who owns the architecture, the runtime contract and the acceptance tests. The development journal in `docs/development/` records the decisions.
 ## License
 
 MIT
