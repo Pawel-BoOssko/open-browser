@@ -1,0 +1,59 @@
+param([ValidateRange(1,48)][int]$Hours=8)
+$ErrorActionPreference='Stop'
+if($env:COMPUTERNAME -ne 'SATANAMD'){throw 'WRONG_HOST'}
+$log=Join-Path $env:LOCALAPPDATA ('OpenBrowser\ChatGPT-Lite\diagnostics\lite-events-'+(Get-Date -Format yyyy-MM-dd)+'.jsonl')
+if(!(Test-Path $log)){throw 'MISSING_DOM_HEALTH_LOG'}
+$since=[DateTimeOffset]::UtcNow.AddHours(-$Hours)
+$rows=@(foreach($line in [IO.File]::ReadLines($log)){
+ try{$v=$line|ConvertFrom-Json; if($v.eventName -ne 'hard_dom_health'){continue}
+  $when=[DateTimeOffset]::Parse([string]$v.utc)
+  if($when -ge $since){[pscustomobject]@{utc=$when;pid=[int]$v.pid;turns=[int]$v.details.visibleTurns;enabled=[bool]$v.details.enabled;failures=[int]$v.details.failures;reinsertion=[int]$v.details.reinsertions;removed=[int]$v.details.removedTotal;skip=[string]$v.details.skipped}}
+ }catch{}
+})
+if($rows.Count -eq 0){throw 'NO_DOM_HEALTH_SAMPLES'}
+$rows=@($rows|Sort-Object utc)
+$high=@($rows|Where-Object {$_.turns -gt 10})
+$disabled=@($rows|Where-Object {-not $_.enabled})
+$errors=@($rows|Where-Object {$_.failures -gt 0 -or $_.reinsertion -gt 0})
+$actualFailures=@($rows|Where-Object {$_.failures -gt 0})
+$maxGap=0.0
+$restart=0
+$reinsertionEpisodes=if($rows[0].reinsertion -gt 0){1}else{0}
+for($i=1;$i -lt $rows.Count;$i++){
+ $gap=($rows[$i].utc-$rows[$i-1].utc).TotalSeconds
+ if($gap -gt $maxGap){$maxGap=$gap}
+ if($rows[$i].pid -ne $rows[$i-1].pid){$restart++}
+ if($rows[$i].reinsertion -gt 0 -and ($rows[$i].pid -ne $rows[$i-1].pid -or $rows[$i].reinsertion -gt $rows[$i-1].reinsertion)){$reinsertionEpisodes++}
+}
+$segmentStart=0
+for($i=1;$i -lt $rows.Count;$i++){
+ if($rows[$i].pid -ne $rows[$i-1].pid){$segmentStart=$i}
+}
+$lastSegment=@($rows[$segmentStart..($rows.Count-1)])
+$lastPidSpan=($lastSegment[-1].utc-$lastSegment[0].utc).TotalHours
+$span=($rows[-1].utc-$rows[0].utc).TotalHours
+$complete=($span -ge ($Hours-0.1) -and $maxGap -le 180 -and
+ $restart -eq 0 -and $high.Count -eq 0 -and $disabled.Count -eq 0 -and $errors.Count -eq 0)
+[pscustomobject]@{
+ host=$env:COMPUTERNAME
+ hoursRequested=$Hours
+ samples=$rows.Count
+ observedHours=[math]::Round($span,2)
+ firstUtc=$rows[0].utc.ToString('o')
+ lastUtc=$rows[-1].utc.ToString('o')
+ maxVisibleTurns=($rows|ForEach-Object turns|Measure-Object -Maximum).Maximum
+ samplesOver10=$high.Count
+ disabledSamples=$disabled.Count
+ samplesWithErrorOrPersistedCounter=$errors.Count
+ actualFailureSamples=$actualFailures.Count
+ samplesWithPersistedReinsertionCounter=@($rows|Where-Object reinsertion -gt 0).Count
+ reinsertionEpisodes=$reinsertionEpisodes
+ processChanges=$restart
+ latestPid=$rows[-1].pid
+ latestPidSampleCount=$lastSegment.Count
+ latestPidObservedHours=[math]::Round($lastPidSpan,2)
+ maximumGapSeconds=[math]::Round($maxGap,1)
+ removedInitially=$rows[0].removed
+ removedFinally=$rows[-1].removed
+ eightHourAcceptancePass=$complete
+}|ConvertTo-Json -Compress

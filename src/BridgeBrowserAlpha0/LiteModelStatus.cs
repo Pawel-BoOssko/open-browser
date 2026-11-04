@@ -55,6 +55,13 @@ internal static class LiteModelStatus
         return status.Code;
     }
 
+    // An assistant's optional WAIT marker is not an owner pause.
+    // OBL has a standing owner instruction to keep waking autonomously.
+    // A genuine owner pause is stored separately as Enabled=false.
+    internal static bool IgnoreModelRequestedHold(string? decision,
+        bool isOblLead) => isOblLead &&
+        (decision is "WAIT_UNTIL" or "WAIT_USER");
+
     internal static bool ShouldRecoverBlock(string? decision, bool obLead) =>
         obLead && decision == "BLOCKED";
 
@@ -88,6 +95,14 @@ internal static class LiteModelStatus
         if (ApplyDecision(hold, DateTimeOffset.Parse("2026-11-24T00:00:00Z"), "ready")
             is not null) return 5;
         if (ApplyDecision(hold, t, "wrong_chat") is not null) return 6;
+        if (!IgnoreModelRequestedHold("WAIT_UNTIL", true) ||
+            !IgnoreModelRequestedHold("WAIT_USER", true) ||
+            IgnoreModelRequestedHold("WAIT_UNTIL", false) ||
+            IgnoreModelRequestedHold("WAIT_USER", false) ||
+            IgnoreModelRequestedHold("BLOCKED", true) ||
+            IgnoreModelRequestedHold("DONE", true) ||
+            IgnoreModelRequestedHold("CONTINUE", true) ||
+            IgnoreModelRequestedHold(null, true)) return 9;
         if (!ShouldRecoverBlock("BLOCKED", true) ||
             ShouldRecoverBlock("BLOCKED", false) ||
             ShouldRecoverBlock("WAIT_USER", true) ||

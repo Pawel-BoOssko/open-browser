@@ -1,8 +1,27 @@
-# Open Browser Lite CURRENT STATUS
-2026-10-26 17:59 Europe/Warsaw — SATANAMD only, LC MultiHost target=satamad.
-LIVE v1.72.99 PID528, SHA256 461546BA598351924CD4B7CF7DE5CFAC8110CB900CA7F53F9791CC78EA644116, source and deployed EXE D:\Apps\OpenBrowserLite\releases\v1.72.99_20261026\BridgeBrowserAlpha0.exe. Single real interactive process, WebView2 active on correct new lead chat URL. Live preflight turns10/draft false/toolBusy false/error empty. Keepalive reports running PID528.
-Fallback v1.72.98 SHA 43BD30050CD4C21AA013EB0A3440FFA60ACE458986F9D272FB2EFC244C61CCDB, release manager trial candidatePid=528. Forced restart was verified 2026-10-26 16:58:27Z; GUI health at 16:58:28Z. User mandated no idle/generation waiting for releases; project OPERATING_RULES updated 2026-10-26 17:25.
-1.72.99 changes: diagnostic draftChars, editorSource, editorVisible on wake preflight skips with NO stored editor text, source JS/C# type/telemetry. Test Node syntax PASS, 3 focused JS tests PASS, .NET publish exit0, staged EXE selftests 7/7 PASS.
-Wake new lead sequence3: 2026-10-26 17:52:27 Warsaw; receipt e15df0dad6a94e02bad06dc8bfe52666 visible_ack 16:52:29Z; chat_started written. Previous seq2 was delayed many hours by no_composer/draft_present; watchdog installed every 5min to kill/restart after bounded failure, with 10min cooldown. Last watchdog check 17:54 result0 healthy, next 17:59.
-Archives now 417 files, current DOM <=10 turns with 0 pruning errors. Extended resource soak not yet verified.
-NEXT: next seq4 natural wake and ACK, recurrent watchdog verification, exploit new draft metadata to fix root long-draft, validate archived partial/final and renderer RAM soak. No PBOX1 changes, ChatGPT Tasks, or manual Git commits.
+# OBL: aktualny stan rozwoju, 2026-11-02
+Źródło wymagań: AGENTS.md, OWNER OVERRIDE 2026-11-02. Szczegóły funkcji: docs/OBL_BACKLOG.md. Historia starych decyzji nie jest aktywną listą zadań.
+
+## Ocena wykonania
+Funkcja wdrożona w LIVE i wstępnie sprawdzona lub jawnie przyjęta przez właściciela ma stan ZAKOŃCZONE. Brak dodatkowych testów nie oznacza stanu częściowego. Dopuszczalne tylko testy podstawowe, maksymalnie trzy wybudzenia na etap. Po wdrożeniu reagować na rzeczywiste błędy.
+
+## Funkcje zakończone
+- Naturalne wybudzenia, harmonogram, numeracja, log rzeczywistych ACK i mechanizm wznowień.
+- Rotacja leadów 9 do 0 oraz handoff, przyjęte przez właściciela 2026-11-01 jako działające.
+- Podstawowy watchdog, obsługa pojedynczego aktywnego leada, rozdział SOURCE/STAGED/LIVE, wersje, SHA i rollback.
+- Redukcja DOM do 10 tur, lokalne 12 odpowiedzi, zapis PARTIAL/FINAL, checkpointy, retencja plików i podstawowa diagnostyka.
+- Lokalny edytor Notatki i autosave, kanoniczne projects.json, techniczne odczyty projektu oraz zwykłe wykonanie kolejnych zadań przez wybudzenia.
+
+## Funkcje rozpoczęte albo brakujące
+1. Uprościć faktyczny nadajnik wybudzeń, usunąć mechanizmy odzyskiwania szkiców, blokady związane z tekstem edytora, zbędne odroczenia, preflight i zabezpieczenia niedające wartości dla wysyłki. Wersja produkcyjna w chwili ostatniej weryfikacji nadal zawiera te ścieżki.
+2. Natychmiastowo wdrażać nowe wersje niezależnie od tego, czy poprzedni proces generuje lub pracuje. Odrzucić idle jako warunek instalacji, zachować rzeczywisty rollback. Nie ma potwierdzenia wykonania tej nowej zmiany w LIVE.
+3. Umieścić w rzeczywistej treści wybudzeń pełną instrukcję właściciela o upraszczaniu i aktualizacjach. Sam zapis dokumentu nie wystarcza.
+4. Zbudować nowy, uproszczony interfejs OBL z centralnym czatem, czytelnymi stanami, łatwym notatnikiem i sensownym panelem projektów.
+5. Dokończyć niezależne harmonogramy wielu projektów, swobodne godziny i konfigurację bez centralnej kolejki.
+6. Dokończyć onboarding nowych projektów, potem pozostałe zaplanowane funkcje UI i integracji, zgodnie z backlogiem.
+
+## Zawieszone
+Natywna archiwizacja rozmów ChatGPT: nie podejmować dalszych prac bez nowego polecenia właściciela.
+
+## Stan techniczny
+Ostatnia rzeczywiście potwierdzona produkcyjna wersja w dostępnych dokumentach: v1.73.184, aktywowana 2026-11-01T22:06:15Z. PID3888 obowiązywał w chwili weryfikacji, nie jest bieżącym pomiarem 2026-11-02.
+Operacyjny Beads nadal posiada starsze wpisy wymagające formalnej synchronizacji statusów i usunięcia dawnych kryteriów dodatkowego testowania. Bez wykonania komend Beads nie wolno deklarować ich zamknięcia.

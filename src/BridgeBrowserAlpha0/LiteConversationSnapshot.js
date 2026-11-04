@@ -4,12 +4,28 @@
   if (!global.document || global.location.hostname !== "chatgpt.com") return;
 
   function isGenerating(main) {
-    const controls = main.querySelectorAll(
+    // Fail closed: a streaming response is PARTIAL even when React temporarily
+    // removes or changes the Stop button. The DOM pruning guard also treats
+    // aria-busy as active. Never give an incomplete turn a FINAL archive ACK.
+    if (main.getAttribute?.("aria-busy") === "true" ||
+        main.querySelector?.('[aria-busy="true"]') ||
+        // Tool execution can remain active without aria-busy or a Stop button.
+        // Keep its unfinished assistant turn PARTIAL until the tool stops.
+        main.querySelector?.('[data-testid*="tool-running"],[data-state="running"]'))
+      return true;
+    const controls = global.document.querySelectorAll(
       '[data-testid="stop-button"],button[aria-label="Zatrzymaj"],' +
       'button[aria-label="Stop generating"],button[aria-label="Przerwij generowanie"]');
     return Array.from(controls).some(n => !n.hidden && !n.disabled &&
+      !n.closest?.('aside,nav,[role="navigation"]') &&
       n.getAttribute?.("aria-hidden") !== "true" &&
       (typeof n.getClientRects !== "function" || n.getClientRects().length > 0));
+  }
+
+  function isUserMessage(node) {
+    // Selection IDs are not proof of assistant authorship. The role can be
+    // declared on a parent turn while the ID belongs to a nested child.
+    return !!node?.closest?.('[data-user-message-bubble],[data-message-author-role="user"]');
   }
 
   function collect() {
@@ -25,9 +41,7 @@
           '[data-user-message-bubble],[data-chatgpt-selection-message-id],' +
           '[data-message-author-role]');
         const latest = turns[turns.length - 1];
-        if (!latest || latest.hasAttribute?.('data-user-message-bubble') ||
-            latest.getAttribute?.('data-message-author-role') === 'user')
-          return [];
+        if (!latest || isUserMessage(latest)) return [];
       }
       const modern = Array.from(main.querySelectorAll(
         '[data-chatgpt-selection-message-id]'));
@@ -40,8 +54,14 @@
       const cap = generating ? 1 : 2;
       for (let index = nodes.length - 1; index >= 0 && results.length < cap; index--) {
         const node = nodes[index];
+        if (isUserMessage(node)) continue;
         const text = typeof node.innerText === "string" ? node.innerText : "";
-        if (text.trim().length < 5 || text.length > 200000) continue;
+        if (text.trim().length < 5 || text.length > 200000) {
+          // During streaming this is the newest assistant, not a reason to
+          // fall back to an older completed answer and label it PARTIAL.
+          if (generating) return [];
+          continue;
+        }
         const parent = modern.length ? null :
           node.closest?.('[data-testid^="conversation-turn-"]');
         const id = (modern.length ?
@@ -78,6 +98,7 @@
     const history = [];
     for (let i = 0; i < nodes.length && history.length < 64; i++) {
       const node = nodes[i];
+      if (isUserMessage(node)) continue;
       const text = typeof node.innerText === "string" ? node.innerText : "";
       if (text.trim().length < 5 || text.length > 200000) continue;
       const parent = modern.length ? null :

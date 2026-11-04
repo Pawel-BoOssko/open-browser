@@ -111,7 +111,16 @@ internal sealed partial class ChatGptLiteForm
                 });
                 UpdateHardPruneReportTimer();
             }
-            int count = root.GetProperty("removedTotal").GetInt32();
+            // Once per minute, metadata-only evidence for real DOM >10.
+            LiteEventLog.Write("hard_dom_health", new {
+                visibleTurns = root.GetProperty("visibleTurns").GetInt32(),
+                skipped = root.GetProperty("skipped").GetString(),
+                removedTotal = root.GetProperty("removedTotal").GetInt32(),
+                obsoleteDropped = root.GetProperty("obsoleteDropped").GetInt32(),
+                failures = root.GetProperty("failures").GetInt32(),
+                reinsertions = root.GetProperty("reinsertions").GetInt32(),
+                enabled = root.GetProperty("enabled").GetBoolean()
+            });            int count = root.GetProperty("removedTotal").GetInt32();
             if (count != _lastReportedPruned)
             {
                 LiteEventLog.Write("hard_dom_pruned", new

@@ -8,6 +8,39 @@ internal static class Program
     [STAThread]
     private static void Main(string[] args)
     {
+        if (args.Length == 1 && args[0] == "--lite-md-archive-crash-selftest")
+        {
+            Environment.ExitCode = LiteResponseMarkdownArchive.ProcessCrashRecoverySelfTest();
+            return;
+        }
+        if (args.Length == 2 && args[0] == "--lite-md-archive-crash-child")
+        {
+            Environment.ExitCode = LiteResponseMarkdownArchive.CrashChild(args[1]);
+            return;
+        }
+        if (args.Length == 1 && args[0] == "--lite-successor-composer-probe")
+        {
+            Environment.ExitCode = LiteSuccessorComposerProbe.Run();
+            return;
+        }
+        if (args.Length > 0 && args[0] == "--lite-handoff-generation-rollover")
+        {
+            Environment.ExitCode = LiteHandoffGenerationBootstrap.Run(args,true);
+            return;
+        }        if (args.Length > 0 && args[0] == "--lite-handoff-generation-prepare")
+        {
+            Environment.ExitCode = LiteHandoffGenerationBootstrap.Run(args);
+            return;
+        }        if (args.Length > 0 && args[0] == "--lite-handoff-prepare")
+        {
+            Environment.ExitCode = LiteHandoffBootstrap.Run(args);
+            return;
+        }
+        if (args.Length == 3 && args[0] == "--lite-handoff-document-verify")
+        {
+            Environment.ExitCode = LiteHandoffEvidence.VerifyDocument(args[1], @"D:\projects\open-browser\docs", args[2], DateTimeOffset.UtcNow, out _, out _, out _) ? 0 : 5;
+            return;
+        }
         if (args.Length >= 3 && string.Equals(args[0],
             "--lite-chat-notes-append", StringComparison.OrdinalIgnoreCase))
         {
@@ -27,12 +60,59 @@ internal static class Program
             catch { Environment.ExitCode = 4; }
             return;
         }
-        // Chat-specific schedules can be configured by the chat itself through
+        if (args.Length > 0 &&
+            string.Equals(args[0],"--lite-project-wake",StringComparison.OrdinalIgnoreCase))
+        {
+            Environment.ExitCode = LiteProjectWakeCli.Run(args);
+            return;
+        }
+        if (args.Length == 1 && args[0] == "--lite-project-wake-selftest")
+        {
+            Environment.ExitCode = LiteProjectWakeCli.SelfTest();
+            return;
+        }
+        if (args.Length == 1 && args[0] == "--lite-emergency-selftest")
+        {
+            Environment.ExitCode = LiteWakeEmergency.SelfTest();
+            return;
+        }
+        if (args.Length == 1 && args[0] == "--lite-first-wake-proof-selftest")
+        {
+            Environment.ExitCode = LiteSuccessorFirstWakeProof.SelfTest();
+            return;
+        }        // Chat-specific schedules can be configured by the chat itself through
         // the local command interface, or by the operator in the app.
         if (args.Length > 0 && string.Equals(args[0],
             "--lite-chat-wake-selftest", StringComparison.OrdinalIgnoreCase))
         {
             Environment.ExitCode = LiteChatWakeRegistry.SelfTest();
+            return;
+        }
+        if (args.Length == 2 && string.Equals(args[0],
+            "--lite-chat-wake-owner-rearm-now", StringComparison.OrdinalIgnoreCase))
+        {
+            try
+            {
+                string url = LiteDevWakeState.NormalizeUrl(args[1]);
+                var chats = LiteChatWakeRegistry.Read();
+                if (!LiteChatWakeRegistry.TryOwnerRearmNow(chats, url,
+                    DateTimeOffset.UtcNow))
+                {
+                    LiteEventLog.Write("multi_wake_owner_rearm_refused",
+                        new { reason = "unsafe_or_not_stale_confirmed_response" });
+                    Environment.ExitCode = 6;
+                    return;
+                }
+                LiteChatWakeRegistry.Write(chats);
+                LiteEventLog.Write("multi_wake_owner_explicit_rearm",
+                    new { reason = "new_owner_request", intervalMinutes =
+                        chats.Single(c => c.Url == url).EffectiveMinutes });
+                Environment.ExitCode = 0;
+            }
+            catch
+            {
+                Environment.ExitCode = 5;
+            }
             return;
         }
         if (args.Length >= 2 && string.Equals(args[0],
@@ -174,7 +254,34 @@ internal static class Program
             Environment.ExitCode = LiteResumeLedgerSelfTest.Run();
             return;
         }
-        if (args.Any(arg => string.Equals(arg, "--lite-projects-selftest", StringComparison.OrdinalIgnoreCase)))
+        if (args.Any(arg => string.Equals(arg, "--lite-project-wake-migrate", StringComparison.OrdinalIgnoreCase)))
+        {
+            try
+            {
+                var before = LiteChatWakeRegistry.Read();
+                int count = before.Count;
+                int enabled = before.Count(w => w.Enabled);
+                LiteChatWakeRegistry.Write(before);
+                var after = LiteProjectWakeStore.Read()
+                    ?? throw new InvalidDataException("Project migration did not persist");
+                if (after.Count != count || after.Count(w => w.Enabled) != enabled ||
+                    before.Any(a => !after.Any(b => b.Url == a.Url &&
+                        b.WakeSequence == a.WakeSequence &&
+                        b.Enabled == a.Enabled && b.Prompt == a.Prompt &&
+                        b.SlotAnchorUtc == a.SlotAnchorUtc)))
+                    throw new InvalidDataException("Project migration lost a wake record");
+                LiteEventLog.Write("project_wake_migrated",
+                    new { retained = after.Count, enabled, source = "projects.json" });
+                Environment.ExitCode = 0;
+            }
+            catch (Exception ex)
+            {
+                LiteEventLog.Write("project_wake_migration_failed",
+                    new { errorType = ex.GetType().Name, errorCode = ex.HResult });
+                Environment.ExitCode = 93;
+            }
+            return;
+        }        if (args.Any(arg => string.Equals(arg, "--lite-projects-selftest", StringComparison.OrdinalIgnoreCase)))
         {
             Environment.ExitCode = LiteSelfTest.Run();
             return;
@@ -237,6 +344,26 @@ internal static class Program
         if (args.Any(arg => string.Equals(arg, "--lite-icon-selftest", StringComparison.OrdinalIgnoreCase)))
         {
             Environment.ExitCode = LiteBrandIcon.SelfTest();
+            return;
+        }
+        if (args.Length == 1 && args[0] == "--lite-markdown-partial-crash-selftest")
+        {
+            Environment.ExitCode = LiteResponseMarkdownPartialCrashSelfTest.Run();
+            return;
+        }
+        if (args.Length == 3 && args[0] == "--lite-markdown-partial-crash-child")
+        {
+            Environment.ExitCode = LiteResponseMarkdownPartialCrashSelfTest.RunChild(args[1], args[2]);
+            return;
+        }
+        if (args.Length == 1 && args[0] == "--lite-markdown-crash-selftest")
+        {
+            Environment.ExitCode = LiteResponseMarkdownCrashSelfTest.Run();
+            return;
+        }
+        if (args.Length == 3 && args[0] == "--lite-markdown-crash-child")
+        {
+            Environment.ExitCode = LiteResponseMarkdownCrashSelfTest.RunChild(args[1], args[2]);
             return;
         }
         if (args.Any(arg => string.Equals(arg, "--lite-markdown-selftest", StringComparison.OrdinalIgnoreCase)))

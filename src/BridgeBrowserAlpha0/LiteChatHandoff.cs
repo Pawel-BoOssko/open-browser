@@ -19,6 +19,37 @@ internal static class LiteChatHandoff
     // CLOSED for the automatic STOP handoff request, until full E2E is proven.
     internal const bool AutonomousSuccessorReady = false;
 
+    // Stage a crash-recoverable handoff document BEFORE the observed ~20-wake
+    // ChatGPT conversation cap. Purely advisory: no new chat, no WAIT_USER,
+    // no second executor and no blind retry of any uncertain seed.
+    internal static bool ShouldPrestageSnapshot(
+        LiteChatWakeRegistry.Chat chat, bool projectSchedule,
+        bool? pinnedProofExists = null) =>
+        projectSchedule && chat.Enabled &&
+        LiteWakeRotation.HandoffWake(chat.WakeSequence);
+
+    private static bool HasPinnedProof(string url)
+    {
+        try
+        {
+            string normalized = LiteDevWakeState.NormalizeUrl(url);
+            string hash = Convert.ToHexString(
+                System.Security.Cryptography.SHA256.HashData(
+                    System.Text.Encoding.UTF8.GetBytes(normalized)))
+                .ToLowerInvariant()[..16];
+            string proof = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "OpenBrowser", "ChatGPT-Lite", "diagnostics", "handoff",
+                hash + "_proof.json");
+            return File.Exists(proof);
+        }
+        catch { return true; } // Fail closed: never overwrite pinned snapshot.
+    }
+
+    // Keep the handoff request in rules, not in the wake message.
+    internal static readonly string PrestageSnapshotText =
+        "\nZapisz aktualny handoff projektu zgodnie z zasadami.";
+
     internal static bool NeedsRotation(LiteChatWakeRegistry.Chat chat,
         bool isRegisteredProjectLead, int observedTurns = 0) =>
         isRegisteredProjectLead && chat.Enabled &&
@@ -61,18 +92,7 @@ internal static class LiteChatHandoff
             oldChat.Url, StringComparison.Ordinal);
 
     internal static string RequestText =
-        "\n\nROTACJA CZATU WYKONAWCZEGO — jednorazowa prośba o HANDOFF. " +
-        "Ta rozmowa jest długa. Nie rozpoczynaj już nowych dużych zadań. " +
-        "Przygotuj pełny, konkretny dokument HANDOFF w dokumentacji projektu: " +
-        "co zrobiono, bieżące pliki i ścieżki, LIVE/SOURCE, testy, otwarte zadania, " +
-        "zagrożenia, identyfikatory czatów, zasady pracy i następny krok. " +
-        "Nie zgaduj ani nie twórz adresu nowego czatu. " +
-        "Po faktycznym zapisaniu dokumentu podaj jego dokładną ścieżkę oraz " +
-        "krótkie podsumowanie, a jako OSTATNI wiersz wypisz [OB-STATUS: WAIT_USER]. " +
-        "W ten sposób Open Browser zatrzyma harmonogram starego wykonawcy. " +
-        "Nowy czat będzie można uruchomić dopiero po zatwierdzonym przejęciu. " +
-        "Jeśli zapis dokumentu się nie udał, nie deklaruj gotowego handoffu " +
-        "ani nie emituj WAIT_USER — opisz blokadę w zwykłym checkpointcie.";
+        "\nZapisz aktualny handoff projektu zgodnie z zasadami.";
 
     internal static int SelfTest()
     {
@@ -80,6 +100,23 @@ internal static class LiteChatHandoff
             Url = "https://chatgpt.com/c/11111111-1111-1111-1111-111111111111",
             Enabled = true, WakeSequence = 13
         };
+        old.Prompt = "Open Browser Lite";
+        old.WakeSequence = 9;
+        if (!ShouldPrestageSnapshot(old, true) || ShouldPrestageSnapshot(old, false) ||
+            PrestageSnapshotText.Length > 100 || !PrestageSnapshotText.Contains("handoff"))
+            return 15;
+        old.WakeSequence = 8;
+        if (ShouldPrestageSnapshot(old, true)) return 16;
+        old.WakeSequence = 19;
+        if (!ShouldPrestageSnapshot(old, true, false)) return 17;
+        old.Enabled = false;
+        if (ShouldPrestageSnapshot(old, true)) return 18;
+        old.Enabled = true;
+        old.WakeSequence = 49;
+        if (!ShouldPrestageSnapshot(old, true)) return 25;
+        old.WakeSequence = 50;
+        if (ShouldPrestageSnapshot(old, true)) return 26;
+        old.WakeSequence = 13;
         if (ShouldRequest(old, true) || Request(old, false, true)) return 1;
         if (ShouldRequest(old, true, 49) || NeedsRotation(old, true, 49)) return 12;
         if (ShouldRequest(old, true, 50) || !NeedsRotation(old, true, 50)) return 13;

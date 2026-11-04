@@ -17,6 +17,11 @@ internal sealed partial class ChatGptLiteForm
     private bool _archiveEnabled = true;
     private bool _capturePending;
     private Task<string>? _captureTask;
+    // A timed-out WebView script may remain pending forever. Allow one bounded
+    // retry, never an unbounded queue of stalled ExecuteScriptAsync calls.
+    private readonly List<Task<string>> _timedOutCaptureTasks = new();
+    private const int MaxTimedOutCaptureTasks = 2;
+    private bool _captureRetryLimitLogged;
     private long _captureEpoch;
 
     private void ResetCaptureForNewLocation()
@@ -25,8 +30,14 @@ internal sealed partial class ChatGptLiteForm
         // snapshots for a newly selected chat. Late completions cannot write.
         _captureEpoch++;
         _captureTask = null;
+        _timedOutCaptureTasks.Clear();
+        _captureRetryLimitLogged = false;
         _capturePending = false;
     }
+
+    internal static bool IsArchiveCaptureLeaseCurrent(long startedEpoch,
+        long currentEpoch, Task<string> startedTask, Task<string>? currentTask) =>
+        startedEpoch == currentEpoch && ReferenceEquals(startedTask, currentTask);
 
     internal static bool IsArchiveResultCurrent(long startedEpoch,
         long currentEpoch, Uri startedUri, string? currentSource)
@@ -62,16 +73,47 @@ internal sealed partial class ChatGptLiteForm
         LiteEventLog.Write("archive_observer_installed");
     }
 
+    // Reindex an orphaned durable answer without asking ChatGPT to generate it
+    // again. This executes once per conversation per app instance.
+    private void RecoverArchiveIndex(Uri uri)
+    {
+        try
+        {
+            int recovered = _markdownArchive.RecoverMissingIndex(
+                uri.GetLeftPart(UriPartial.Path));
+            if (recovered > 0)
+                LiteEventLog.Write("archive_index_recovered", new { recovered });
+        }
+        catch (Exception ex)
+        {
+            LiteEventLog.Write("archive_index_recovery_failed",
+                new { errorType = ex.GetType().Name });
+        }
+    }
+
     private async Task CaptureVisibleAnswersAsync()
     {
         var core = _browser.CoreWebView2;
+        _timedOutCaptureTasks.RemoveAll(static task => task.IsCompleted);
         if (!_archiveEnabled || _capturePending ||
             _captureTask is { IsCompleted: false } || core is null) return;
+        if (_timedOutCaptureTasks.Count >= MaxTimedOutCaptureTasks)
+        {
+            if (!_captureRetryLimitLogged)
+            {
+                LiteEventLog.Write("archive_probe_retry_budget_exhausted", new {
+                    outstanding = _timedOutCaptureTasks.Count });
+                _captureRetryLimitLogged = true;
+            }
+            return; // Two stalled WebView calls must not multiply indefinitely.
+        }
+        _captureRetryLimitLogged = false;
         if (!Uri.TryCreate(core.Source, UriKind.Absolute, out var uri) ||
             uri.Host != "chatgpt.com" ||
             !(uri.AbsolutePath.StartsWith("/c/", StringComparison.OrdinalIgnoreCase) ||
               uri.AbsolutePath.StartsWith("/g/", StringComparison.OrdinalIgnoreCase))) return;
 
+        RecoverArchiveIndex(uri);
         _capturePending = true;
         long epoch = _captureEpoch;
         try
@@ -81,9 +123,17 @@ internal sealed partial class ChatGptLiteForm
             _captureTask = call;
             if (await Task.WhenAny(call, Task.Delay(7000)) != call)
             {
-                LiteEventLog.Write("archive_probe_timeout");
-                // Remain single-flight for this document, but never await
-                // indefinitely. Observe eventual exceptions off the UI thread.
+                // A timeout from a previous navigation must never clear the
+                // current page's capture slot or consume its retry budget.
+                if (IsArchiveCaptureLeaseCurrent(epoch, _captureEpoch, call, _captureTask))
+                {
+                    _timedOutCaptureTasks.Add(call);
+                    _captureTask = null;
+                    LiteEventLog.Write("archive_probe_timeout", new {
+                        outstanding = _timedOutCaptureTasks.Count });
+                }
+                // A late completion cannot persist stale data. The next timer
+                // tick re-captures the current DOM. Observe late faults.
                 _ = call.ContinueWith(t => { _ = t.Exception; },
                     CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted,
                     TaskScheduler.Default);

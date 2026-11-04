@@ -25,9 +25,30 @@ function run(text = "", busy = false, host = "chatgpt.com", speaker = "alert") {
     : speaker === "latestError"
       ? [{ ...node, textContent: "Earlier successful response" }, node]
       : [node];
+  const terminalPanel = {
+    textContent: text,
+    innerText: text,
+    parentElement: null,
+    closest() { return ["terminalQuote","terminalHiddenButton"].includes(speaker) ? {} : null; },
+    getAttribute() { return null; },
+    getClientRects() { return [{}]; }
+  };
+  const terminalButton = {
+    innerText: "Rozpocznij nowy czat",
+    parentElement: terminalPanel,
+    hidden: speaker === "terminalHiddenButton",
+    getAttribute() { return null; },
+    getClientRects() { return speaker === "terminalHiddenButton" ? [] : [{}]; },
+    closest(selector) {
+      return ["terminalQuote","terminalHiddenButton"].includes(speaker) && selector.includes("[data-message-author-role]") ? {} : null;
+    }
+  };
   const main = {
     textContent: speaker === "shellError" || speaker === "dilOnlyShellQuote" ? text : "",
     querySelectorAll(selector) {
+      if (selector === 'button,a,[role="button"]')
+        return ["terminalBanner","terminalQuote","terminalHiddenButton"].includes(speaker)
+          ? [terminalButton] : [];
       if (selector.startsWith('[data-testid^="conversation-turn-"]'))
         return ["shellError","dilOnlyShellQuote","modernConversation"].includes(speaker)
           ? [] : [node];
@@ -35,7 +56,7 @@ function run(text = "", busy = false, host = "chatgpt.com", speaker = "alert") {
         return ["dilOnlyShellQuote","modernConversation"].includes(speaker)
           ? [node, { ...node, textContent: "Another hydrated turn" }] : [];
       if (selector.startsWith('[data-message-author-role'))
-        return speaker === "user" || speaker === "sidebar" || speaker === "shellError" ? [] : assistantNodes;
+        return speaker === "user" || speaker === "sidebar" || speaker === "shellError" || ["terminalQuote","terminalHiddenButton"].includes(speaker) ? [] : assistantNodes;
       throw new Error("Unknown main selector: " + selector);
     }
   };
@@ -57,9 +78,12 @@ function run(text = "", busy = false, host = "chatgpt.com", speaker = "alert") {
           return ["alert", "sidebar", "hiddenAlert", "ariaHiddenAlert",
             "parentHiddenAlert", "detachedAlert", "cssHiddenAlert"].includes(speaker) && text
             ? [node] : [];
+        if (selector.startsWith('#prompt-textarea')) return [];
         if (selector.startsWith('[data-testid^="conversation-turn-"]')) return [node];
         if (selector.startsWith('[data-message-author-role'))
-          return speaker === "user" ? [] : assistantNodes;
+          return speaker === "user" || ["terminalQuote","terminalHiddenButton"].includes(speaker) ? [] : assistantNodes;
+        if (selector.startsWith('[role="status"]')) return [];
+        if (selector === 'button,[role="button"]' || selector === 'h1,h2,h3,[role="heading"]') return [];
         throw new Error("Unknown selector: " + selector);
       },
       querySelector(selector) {
@@ -131,4 +155,20 @@ assert.equal(quotedShell.visibleError, null,
   "modern hydrated turns prevent a false empty-shell conversation failure");
 assert.equal(run("Couldn't load this conversation", false,
   "chatgpt.com", "shellError").domVariant, "unhydrated");
-console.log("LiteResponseSignal: hidden alerts and latest-reply checks PASS");
+const terminalPL = "Osiągnięto maksymalną długość dla tej konwersacji, możesz jednak dalej rozmawiać.";
+const terminalEN = "You've reached the maximum length for this conversation, but you can continue by starting a new chat.";
+assert.equal(run(terminalPL, false, "chatgpt.com", "terminalBanner").visibleError,
+  "conversation_length_exceeded", "Polish terminal banner with new-chat control is detected");
+assert.equal(run(terminalEN, false, "chatgpt.com", "terminalBanner").visibleError,
+  "conversation_length_exceeded", "English terminal banner is detected");
+assert.equal(run(terminalPL, false, "chatgpt.com", "terminalBanner").errorSource,
+  "terminal_new_chat_panel", "structured terminal panel source is reported");
+assert.equal(run(terminalPL, false, "chatgpt.com", "terminalQuote").visibleError,
+  null, "quoted user text with a new-chat-like control cannot trigger");
+assert.equal(run(terminalPL, false, "chatgpt.com", "terminalHiddenButton").visibleError,
+  null, "hidden terminal control is not accepted");
+assert.equal(run(terminalPL, false, "chatgpt.com", "user").visibleError,
+  null, "user quotation alone never blocks wake");
+assert.equal(run(terminalPL, false, "chatgpt.com", "alert").visibleError,
+  "conversation_length_exceeded", "visible terminal alert is classified");
+console.log("LiteResponseSignal: terminal banners, negative controls and historical checks PASS");

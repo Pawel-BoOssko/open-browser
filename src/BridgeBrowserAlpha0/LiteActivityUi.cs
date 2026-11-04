@@ -149,7 +149,25 @@ internal sealed partial class ChatGptLiteForm
                     (reason.Length > 0 && (stage is "deferred" or "engine_failure")
                         ? " (" + reason.Replace('\r',' ').Replace('\n',' ') + ")" : "");
             }
-            string type = root.TryGetProperty("eventName", out var ev)
+            // Visible faults outrank routine progress: show the actual
+            // diagnostic CODE (never raw page contents or personal prompts).
+            string eventName = root.TryGetProperty("eventName", out var eventProperty)
+                ? eventProperty.GetString() ?? "" : "";
+            if (eventName == "response_error_transition")
+            {
+                string state = root.TryGetProperty("details", out var detail) &&
+                    detail.ValueKind == JsonValueKind.Object &&
+                    detail.TryGetProperty("state", out var value) &&
+                    value.ValueKind == JsonValueKind.String ?
+                    value.GetString() ?? "" : "";
+                return time + "   ChatGPT   " +
+                    (state == "cleared" ? "Błąd strony ustąpił" :
+                     "AWARIA STRONY: " + state);
+            }
+            if (eventName == "conversation_limit_terminal_confirmed")
+                return time + "   ChatGPT   LIMIT DŁUGOŚCI: wymagany HANDOFF";
+            if (eventName == "response_probe_still_pending")
+                return time + "   ChatGPT   Brak odpowiedzi renderera";            string type = root.TryGetProperty("eventName", out var ev)
                 ? ev.GetString() ?? "" : "";
             string item = type switch
             {

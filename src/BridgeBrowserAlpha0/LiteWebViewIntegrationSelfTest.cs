@@ -68,7 +68,8 @@ internal static class LiteWebViewIntegrationSelfTest
                     foreach (string name in new[] {
                         "LiteHighGuard.js", "LiteResponseSignal.js",
                         "LiteResumeProbe.js", "LiteResumeSender.js",
-                        "LiteDomOptimizer.js", "LiteDomHardPrune.js"
+                        "LiteDomOptimizer.js", "LiteDomHardPrune.js",
+                        "LiteConversationSnapshot.js"
                     }) {
                         string script = File.ReadAllText(Path.Combine(
                             AppContext.BaseDirectory, name));
@@ -155,6 +156,22 @@ internal static class LiteWebViewIntegrationSelfTest
                     Ensure(await EvaluateAsync(core,
                         "document.querySelectorAll('main [data-user-message-bubble],main [data-chatgpt-selection-message-id]').length") ==
                         "4", "short chat is preserved across OFF/ON/OFF cycle");
+                    phase = "native_visibility_short_cooldown";
+                    var cooldownBase = DateTimeOffset.UnixEpoch;
+                    Ensure(ChatGptLiteForm.NativeVisibilityShortCooldownDelay(
+                        cooldownBase, cooldownBase.AddSeconds(25)) ==
+                        TimeSpan.FromSeconds(26),
+                        "wake just before cooldown expiry waits briefly and audits");
+                    Ensure(ChatGptLiteForm.NativeVisibilityShortCooldownDelay(
+                        cooldownBase, cooldownBase.AddSeconds(60)) ==
+                        TimeSpan.FromSeconds(61),
+                        "short retry waits at most 61 seconds including safety margin");
+                    Ensure(ChatGptLiteForm.NativeVisibilityShortCooldownDelay(
+                        cooldownBase, cooldownBase.AddSeconds(61)) is null,
+                        "long rate limit does not block wake loop");
+                    Ensure(ChatGptLiteForm.NativeVisibilityShortCooldownDelay(
+                        cooldownBase, cooldownBase.AddSeconds(-1)) is null,
+                        "expired rate limit proceeds immediately");
                     phase = "worker_hydration_total_deadline";
                     Ensure(ChatGptLiteForm.WorkerHistoryProbeBudgetMs(0) == 6500,
                         "first hydration probe has at most 6.5s budget");
@@ -245,6 +262,37 @@ internal static class LiteWebViewIntegrationSelfTest
                     secondPending.SetResult(observation);
                     Ensure(!(await duringSecond).Stable,
                         "route A-B-A during second snapshot cannot confirm an old response");
+                    phase = "rotation_foreground_follow";
+                    const string oldLead = "https://chatgpt.com/c/6ae6112b-a58c-83e9-b2a4-3083ff5c995f";
+                    const string newLead = "https://chatgpt.com/c/6ae62e2c-40e4-83e9-9057-1533aa227932";
+                    const string foreignLead = "https://chatgpt.com/c/6ae5ce2b-9ecc-83e9-9ed8-c7c7b846029c";
+                    Ensure(ChatGptLiteForm.ShouldFollowPromotedLeadForeground(
+                        oldLead, oldLead, newLead), "old lead error page follows promoted lead");
+                    Ensure(ChatGptLiteForm.ShouldFollowPromotedLeadForeground(
+                        "https://chatgpt.com/", oldLead, newLead), "owned homepage follows promoted lead");
+                    Ensure(!ChatGptLiteForm.ShouldFollowPromotedLeadForeground(
+                        foreignLead, oldLead, newLead), "foreign conversation remains untouched");
+                    Ensure(!ChatGptLiteForm.ShouldFollowPromotedLeadForeground(
+                        "https://example.com/", oldLead, newLead), "unrelated site remains untouched");
+                    Ensure(!ChatGptLiteForm.ShouldFollowPromotedLeadForeground(
+                        oldLead, oldLead, "https://example.com/"), "invalid successor cannot be followed");
+                    phase = "stall_two_slot_direct_recovery";
+                    var firstStallSlot = new DateTimeOffset(2026,10,31,16,0,0,TimeSpan.Zero);
+                    Ensure(!ChatGptLiteForm.HasStallPassedSecondSlot(
+                        firstStallSlot, firstStallSlot.AddMinutes(14), 15),
+                        "first slot still permits two-minute retry");
+                    Ensure(ChatGptLiteForm.HasStallPassedSecondSlot(
+                        firstStallSlot, firstStallSlot.AddMinutes(15), 15),
+                        "second slot forces immediate numbered wake");
+                    Ensure(!ChatGptLiteForm.HasStallPassedSecondSlot(
+                        default, firstStallSlot.AddMinutes(30), 15),
+                        "no phantom overdue without first scheduled slot");
+                    Ensure(ChatGptLiteForm.IsStalledLeadReason("generating", false),
+                        "active generation counts as busy");
+                    Ensure(ChatGptLiteForm.IsStalledLeadReason("assistant_not_complete", true),
+                        "unfinished lead answer counts as busy");
+                    Ensure(!ChatGptLiteForm.IsStalledLeadReason("assistant_not_complete", false),
+                        "unfinished non-lead must not force a wake");
                     phase = "wake_delivery_uncertainty_fence";
                     Ensure(ChatGptLiteForm.IsDefinitelyUnsentWake(
                         "busy_generating", "not_submitted"),
@@ -344,8 +392,8 @@ internal static class LiteWebViewIntegrationSelfTest
                     draftOldAgain.UserNodeCount--;
                     Ensure(LiteChatWakePreflight.Eligibility(
                         draftOld, draftOldAgain, recoverPath,
-                        oldHash.ToLowerInvariant()) == "same_answer_already_woken",
-                        "lowercase durable hash cannot trigger duplicate of same response");
+                        oldHash.ToLowerInvariant()) == "ready",
+                        "owner allows another scheduled wake from an unchanged completed response");
                     draftOld.HasDraft = true; draftOldAgain.HasDraft = true;
                     Ensure(LiteChatWakePreflight.SameConversationHistory(
                         draftOld, draftOldAgain),
@@ -416,12 +464,12 @@ internal static class LiteWebViewIntegrationSelfTest
                         "foreign chat cannot forge terminal completion");
                     Ensure(ChatGptLiteForm.ChooseWakePreflightGate(false,
                         "own_draft_clicked_unconfirmed", "", "ready", nextHash) ==
-                        ChatGptLiteForm.WakePreflightGate.HoldUnconfirmedRecovery,
-                        "ordinary answer with unknown baseline must remain fenced");
+                        ChatGptLiteForm.WakePreflightGate.Continue,
+                        "uncertain prior wake does not block the next stable answer");
                     Ensure(ChatGptLiteForm.ChooseWakePreflightGate(false,
                         "own_draft_clicked_unconfirmed", oldHash, "ready", oldHash) ==
-                        ChatGptLiteForm.WakePreflightGate.HoldUnconfirmedRecovery,
-                        "ordinary same-answer recovery must not duplicate wake");
+                        ChatGptLiteForm.WakePreflightGate.Continue,
+                        "duplicate wake is allowed even after an identical answer");
                     Ensure(ChatGptLiteForm.ChooseWakePreflightGate(false,
                         "own_draft_clicked_unconfirmed", oldHash, "ready", nextHash) ==
                         ChatGptLiteForm.WakePreflightGate.Continue,
@@ -889,16 +937,35 @@ internal static class LiteWebViewIntegrationSelfTest
                         "window.__OPENBROWSER_RESUME_SENDER__.hasAck('" + receipt + "')") ==
                         "false", "no receipt before a real user message");
                     var js = "window.__OPENBROWSER_RESUME_SENDER__?.send(" +
-                        JsonSerializer.Serialize("Napisz ósmy rozdział tej testowej książki.") +
+                        JsonSerializer.Serialize("Napisz Ăłsmy rozdziaĹ‚ tej testowej ksiÄ…ĹĽki.") +
                         "," + JsonSerializer.Serialize(receipt) + ")";
                     phase = "send_test_message";
+                    // Encoded HTML entity survives editors with the wrong Windows codepage.
+                    // The rendered aria-label must match the sender's exact Polish selector.
+                    Ensure(FixtureHtml.Contains("aria-label=\"Wy&#347;lij\"") &&
+                        File.ReadAllText(Path.Combine(AppContext.BaseDirectory,
+                            "LiteResumeSender.js")).Contains("aria-label=\"Wy\u015blij\""),
+                        "fixture Send button label matches the real JS sender selector");
                     var state = await EvaluateAsync(core, js);
                     Ensure(state == "submission_requested", "one submission requested");
                     phase = "wait_and_check_ack";
-                    await Task.Delay(850);
-                    bool ack = await EvaluateAsync(core,
-                        "window.__OPENBROWSER_RESUME_SENDER__?.hasAck('" + receipt + "')") == "true";
+                    // A hidden isolated WebView2 can throttle JS setTimeout(250).
+                    // Observe for a bounded time; never submit the message twice.
+                    bool ack = false;
+                    for (int attempt = 0; attempt < 16 && !ack; attempt++)
+                    {
+                        await Task.Delay(400);
+                        ack = await EvaluateAsync(core,
+                            "window.__OPENBROWSER_RESUME_SENDER__?.hasAck('" + receipt + "')") == "true";
+                    }
                     if (!ack) {
+                        var senderPhase = await EvaluateAsync(core,
+                            "window.__OPENBROWSER_RESUME_SENDER__.phase('" + receipt + "')");
+                        var senderDiagnosis = await EvaluateAsync(core,
+                            "JSON.stringify(window.__OPENBROWSER_RESUME_SENDER__.diagnose())");
+                        LiteEventLog.Write("webview_sender_ack_diagnostic", new {
+                            phase = senderPhase, diagnosis = senderDiagnosis, offline = true
+                        });
                         var bubbles = await EvaluateAsync(core,
                             "document.querySelectorAll('[data-user-message-bubble]').length");
                         var draftLength = await EvaluateAsync(core,
@@ -921,10 +988,55 @@ internal static class LiteWebViewIntegrationSelfTest
                     Ensure(await EvaluateAsync(core,
                         "document.querySelectorAll('[data-user-message-bubble]').length") == "3",
                         "no duplicate bubble after repeated call");
+                    phase = "minimal_numbered_wake_receipt";
+                    const string minimalReceipt = "abcdef0123456789abcdef0123456789";
+                    const string minimalWake = "[OB-WAKE-000208]\nKontynuuj projekt: wykonaj kolejny niezakończony etap z planu, przede wszystkim zmianę w kodzie lub wdrożenie. Nie powtarzaj zaliczonych testów bez konkretnej przyczyny.";
+                    Ensure(await EvaluateAsync(core,
+                        "window.__OPENBROWSER_RESUME_SENDER__.sendDirect(" +
+                        JsonSerializer.Serialize(minimalWake) + "," +
+                        JsonSerializer.Serialize(minimalReceipt) + ",true," +
+                        JsonSerializer.Serialize("/c/11111111-1111-1111-1111-111111111111") + ")") ==
+                        "submission_requested", "minimal two-line OBL wake can be staged");
+                    string beforeEditor = await EvaluateAsync(core,
+                        "(() => {let e=document.querySelector('#prompt-textarea');" +
+                        "let t=e?.value||e?.innerText||e?.textContent||'';" +
+                        "return JSON.stringify({len:t.length,marker:t.includes('[OB-WAKE-000208]')});})()");
+                    await Task.Delay(500);
+                    string afterEditor = await EvaluateAsync(core,
+                        "(() => {let e=document.querySelector('#prompt-textarea');" +
+                        "let t=e?.value||e?.innerText||e?.textContent||'';" +
+                        "let exp=" + JsonSerializer.Serialize(minimalWake) + ";" +
+                        "let a=t.replace(/\\s+/g,' ').trim(),b=exp.replace(/\\s+/g,' ').trim();" +
+                        "let i=0;while(i<Math.min(a.length,b.length)&&a[i]===b[i])i++;" +
+                        "return JSON.stringify({len:t.length,marker:t.includes('[OB-WAKE-000208]')," +
+                        "equal:a===b,normLen:a.length,expectedLen:b.length,firstDiff:i," +
+                        "actualCode:a.charCodeAt(i),expectedCode:b.charCodeAt(i)});})()");
+                    string minimalClick = await EvaluateAsync(core,
+                        "window.__OPENBROWSER_RESUME_SENDER__.submitDirect(" +
+                        JsonSerializer.Serialize(minimalReceipt) + ")");
+                    Ensure(minimalClick is "click_invoked" or "form_submitted",
+                        "minimal wake click actually invoked: " + minimalClick +
+                        "; before=" + beforeEditor + "; after=" + afterEditor);
+                    bool minimalAck = false;
+                    for (int i=0; i<16 && !minimalAck; i++)
+                    {
+                        await Task.Delay(250);
+                        minimalAck = await EvaluateAsync(core,
+                            "window.__OPENBROWSER_RESUME_SENDER__.hasAck(" +
+                            JsonSerializer.Serialize(minimalReceipt) + ")") == "true";
+                    }
+                    Ensure(minimalAck, "internal receipt correlates visible numeric wake marker");
+                    Ensure(await EvaluateAsync(core,
+                        "document.querySelectorAll('[data-user-message-bubble]').length") == "4",
+                        "exactly one minimal numbered wake bubble");
+                    Ensure(await EvaluateAsync(core,
+                        "document.querySelector('main').innerText.includes(" +
+                        JsonSerializer.Serialize("[OB-" + minimalReceipt + "]") + ")") == "false",
+                        "receipt never appears in human-visible wake message");
                     phase = "detect_and_clear_visible_failure";
                     await core.ExecuteScriptAsync("(() => {const n=document.createElement('div'); " +
                         "n.id='qa-error';n.setAttribute('data-chatgpt-selection-message-id','failure');" +
-                        "n.innerText='Nie udało się wczytać tej odpowiedzi';" +
+                        "n.innerText='Failed to load this response';" +
                         "document.querySelector('main').appendChild(n);})()");
                     Ensure(await EvaluateAsync(core,
                         "window.__OPENBROWSER_RESPONSE_SIGNALS__.read().visibleError") ==
@@ -936,6 +1048,146 @@ internal static class LiteWebViewIntegrationSelfTest
                     Ensure(await EvaluateAsync(core,
                         "window.__OPENBROWSER_RESUME_PROBE__.observe().error") == "false",
                         "test fixture error can disappear without automatic retry");
+                    // Archive capture must not label ongoing output FINAL when
+                    // the Stop button is temporarily absent from a real WebView2.
+                    phase = "archive_snapshot_aria_busy_partial_guard";
+                    await core.ExecuteScriptAsync("""
+                        (() => {
+                          const main=document.querySelector('main');
+                          const node=document.createElement('div');
+                          node.setAttribute('data-chatgpt-selection-message-id','qa-streaming');
+                          node.textContent='Streaming durable assistant text for recovery';
+                          main.appendChild(node);
+                        })()
+                        """);
+                    Ensure(await EvaluateAsync(core,
+                        "window.__OPENBROWSER_LITE_SNAPSHOT__.collectForArchive().some(x=>" +
+                        "x.turnId==='qa-streaming' && !x.partial)") == "true",
+                        "a completed assistant is archived FINAL without busy markers");
+                    await core.ExecuteScriptAsync("""
+                        (() => {
+                          const main=document.querySelector('main');
+                          const shortAnswer=document.createElement('div');
+                          shortAnswer.setAttribute('data-chatgpt-selection-message-id','qa-new-short');
+                          shortAnswer.textContent='abc';
+                          main.appendChild(shortAnswer);
+                          main.setAttribute('aria-busy','true');
+                        })()
+                        """);
+                    Ensure(await EvaluateAsync(core,
+                        "window.__OPENBROWSER_LITE_SNAPSHOT__.collectForArchive().length") == "0",
+                        "short newest assistant must not relabel previous FINAL as PARTIAL");
+                    await core.ExecuteScriptAsync("""
+                        (() => {
+                          document.querySelector('[data-chatgpt-selection-message-id="qa-new-short"]')
+                            .textContent='New answer has now accumulated enough text';
+                        })()
+                        """);
+                    Ensure(await EvaluateAsync(core,
+                        "JSON.stringify(window.__OPENBROWSER_LITE_SNAPSHOT__.collectForArchive()" +
+                        ".map(x=>[x.turnId,x.partial]))") ==
+                        "[[\"qa-new-short\",true]]",
+                        "longer newest assistant alone becomes PARTIAL");
+                    await core.ExecuteScriptAsync("""
+                        (() => {
+                          const main=document.querySelector('main');
+                          main.removeAttribute('aria-busy');
+                          main.querySelector('[data-chatgpt-selection-message-id="qa-new-short"]').remove();
+                        })()
+                        """);
+                    await core.ExecuteScriptAsync("""
+                        (() => {
+                          const user=document.createElement('div');
+                          user.id='qa-user-with-selection-id';
+                          user.setAttribute('data-message-author-role','user');
+                          const nested=document.createElement('div');
+                          nested.setAttribute('data-chatgpt-selection-message-id','qa-user-id');
+                          nested.textContent='A user question that must never be archived as assistant';
+                          user.appendChild(nested);
+                          document.querySelector('main').appendChild(user);
+                        })()
+                        """);
+                    Ensure(await EvaluateAsync(core,
+                        "window.__OPENBROWSER_LITE_SNAPSHOT__.collectForArchive().some(x=>" +
+                        "x.turnId==='qa-user-id')") == "false",
+                        "a nested user selection ID is never archived as assistant FINAL");
+                    await core.ExecuteScriptAsync("document.getElementById('qa-user-with-selection-id').remove()");
+                    await core.ExecuteScriptAsync(
+                        "document.querySelector('main').setAttribute('aria-busy','true')");
+                    Ensure(await EvaluateAsync(core,
+                        "window.__OPENBROWSER_LITE_SNAPSHOT__.collectForArchive().some(x=>" +
+                        "x.turnId==='qa-streaming' && x.partial)") == "true",
+                        "aria-busy main yields PARTIAL without Stop button");
+                    await core.ExecuteScriptAsync("""
+                        (() => {
+                          const main=document.querySelector('main');
+                          main.removeAttribute('aria-busy');
+                          main.querySelector('[data-chatgpt-selection-message-id="qa-streaming"]')
+                              .setAttribute('aria-busy','true');
+                        })()
+                        """);
+                    Ensure(await EvaluateAsync(core,
+                        "window.__OPENBROWSER_LITE_SNAPSHOT__.collectForArchive().some(x=>" +
+                        "x.turnId==='qa-streaming' && x.partial)") == "true",
+                        "descendant aria-busy yields PARTIAL without Stop button");
+                    await core.ExecuteScriptAsync("""
+                        (() => {
+                          const main=document.querySelector('main');
+                          main.querySelector('[data-chatgpt-selection-message-id="qa-streaming"]')
+                            .removeAttribute('aria-busy');
+                          const tool=document.createElement('div');
+                          tool.id='qa-active-tool';
+                          tool.setAttribute('data-state','running');
+                          main.appendChild(tool);
+                        })()
+                        """);
+                    Ensure(await EvaluateAsync(core,
+                        "window.__OPENBROWSER_LITE_SNAPSHOT__.collectForArchive().some(x=>" +
+                        "x.turnId==='qa-streaming' && x.partial)") == "true",
+                        "running tool state yields PARTIAL without aria-busy or Stop");
+                    await core.ExecuteScriptAsync("""
+                        (() => {
+                          const tool=document.getElementById('qa-active-tool');
+                          tool.removeAttribute('data-state');
+                          tool.setAttribute('data-testid','qa-tool-running');
+                        })()
+                        """);
+                    Ensure(await EvaluateAsync(core,
+                        "window.__OPENBROWSER_LITE_SNAPSHOT__.collectForArchive().some(x=>" +
+                        "x.turnId==='qa-streaming' && x.partial)") == "true",
+                        "running tool testid yields PARTIAL without Stop");
+                    await core.ExecuteScriptAsync("document.getElementById('qa-active-tool').remove()");
+                    Ensure(await EvaluateAsync(core,
+                        "window.__OPENBROWSER_LITE_SNAPSHOT__.collectForArchive().some(x=>" +
+                        "x.turnId==='qa-streaming' && !x.partial)") == "true",
+                        "completed tool allows FINAL after running marker disappears");
+                    await core.ExecuteScriptAsync("""
+                        (() => {
+                          const main=document.querySelector('main');
+                          const node=main.querySelector('[data-chatgpt-selection-message-id="qa-streaming"]');
+                          node.removeAttribute('aria-busy');
+                          const user=document.createElement('div');
+                          user.id='qa-awaiting-assistant';
+                          user.setAttribute('data-user-message-bubble','');
+                          const nested=document.createElement('div');
+                          nested.setAttribute('data-chatgpt-selection-message-id','qa-user-pending-id');
+                          nested.textContent='Waiting for the next model answer';
+                          user.appendChild(nested);
+                          main.appendChild(user);
+                          main.setAttribute('aria-busy','true');
+                        })()
+                        """);
+                    Ensure(await EvaluateAsync(core,
+                        "window.__OPENBROWSER_LITE_SNAPSHOT__.collectForArchive().length") == "0",
+                        "generating with newest USER never mislabels prior assistant PARTIAL");
+                    await core.ExecuteScriptAsync("""
+                        (() => {
+                          const main=document.querySelector('main');
+                          main.removeAttribute('aria-busy');
+                          document.getElementById('qa-awaiting-assistant').remove();
+                          main.querySelector('[data-chatgpt-selection-message-id="qa-streaming"]').remove();
+                        })()
+                        """);
                     phase = "check_dil_soft_pilot";
                     await core.ExecuteScriptAsync("""
                         (() => {
@@ -974,17 +1226,16 @@ internal static class LiteWebViewIntegrationSelfTest
 
                     // Real offline WebView2 check for the 10-turn bound, with a
                     // mandatory durable-archive acknowledgement before deletion.
-                    phase = "hard_dom_archive_gate_10_turns";
+                    phase = "hard_dom_owner_authorized_10_turns";
                     Ensure(await EvaluateAsync(core,
                         "window.__OPENBROWSER_HARD_PRUNE__.enable(true).enabled") ==
                         "true", "owner can enable 10-turn hard pruning");
                     Ensure(await EvaluateAsync(core,
-                        "window.__OPENBROWSER_HARD_PRUNE__.prune().skipped") ==
-                        "awaiting_archive",
-                        "WebView2 may not prune assistant text without archive proof");
+                        "window.__OPENBROWSER_HARD_PRUNE__.prune().visibleTurns") ==
+                        "10", "owner-authorized hard DOM pruning keeps ten newest");
                     Ensure(await EvaluateAsync(core,
-                        "document.querySelectorAll('main [data-user-message-bubble],main [data-chatgpt-selection-message-id]').length > 10") ==
-                        "true", "unarchived messages remain visible");
+                        "window.__OPENBROWSER_HARD_PRUNE__.status().obsoleteDropped > 0") ==
+                        "true", "obsolete older DOM is discarded without archive ACK");
                     await core.ExecuteScriptAsync("""
                         window.__OPENBROWSER_HARD_PRUNE__.ackSaved(
                           Array.from(document.querySelectorAll(
@@ -1000,6 +1251,61 @@ internal static class LiteWebViewIntegrationSelfTest
                     Ensure(await EvaluateAsync(core,
                         "document.querySelector('#prompt-textarea') !== null") ==
                         "true", "10-turn prune never removes composer");
+
+                    // Real timer, NOT an explicit prune() call: create the 11th
+                    // DIL message and time actual MutationObserver removal.
+                    phase = "hard_dom_11_to_10_under_5s";
+                    await core.ExecuteScriptAsync("""
+                        (() => {
+                          const main=document.querySelector('main');
+                          const item=document.createElement('div');
+                          item.setAttribute('data-chatgpt-selection-message-id',
+                            'qa-automatic-eleventh');
+                          item.textContent='Test automaticznej redukcji 11 do 10.';
+                          window.__OBL_QA_PRUNE_START__=performance.now();
+                          window.__OBL_QA_PRUNE_ELAPSED__=-1;
+                          const watcher=new MutationObserver(() => {
+                            const count=main.querySelectorAll(
+                              '[data-user-message-bubble],[data-chatgpt-selection-message-id]').length;
+                            if (count===10 && window.__OBL_QA_PRUNE_ELAPSED__<0) {
+                              window.__OBL_QA_PRUNE_ELAPSED__=
+                                performance.now()-window.__OBL_QA_PRUNE_START__;
+                              watcher.disconnect();
+                            }
+                          });
+                          watcher.observe(main,{childList:true,subtree:true});
+                          main.appendChild(item);
+                        })();
+                        """);
+                    double elapsedMs=-1;
+                    for (int sample=0;sample<125;sample++)
+                    {
+                        await Task.Delay(50);
+                        string elapsed=await EvaluateAsync(core,
+                            "window.__OBL_QA_PRUNE_ELAPSED__");
+                        if (double.TryParse(elapsed,
+                            System.Globalization.NumberStyles.Float,
+                            System.Globalization.CultureInfo.InvariantCulture,
+                            out double measured) && measured>=0)
+                        { elapsedMs=measured; break; }
+                    }
+                    string pruneResult=await EvaluateAsync(core,
+                        "JSON.stringify(window.__OPENBROWSER_HARD_PRUNE__.status())");
+                    LiteEventLog.Write("hard_dom_auto_prune_qa", new {
+                        elapsedMs, targetMs=5000,
+                        passed=elapsedMs>=0 && elapsedMs<=5000,
+                        offline=true
+                    });
+                    Ensure(elapsedMs>=0 && elapsedMs<=5000,
+                        "automatic 11->10 in actual WebView2 must finish within 5s; elapsedMs=" +
+                        elapsedMs.ToString(System.Globalization.CultureInfo.InvariantCulture) +
+                        "; status=" + pruneResult);
+                    Ensure(await EvaluateAsync(core,
+                        "window.__OPENBROWSER_HARD_PRUNE__.status().reinsertions") ==
+                        "0", "automatic prune did not trigger React reinsertions");
+                    Ensure(await EvaluateAsync(core,
+                        "document.querySelector('#prompt-textarea') !== null") ==
+                        "true", "automatic pruning preserves the active composer");
 
                     // The same WebView2 worker must isolate two different
                     // chat histories after real document navigations.
@@ -1030,7 +1336,7 @@ internal static class LiteWebViewIntegrationSelfTest
                     await core.ExecuteScriptAsync(
                         "document.querySelector('#prompt-textarea').innerText=" +
                         JsonSerializer.Serialize("[OB-" + ownDraftReceipt +
-                            "]\nPrzywróć tylko testową rozmowę B."));
+                            "]\nPrzywrĂłÄ‡ tylko testowÄ… rozmowÄ™ B."));
                     Ensure(await EvaluateAsync(core,
                         "window.__OPENBROWSER_RESUME_SENDER__.submitOwnDraft(" +
                         JsonSerializer.Serialize(new Uri(chatUrl).AbsolutePath) + ")") ==
@@ -1051,7 +1357,7 @@ internal static class LiteWebViewIntegrationSelfTest
                     const string receiptB = "fedcba0987654321fedcba0987654321";
                     const string receiptBlocked = "abcdef0123456789abcdef0123456789";
                     string payloadB = "[OB-" + receiptB +
-                        "]\nKontynuuj wyłącznie drugą testową rozmowę.";
+                        "]\nKontynuuj wyĹ‚Ä…cznie drugÄ… testowÄ… rozmowÄ™.";
                     string directB = "window.__OPENBROWSER_RESUME_SENDER__.sendDirect(" +
                         JsonSerializer.Serialize(payloadB) + "," +
                         JsonSerializer.Serialize(receiptB) + ",true," +
@@ -1124,7 +1430,7 @@ internal static class LiteWebViewIntegrationSelfTest
                     Ensure(await EvaluateAsync(core, directB) == "already_visible",
                         "second chat receipt cannot be sent twice");
                     string blockedPayload = "[OB-" + receiptBlocked +
-                        "]\nNie wysyłaj do rozmowy po zmianie adresu.";
+                        "]\nNie wysyĹ‚aj do rozmowy po zmianie adresu.";
                     string blockedJs = "window.__OPENBROWSER_RESUME_SENDER__.sendDirect(" +
                         JsonSerializer.Serialize(blockedPayload) + "," +
                         JsonSerializer.Serialize(receiptBlocked) + ",true)";
@@ -1168,7 +1474,41 @@ internal static class LiteWebViewIntegrationSelfTest
                         "window.__OPENBROWSER_RESUME_SENDER__.hasAck('" + receiptB + "')") ==
                         "false", "chat B receipt cannot appear inside reloaded chat A");
 
+                    phase = "worker_archive_timeout_retry_gate";
+                    Ensure(ChatGptLiteForm.IsWorkerArchiveRetryAllowed(0),
+                        "worker archive accepts first probe after route change");
+                    Ensure(ChatGptLiteForm.IsWorkerArchiveRetryAllowed(1),
+                        "worker archive allows one retry after stalled script");
+                    Ensure(!ChatGptLiteForm.IsWorkerArchiveRetryAllowed(2),
+                        "worker archive caps two unresolved WebView calls");
+                    Ensure(!ChatGptLiteForm.IsWorkerArchiveRetryAllowed(3),
+                        "worker archive cannot accumulate a third unresolved script");
+                    Ensure(ChatGptLiteForm.IsWorkerArchivePendingForEpoch(
+                        true, 10, 10),
+                        "same-route capture remains exclusively pending");
+                    Ensure(!ChatGptLiteForm.IsWorkerArchivePendingForEpoch(
+                        true, 10, 11),
+                        "old worker route pending cannot block successor chat");
+                    Ensure(!ChatGptLiteForm.IsWorkerArchivePendingForEpoch(
+                        false, 10, 10),
+                        "completed worker archive is not marked pending");
                     phase = "archive_cross_navigation_fence";
+                    var oldCapture = new TaskCompletionSource<string>(
+                        TaskCreationOptions.RunContinuationsAsynchronously).Task;
+                    var newCapture = new TaskCompletionSource<string>(
+                        TaskCreationOptions.RunContinuationsAsynchronously).Task;
+                    Ensure(ChatGptLiteForm.IsArchiveCaptureLeaseCurrent(
+                        10, 10, oldCapture, oldCapture),
+                        "current document owns its timed-out capture lease");
+                    Ensure(!ChatGptLiteForm.IsArchiveCaptureLeaseCurrent(
+                        10, 11, oldCapture, newCapture),
+                        "stale page timeout cannot exhaust successor retry budget");
+                    Ensure(!ChatGptLiteForm.IsArchiveCaptureLeaseCurrent(
+                        10, 10, oldCapture, newCapture),
+                        "stale timeout cannot clear another in-flight capture");
+                    Ensure(!ChatGptLiteForm.IsArchiveCaptureLeaseCurrent(
+                        10, 10, oldCapture, null),
+                        "already reset capture slot cannot be claimed by stale timeout");
                     Ensure(ChatGptLiteForm.IsArchiveResultCurrent(
                         10, 10, new Uri(chatUrl), chatUrl),
                         "archive accepts same chat and same navigation epoch");
@@ -1181,8 +1521,43 @@ internal static class LiteWebViewIntegrationSelfTest
                     Ensure(!ChatGptLiteForm.IsArchiveResultCurrent(
                         10, 10, new Uri(chatUrl), "about:blank"),
                         "archive rejects non-ChatGPT navigation result");
+                    phase = "conversation_load_failed_full_probe";
+                    Ensure(await EvaluateAsync(core,
+                        "(() => { const m = document.querySelector('main'); " +
+                        "m.textContent = 'Failed to load this conversation'; " +
+                        "return m.textContent; })()") ==
+                        "Failed to load this conversation",
+                        "isolated broken-conversation shell is visible in main");
+                    var probeOptions = new JsonSerializerOptions {
+                        PropertyNameCaseInsensitive = true
+                    };
+                    string failedProbeJson = await EvaluateAsync(core,
+                        "JSON.stringify(window.__OPENBROWSER_RESUME_PROBE__.observe())");
+                    var failedProbeA = JsonSerializer.Deserialize<LiteChatWakePreflight.Observation>(
+                        failedProbeJson, probeOptions);
+                    Ensure(failedProbeA is not null && failedProbeA.Error &&
+                        failedProbeA.FailureKind == "conversation_load_failed" &&
+                        failedProbeA.TurnCount == 0 && !failedProbeA.HasDraft,
+                        "real WebView2 JS exposes empty failed-conversation kind");
+                    await Task.Delay(100);
+                    string failedProbeJsonB = await EvaluateAsync(core,
+                        "JSON.stringify(window.__OPENBROWSER_RESUME_PROBE__.observe())");
+                    var failedProbeB = JsonSerializer.Deserialize<LiteChatWakePreflight.Observation>(
+                        failedProbeJsonB, probeOptions);
+                    Ensure(failedProbeB is not null && failedProbeB.Error &&
+                        failedProbeB.FailureKind == "conversation_load_failed" &&
+                        failedProbeB.TurnCount == 0 && !failedProbeB.HasDraft,
+                        "real WebView2 second observation preserves failure kind");
+                    string failedPath = new Uri(chatUrl).AbsolutePath;
+                    Ensure(LiteChatWakePreflight.Eligibility(failedProbeA, failedProbeB,
+                        failedPath, "") == "chatgpt_app_problem",
+                        "real WebView2 failure drives emergency rotation eligibility");
+                    failedProbeB!.HasDraft = true;
+                    Ensure(LiteChatWakePreflight.Eligibility(failedProbeA, failedProbeB,
+                        failedPath, "") == "response_error",
+                        "cross-layer guard prevents rotation when a draft exists");
                     LiteEventLog.Write("webview_integration_selftest", new {
-                        passed = true, checks = 222, offline = true
+                        passed = true, checks = 242, offline = true
                     });
                     code = 0;
                 }
@@ -1232,19 +1607,19 @@ internal static class LiteWebViewIntegrationSelfTest
 <html lang="pl"><head><meta charset="utf-8"><title>testowy</title></head>
 <body>
 <button aria-label="Wybierz model ChatGPT" data-selected-reasoning-effort="high">
-Wysiłek myślowy</button>
+WysiĹ‚ek myĹ›lowy</button>
 <aside aria-busy="true" style="display:none">Background spinner, not a response</aside>
 <main id="conversation">
-<div data-user-message-bubble>Napisz książkę przygodową.</div>
-<div data-chatgpt-selection-message-id="chapter1">Rozdział pierwszy.</div>
-<div data-user-message-bubble>Kontynuuj przygodę.</div>
-<div data-chatgpt-selection-message-id="chapter7">Rozdział 7. Czarny kompas.
-Zostały wątki do rozwinięcia.</div>
+<div data-user-message-bubble>Napisz ksiÄ…ĹĽkÄ™ przygodowÄ….</div>
+<div data-chatgpt-selection-message-id="chapter1">RozdziaĹ‚ pierwszy.</div>
+<div data-user-message-bubble>Kontynuuj przygodÄ™.</div>
+<div data-chatgpt-selection-message-id="chapter7">RozdziaĹ‚ 7. Czarny kompas.
+ZostaĹ‚y wÄ…tki do rozwiniÄ™cia.</div>
 </main>
 <form data-chatgpt-composer>
-<div id="prompt-textarea" contenteditable="true" aria-label="Napisz wiadomość"></div>
-<button type="submit" aria-label="Wyślij">Wyślij</button>
-<button type="button" aria-label="Tryb głosowy">Mów</button>
+<div id="prompt-textarea" contenteditable="true" aria-label="Napisz wiadomoĹ›Ä‡"></div>
+<button type="submit" aria-label="Wy&#347;lij">Wy&#347;lij</button>
+<button type="button" aria-label="Tryb gĹ‚osowy">MĂłw</button>
 </form>
 <script>
 document.querySelector('form[data-chatgpt-composer]').addEventListener('submit',(e)=>{
@@ -1262,3 +1637,4 @@ document.querySelector('form[data-chatgpt-composer]').addEventListener('submit',
 </body></html>
 """;
 }
+

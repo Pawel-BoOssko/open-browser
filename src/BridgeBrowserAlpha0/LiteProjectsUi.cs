@@ -14,9 +14,12 @@ internal sealed partial class ChatGptLiteForm
     };
     private readonly TextBox _projectTitle = new()
     {
-        Width = 130, PlaceholderText = "Nazwa projektu"
+        Width = 116, PlaceholderText = "Nazwa (opc.)"
     };
+    private readonly ToolTip _projectAddHint = new();
     private string? _selectedProjectId;
+    // Keep all bookmarked chats in the registry. Collapse only their UI rows.
+    private readonly HashSet<string> _expandedArchiveProjects = new(StringComparer.Ordinal);
 
     private Control CreateProjectsUi()
     {
@@ -28,26 +31,34 @@ internal sealed partial class ChatGptLiteForm
         container.RowStyles.Add(new RowStyle(SizeType.Absolute, 36));
         container.RowStyles.Add(new RowStyle(SizeType.Absolute, 40));
         container.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        container.RowStyles.Add(new RowStyle(SizeType.Absolute, 105));
+        container.RowStyles.Add(new RowStyle(SizeType.Absolute, 139));
 
-        container.Controls.Add(new Label
+        var dashboardButton = new Button
         {
-            Text = "Projekty", Dock = DockStyle.Fill,
-            Padding = new Padding(12, 8, 0, 0),
+            Text = "Pulpit projektow", Dock = DockStyle.Fill,
             Font = new Font(SystemFonts.DefaultFont, FontStyle.Bold)
-        }, 0, 0);
+        };
+        dashboardButton.Click += (_, _) =>
+            ShowProjectWorkspace();
+        container.Controls.Add(dashboardButton, 0, 0);
 
         var addRow = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = false };
-        var add = new Button { Text = "Dodaj", Width = 65 };
+        var add = new Button { Text = "Dodaj + czat", Width = 104 };
+        _projectAddHint.SetToolTip(add,
+            "Jedno kliknięcie: bez wpisywania nazwy używa tytułu otwartego nieprzypisanego czatu. Wpisana nazwa tworzy projekt także bez czatu.");
         add.Click += (_, _) =>
         {
             try
             {
                 if (_projects is null) return;
-                var project = _projects.AddProject(_projectTitle.Text);
+                var core = _browser.CoreWebView2;
+                var project = _projects.AddProjectWithCurrentChat(
+                    _projectTitle.Text, core?.DocumentTitle, core?.Source);
                 _projectTitle.Clear();
                 _selectedProjectId = project.Id;
-                LiteEventLog.Write("project_added", new { projectCount = _projects.Projects.Count });
+                LiteEventLog.Write("project_added", new {
+                    projectCount = _projects.Projects.Count,
+                    leadAttached = project.Chats.Any(c => c.Role == "lead") });
                 RenderProjects();
             }
             catch (Exception ex)
@@ -80,14 +91,51 @@ internal sealed partial class ChatGptLiteForm
         };
         transfer.Click += (_, _) => TakeOverSelectedProjectChat();
         var handoffActions = new TableLayoutPanel {
-            Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3
+            Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 4
         };
+        handoffActions.RowStyles.Add(new RowStyle(SizeType.Absolute, 34));
         handoffActions.RowStyles.Add(new RowStyle(SizeType.Absolute, 34));
         handoffActions.RowStyles.Add(new RowStyle(SizeType.Absolute, 34));
         handoffActions.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         handoffActions.Controls.Add(pin, 0, 0);
         handoffActions.Controls.Add(handoff, 0, 1);
         handoffActions.Controls.Add(transfer, 0, 2);
+        var history = new Button
+        {
+            Text = "Historia pracy", Dock = DockStyle.Fill, Height = 30
+        };
+        history.Click += (_, _) =>
+        {
+            if (_selectedProjectId is { } id)
+                new LiteWorkHistoryViewer(id).Show(this);
+        };
+        history.Dock = DockStyle.None;
+        history.Width = 108;
+        history.Margin = new Padding(0);
+        var previewHandoff = new Button
+        {
+            Text = "Przekazanie", Width = 125, Height = 30,
+            Margin = new Padding(0)
+        };
+        previewHandoff.Click += (_, _) =>
+        {
+            var project = LiteProjectRegistry.OpenDefault().Projects
+                .FirstOrDefault(p => p.Id == _selectedProjectId);
+            if (project?.Key != "obl")
+            {
+                MessageBox.Show(this, "Ten podglad dotyczy projektu OBL.",
+                    "Open Browser Lite");
+                return;
+            }
+            new LiteHandoffPreviewUi().Show(this);
+        };
+        var previewRow = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Fill, WrapContents = false, Margin = new Padding(0)
+        };
+        previewRow.Controls.Add(history);
+        previewRow.Controls.Add(previewHandoff);
+        handoffActions.Controls.Add(previewRow, 0, 3);
         container.Controls.Add(handoffActions, 0, 3);
 
         try
@@ -151,15 +199,70 @@ internal sealed partial class ChatGptLiteForm
                 };
                 _projectList.Controls.Add(projectButton);
                 if (!selected) continue;
+                var rename = new Button
+                {
+                    Width = 238, Height = 27,
+                    Text = "Zmien nazwe projektu"
+                };
+                rename.Click += (_, _) =>
+                {
+                    using var dialog = new Form
+                    {
+                        Text = "Zmien nazwe projektu",
+                        Width = 420, Height = 160,
+                        MinimumSize = new Size(360, 160),
+                        FormBorderStyle = FormBorderStyle.FixedDialog,
+                        StartPosition = FormStartPosition.CenterParent,
+                        MaximizeBox = false, MinimizeBox = false
+                    };
+                    var input = new TextBox
+                    {
+                        Left = 12, Top = 15, Width = 378,
+                        Text = project.Title, MaxLength = 120,
+                        Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+                    };
+                    var ok = new Button
+                    {
+                        Text = "Zapisz", Left = 217, Top = 57,
+                        Width = 82, DialogResult = DialogResult.OK
+                    };
+                    var cancel = new Button
+                    {
+                        Text = "Anuluj", Left = 308, Top = 57,
+                        Width = 82, DialogResult = DialogResult.Cancel
+                    };
+                    dialog.Controls.AddRange(new Control[] { input, ok, cancel });
+                    dialog.AcceptButton = ok;
+                    dialog.CancelButton = cancel;
+                    if (dialog.ShowDialog(this) != DialogResult.OK) return;
+                    try
+                    {
+                        LiteProjectRegistry.OpenDefault().RenameProject(projectId, input.Text);
+                        LiteEventLog.Write("project_renamed", new { projectKey = project.Key });
+                        RenderProjects();
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show(this, ex.Message, "Open Browser Lite: projekty");
+                    }
+                };
+                _projectList.Controls.Add(rename);
 
-                foreach (var chat in project.Chats)
+                var archiveChats = project.Chats.Where(c => c.Role != "lead")
+                    .OrderByDescending(c => c.AddedUtc)
+                    .ThenBy(c => c.Id, StringComparer.Ordinal)
+                    .ToArray();
+                bool expanded = _expandedArchiveProjects.Contains(project.Id);
+                var visibleChats = project.Chats.Where(c => c.Role == "lead")
+                    .Concat(expanded ? archiveChats : archiveChats.Take(2));
+                foreach (var chat in visibleChats)
                 {
                     var row = new Panel { Width = 238, Height = 54 };
                     var link = new Button
                     {
                         Width = 179, Height = 29, Left = 8, Top = 0,
                         TextAlign = ContentAlignment.MiddleLeft, AutoEllipsis = true,
-                        Text = (chat.Role == "lead" ? "★ " : "Archiwum: ") + chat.Title
+                        Text = (chat.Role == "lead" ? "★ " : "Archiwum OBL: ") + chat.Title
                     };
                     string url = chat.Url;
                     link.Click += async (_, _) =>
@@ -234,6 +337,22 @@ internal sealed partial class ChatGptLiteForm
                     row.Controls.Add(toggle);
                     _projectList.Controls.Add(row);
                 }
+                if (archiveChats.Length > 2)
+                {
+                    var showOlder = new Button
+                    {
+                        Width = 238, Height = 28, AutoEllipsis = true,
+                        Text = expanded ? "Ukryj starsze rozmowy" :
+                            $"Pokaż starsze ({archiveChats.Length - 2})"
+                    };
+                    showOlder.Click += (_, _) =>
+                    {
+                        if (!_expandedArchiveProjects.Add(projectId))
+                            _expandedArchiveProjects.Remove(projectId);
+                        RenderProjects();
+                    };
+                    _projectList.Controls.Add(showOlder);
+                }
             }
         }
         finally
@@ -265,6 +384,7 @@ internal sealed partial class ChatGptLiteForm
 
     private void ToggleProjectLeadWake(string projectId, string chatId)
     {
+        string auditId = LiteUiActionAudit.Requested("project_wake_toggle");
         try
         {
             _projects = LiteProjectRegistry.OpenDefault();
@@ -299,9 +419,15 @@ internal sealed partial class ChatGptLiteForm
                 _projects.Projects, schedules))
                 throw new InvalidOperationException(
                     "Nie wolno włączyć dwóch wykonawców w jednym projekcie");
+            LiteUiActionAudit.Executed(auditId, "project_wake_toggle", "registry_write_invoked");
             LiteChatWakeRegistry.Write(schedules);
+            var stored = LiteChatWakeRegistry.Read().Single(w => w.Url == chat.Url);
+            LiteUiActionAudit.Result(auditId, "project_wake_toggle",
+                stored.Enabled == schedules.First(w => w.Url == chat.Url).Enabled
+                    ? "persisted_verified" : "readback_mismatch",
+                stored.Enabled == schedules.First(w => w.Url == chat.Url).Enabled);
             LiteEventLog.Write("project_lead_wake_toggled", new {
-                enabled = schedules.First(w => w.Url == chat.Url).Enabled,
+                enabled = stored.Enabled,
                 projectChatCount = project.Chats.Count
             });
             RenderProjects();
@@ -309,19 +435,21 @@ internal sealed partial class ChatGptLiteForm
         }
         catch (Exception ex)
         {
+            LiteUiActionAudit.Result(auditId, "project_wake_toggle",
+                "exception_" + ex.GetType().Name, false);
             LiteEventLog.Write("project_lead_wake_toggle_failed",
                 new { errorType = ex.GetType().Name });
             MessageBox.Show(this, ex.Message, "Wybudzenia projektu");
         }
     }
 
-    private void RequestSelectedProjectHandoff()
+    private void RequestSelectedProjectHandoff(string? projectId = null)
     {
         try
         {
             _projects = LiteProjectRegistry.OpenDefault();
             var project = _projects.Projects.FirstOrDefault(p =>
-                p.Id == _selectedProjectId)
+                p.Id == (projectId ?? _selectedProjectId))
                 ?? throw new InvalidOperationException("Wybierz projekt.");
             var lead = project.Chats.SingleOrDefault(c => c.Role == "lead")
                 ?? throw new InvalidOperationException(
@@ -356,13 +484,13 @@ internal sealed partial class ChatGptLiteForm
         }
     }
 
-    private void TakeOverSelectedProjectChat()
+    private void TakeOverSelectedProjectChat(string? projectId = null)
     {
         try
         {
             _projects = LiteProjectRegistry.OpenDefault();
             var project = _projects.Projects.FirstOrDefault(p =>
-                p.Id == _selectedProjectId)
+                p.Id == (projectId ?? _selectedProjectId))
                 ?? throw new InvalidOperationException("Wybierz projekt.");
             var oldLead = project.Chats.SingleOrDefault(c => c.Role == "lead")
                 ?? throw new InvalidOperationException("Brak starego wykonawcy.");
@@ -398,7 +526,9 @@ internal sealed partial class ChatGptLiteForm
                     "Zabronione dwóch aktywnych wykonawców projektu.");
             LiteChatWakeRegistry.Write(plans);
             LiteEventLog.Write("project_handoff_new_lead_armed", new {
-                oldChatArchived = true, newChatScheduled = true
+                oldChatLocalRoleArchived = true,
+                nativeChatGptArchiveStatus = "not_performed",
+                newChatScheduled = true
             });
             RenderProjects();
             UpdateMultiWakeStatus();

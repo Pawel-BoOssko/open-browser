@@ -40,7 +40,24 @@ function AuditEvent([string]$action,$metadata) {
  [IO.File]::AppendAllText((Join-Path $diag 'lite-release-satanamd-events.jsonl'),($obj|ConvertTo-Json -Compress -Depth 5)+[Environment]::NewLine,$utf8)
 }
 function Running {
- return @(Get-CimInstance Win32_Process -Filter "name='BridgeBrowserAlpha0.exe'")
+ $result=@()
+ foreach($p in @(Get-CimInstance Win32_Process -Filter "name='BridgeBrowserAlpha0.exe'")){
+  $path=[string]$p.ExecutablePath
+  # CIM may hide ExecutablePath in a non-elevated session.
+  # Use only the previously pinned PID in session 1 and the release manifest.
+  # This is a manifest-backed fallback, not direct proof of the process image.
+  if([string]::IsNullOrWhiteSpace($path) -and $null -ne $state -and
+     [int]$p.SessionId -eq 1){
+   if($state.phase -eq 'trial' -and [int]$p.ProcessId -eq [int]$state.candidatePid){
+    $path=[string]$state.candidateExe
+   }elseif($state.phase -eq 'queued' -and [int]$p.ProcessId -eq [int]$state.previousPid){
+    # SOURCE 2026-11-02 P0-02: permit queued successor after CIM hides path.
+    $path=[string]$state.previousExe
+   }
+  }
+  $result+= [pscustomobject]@{ProcessId=[int]$p.ProcessId;ExecutablePath=$path}
+ }
+ return $result
 }
 function HadCleanClose([int]$expectedPid,[string]$afterUtc) {
  if($expectedPid -le 0){return $false}
@@ -177,6 +194,20 @@ try{
   if($state){Write-Output ('CANDIDATE='+$state.candidateExe+' PREVIOUS='+$state.previousExe)}
   return
  }
+ # Every new queued release must re-arm the one-shot idle deploy task.
+ # Its previous successful activation disables the task intentionally.
+ function EnableQueuedDeployTask {
+  try {
+   Enable-ScheduledTask -TaskName 'OBL Queue Deploy Idle 20261101' -ErrorAction Stop | Out-Null
+   AuditEvent 'release_queue_task_enabled' @{task='OBL Queue Deploy Idle 20261101'}
+  }catch {
+   AuditEvent 'release_queue_task_enable_failed' @{error=$_.Exception.Message}
+   # NIEAKTUALNE od 2026-11-02: blad rejestracji one-shot nie odrzuca poprawnie
+   # zapisanego QUEUED. Starszy kod konczyl sie tu wyjatkiem (throw).
+   # Istniejacy niezalezny OBL Force Recovery SATANAMD obsluguje queued.
+   Write-Warning ('RELEASE_QUEUED_RECOVERY_TASK_FALLBACK: '+$_.Exception.Message)
+  }
+ }
  if($Mode -eq 'Queue'){
   if(-not $CandidateExe -or -not $ExpectedSha){throw 'Explicit EXE and SHA required'}
   $candidate=[IO.Path]::GetFullPath($CandidateExe)
@@ -185,6 +216,7 @@ try{
   $actual=HashFile $candidate
   if($actual -ne $ExpectedSha.ToLowerInvariant()){throw 'Candidate hash mismatch'}
   if($state -and $state.phase -eq 'queued' -and $state.candidateExe -eq $candidate -and $state.candidateSha -eq $actual){
+   EnableQueuedDeployTask
    Write-Output 'ALREADY_QUEUED';return
   }
   if($state -and $state.phase -notin @('queued','trial','rolled_back','cancelled')){throw 'Unresolved previous release state'}
@@ -212,6 +244,7 @@ try{
   }
   WriteState $s
   AuditEvent 'release_queued' @{previousPid=$s.previousPid;candidateSha=$actual}
+  EnableQueuedDeployTask
   Write-Output 'QUEUED_CURRENT_PROCESS_UNTOUCHED'
   return
  }

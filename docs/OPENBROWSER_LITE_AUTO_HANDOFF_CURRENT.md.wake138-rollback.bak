@@ -1,0 +1,31 @@
+﻿# OPENBROWSER LITE AUTO HANDOFF CURRENT
+Project: obl
+Last wake: 129
+Full wake ID: OBL-000129-A01-185659
+Saved UTC: 2026-10-30T18:06:06.5944808Z
+Saved local SATANAMD: 2026-10-30T19:06:06.5944808+01:00
+Current chat: https://chatgpt.com/c/6ae4d648-73fc-83e9-ab2a-f9c8840ed007
+Host: SATANAMD
+
+## Release
+LIVE: v1.73.71 PID25672 Session1, one GUI process verified. Candidate SOURCE v1.73.72 built and published.
+Staged: D:/Apps/OpenBrowserLite/releases/v1.73.72_20261030/BridgeBrowserAlpha0.exe, SHA256 E0EBEDCC7F08CDE69428DB91FE931481891FB7E684C9DEB0C9F9908A7F62D17D (matches original build and QA binary).
+release-manager-satanamd.ps1 -Mode Queue succeeded; release state phase=queued, UTC18:04:38, previous v1.73.71 PID25672, candidate v1.73.72 PID0, NOT ACTIVATED. Immediate rollback candidate v1.73.71; older v1.73.70 retained.
+STAGING robocopy result: 28 copied, 1 skipped (QA exe), 0 failed, 0 mismatch. Robocopy exit1 means files copied; wrapper marked failed only due nonzero. Staged SHA readback confirmed.
+
+## Beads and checkpoint
+Beads obl-p0-01-02: previous stale START125 without STOP; reviewed checkpoint/artifacts and absence of QA process; START129 succeeded, STOP129 succeeded; task remains in_progress, not DONE.
+obl-p0-08-06 had prior NORMAL_STOP109. Canonical requirements docs/OBL_BACKLOG.md. Latest evidence in docs/OPENBROWSER_LITE_CHECKPOINT.md; AGENTS.md and docs/OPENBROWSER_LITE_OPERATING_RULES_2026-10-25.md apply.
+Wake129 lifecycle chat_started successfully logged; chat_finished to be appended immediately after handoff. Engine visible_ack confirmed for wake129, not fabricated.
+
+## Test evidence
+v1.73.72 earlier headless 4/5 EXE tests PASS; WebView2 integration failed 0x80070578 (also baseline v1.73.71) without interactive HWND.
+Separate interactive user-session scheduled task tested renamed QA apphost OBL-WebView-QA-17372.exe. 2026-10-30 UTC18:02:10 pid27368 webview_integration_selftest passed=true checks=222. Task last result 0. Original EXE and QA EXE SHA equal. Combined candidate tests 5/5 PASS.
+Previous interactive selftest exit1 was caused by launcher stop_outdated killing same-named BridgeBrowserAlpha0.exe PID24036. Renaming QA EXE isolated it. Temporary task removed; subsequent task query exit1 FILE_NOT_FOUND expected.
+
+## Blockers and next action
+DO NOT run scripts/obl-force-deploy-satanamd.ps1 as-is: it contains process-name-based multi-process termination contrary to latest owner instructions. Canonical launcher also loops over all same-name running processes, so inspect/adjust to single exact PID before activating queued release.
+NEXT: safely activate queued v1.73.72 with PID-specific verified stop and interactive session; verify correct hash, responsive GUI, one active GUI, real wake and next chat rotation. On failure rollback to previous v1.73.71; preserve profile and wake schedule. Update startup shortcuts via documented repair script and verify.
+Wake project obl: Enabled=true, Minutes=20, FastMinutes=15, WakeSequence=129, DueUtc=2026-10-30T18:09:21Z as of latest project state read. Do not disable or change schedule. Wake130 must go to independently created NEW lead chat; no manual lead switch.
+Rejected scan attempt: wrapper with nested powershell -NoProfile -ExecutionPolicy Bypass -File obl-beads.ps1 -Action scan was blocked before execution by OpenAI safeguards (no exit code). Direct one-command invocation of same script -Action scan succeeded exit0. For every LC invocation use exactly ONE remote PowerShell command.
+No deployment or restart in wake129, task is still in_progress. All further work must stay on SATANAMD; never use PBOX1 or ChatGPT Tasks.

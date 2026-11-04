@@ -18,6 +18,7 @@ internal static class LiteChatWakePreflight
         public string EditorSource { get; set; } = "none";
         public bool EditorVisible { get; set; }
         public bool Error { get; set; }
+        public string FailureKind { get; set; } = "";
         public bool ComposerReady { get; set; }
         public int TurnCount { get; set; }
         public int AssistantNodeCount { get; set; }
@@ -65,6 +66,24 @@ internal static class LiteChatWakePreflight
         if (first is null || second is null) return "probe_failed";
         if (first.Location != expectedPath || second.Location != expectedPath)
             return "wrong_chat";
+        if (first.FailureKind == "conversation_length_exceeded" &&
+            second.FailureKind == "conversation_length_exceeded")
+            return "conversation_length_exceeded";
+        if (first.FailureKind == "chatgpt_app_problem" &&
+            second.FailureKind == "chatgpt_app_problem")
+            return "chatgpt_app_problem";
+        if (first.FailureKind == "connection_interrupted" &&
+            second.FailureKind == "connection_interrupted")
+            return "connection_interrupted";
+        // Two independent empty conversation-load failures are a terminal
+        // lead-page problem: let the existing emergency successor recover it.
+        // A partial history or owner draft must not trigger rotation.
+        if (first.Error && second.Error &&
+            first.FailureKind == "conversation_load_failed" &&
+            second.FailureKind == "conversation_load_failed" &&
+            first.TurnCount == 0 && second.TurnCount == 0 &&
+            !first.HasDraft && !second.HasDraft)
+            return "chatgpt_app_problem";
         if (second.Error || first.Error) return "response_error";
         if (second.Generating || first.Generating || second.ToolBusy || first.ToolBusy)
             return "generating";
@@ -78,8 +97,9 @@ internal static class LiteChatWakePreflight
         if (!SameConversationHistory(first, second)) return "history_not_stable";
         string hash = Fingerprint(second.Text);
         if (hash != Fingerprint(first.Text)) return "answer_not_stable";
-        if (string.Equals(hash, lastAttemptAnswerHash,
-            StringComparison.OrdinalIgnoreCase)) return "same_answer_already_woken";
+        // Owner 2026-10-29: identical completed assistant answers may trigger
+        // subsequent scheduled wakes. Keep route, draft, error, generation
+        // and stable-history checks; only remove answer-hash deduplication.
         return "ready";
     }
 
@@ -99,9 +119,9 @@ internal static class LiteChatWakePreflight
         var b = new Observation { Location = path, Role = "assistant",
             Text = a.Text, ComposerReady = true, TurnCount = 4, AssistantNodeCount = 2 };
         if (Eligibility(a, b, path, "") != "ready") return 2;
-        if (Eligibility(a, b, path, Fingerprint(a.Text)) != "same_answer_already_woken") return 3;
+        if (Eligibility(a, b, path, Fingerprint(a.Text)) != "ready") return 3;
         if (Eligibility(a, b, path, Fingerprint(a.Text).ToLowerInvariant()) !=
-            "same_answer_already_woken") return 10;
+            "ready") return 10;
         b.TurnCount = 5;
         if (Eligibility(a, b, path, "") != "history_not_stable" ||
             StableAssistantFingerprint(a, b, path) != "") return 11;
@@ -122,6 +142,22 @@ internal static class LiteChatWakePreflight
         if (Eligibility(a, b, path, "") != "answer_not_stable") return 7;
         b.Text = a.Text; b.Role = "user";
         if (Eligibility(a, b, path, "") != "assistant_not_complete") return 8;
+        var failedA = new Observation { Location = path, Error = true,
+            FailureKind = "conversation_load_failed" };
+        var failedB = new Observation { Location = path, Error = true,
+            FailureKind = "conversation_load_failed" };
+        if (Eligibility(failedA, failedB, path, "") != "chatgpt_app_problem") return 17;
+        failedB.HasDraft = true;
+        if (Eligibility(failedA, failedB, path, "") != "response_error") return 18;
+        failedB.HasDraft = false; failedB.TurnCount = 1;
+        if (Eligibility(failedA, failedB, path, "") != "response_error") return 19;
+        a.Error = b.Error = true;
+        a.FailureKind = b.FailureKind = "conversation_length_exceeded";
+        if (Eligibility(a, b, path, "") != "conversation_length_exceeded") return 15;
+        b.FailureKind = "";
+        if (Eligibility(a, b, path, "") != "response_error") return 16;
+        a.Error = b.Error = false;
+        a.FailureKind = "";
         if (!IsCompletion("[BOOK-COMPLETE]") ||
             !IsCompletion("[OPENBROWSER-PLAN-COMPLETE]") ||
             IsCompletion("Asked to say [BOOK-COMPLETE]")) return 9;

@@ -20,8 +20,10 @@ internal static class LiteWakeJournal
     private static readonly HashSet<string> Phases = new(StringComparer.Ordinal)
     {
         "due", "deferred", "attempt_reserved", "definitely_unsent",
-        "submission_attempted", "receipt_confirmed", "receipt_uncertain",
-        "recovery", "schedule_completed", "engine_failure"
+        "submission_attempted", "notes_submitted", "receipt_confirmed", "receipt_uncertain",
+        "recovery", "schedule_completed", "engine_failure",
+        "cross_source_evidence", "receipt_resolved",
+        "rotation_retry_rearmed"
     };
 
     // Bounded, privacy-safe diagnostic codes. Never write exception messages,
@@ -121,6 +123,67 @@ internal static class LiteWakeJournal
             catch (ArgumentException) { }
             try { MakeLine("deferred", result: "https://chatgpt.com/c/secret"); return 4; }
             catch (ArgumentException) { }
+            var now = DateTimeOffset.Parse("2026-10-28T14:00:00Z");
+            if (!ChatGptLiteForm.ShouldRestoreChatView("no_composer",false,
+                    now, now.AddMinutes(-10)) ||
+                !ChatGptLiteForm.ShouldRestoreChatView("response_error",false,
+                    now, DateTimeOffset.MinValue) ||
+                ChatGptLiteForm.ShouldRestoreChatView("generating",false,
+                    now, DateTimeOffset.MinValue) ||
+                ChatGptLiteForm.ShouldRestoreChatView("no_composer",true,
+                    now, DateTimeOffset.MinValue) ||
+                ChatGptLiteForm.ShouldRestoreChatView("no_composer",false,
+                    now, now.AddMinutes(-2))) return 12;            if (ChatGptLiteForm.ShouldRestoreChatView(
+                    "no_composer", false, now, now.AddSeconds(-44),
+                    TimeSpan.FromSeconds(45)) ||
+                !ChatGptLiteForm.ShouldRestoreChatView(
+                    "no_composer", false, now, now.AddSeconds(-45),
+                    TimeSpan.FromSeconds(45)) ||
+                ChatGptLiteForm.ShouldRestoreChatView(
+                    "response_error", true, now, now.AddMinutes(-10),
+                    TimeSpan.FromSeconds(45))) return 17;
+            if (LiteWakeEvidenceReconciler.SelfTest() != 0) return 11;
+            string submitted = MakeLine("notes_submitted", 27,
+                "0123456789abcdef0123456789abcdef", "click_invoked");
+            if (!submitted.Contains("notes_submitted") ||
+                submitted.Contains("receipt_confirmed")) return 13;
+            // Regression: uncertain successor rearm is a first-class journal stage.
+            // A mismatched allowlist silently loses durable evidence, because Write
+            // intentionally catches errors to avoid interrupting the wake.
+            string rearmed = MakeLine("rotation_retry_rearmed", 205,
+                "0123456789abcdef0123456789abcdef", "no_receipt_proof_after_3min");
+            using var rearmedDoc = JsonDocument.Parse(rearmed);
+            if (rearmedDoc.RootElement.GetProperty("stage").GetString() !=
+                    "rotation_retry_rearmed" ||
+                rearmedDoc.RootElement.GetProperty("wakeSequence").GetInt64() != 205 ||
+                rearmedDoc.RootElement.GetProperty("result").GetString() !=
+                    "no_receipt_proof_after_3min") return 18;
+            string label = ChatGptLiteForm.FormatWakeStatus(14,
+                DateTimeOffset.Parse("2026-10-28T15:03:00+00:00"), true);
+            if (!label.Contains("Poprz. #000014") ||
+                !label.Contains("Nast.") ||
+                !ChatGptLiteForm.FormatWakeStatus(0,
+                    DateTimeOffset.UtcNow,true).Contains("Poprz. brak") ||
+                !ChatGptLiteForm.FormatWakeStatus(14,
+                    DateTimeOffset.UtcNow,false).Contains("Pauza")) return 14;
+            if (LiteCheckpointRetention.SelfTest() != 0) return 15;
+            if (ChatGptLiteForm.NotesDebounceMs != 3000 ||
+                !ChatGptLiteForm.SavedNotesStatus("12:00:00")
+                    .Contains("NIE do checkpointu")) return 16;
+            var t = DateTimeOffset.UtcNow;
+            if (!ChatGptLiteForm.IsUnusablePage(false,0,"complete",
+                    t.AddSeconds(-40),t) ||
+                ChatGptLiteForm.IsUnusablePage(false,0,"loading",
+                    t.AddSeconds(-40),t) ||
+                ChatGptLiteForm.IsUnusablePage(true,0,"complete",
+                    t.AddSeconds(-40),t) ||
+                ChatGptLiteForm.IsUnusablePage(false,1,"complete",
+                    t.AddSeconds(-40),t) ||
+                ChatGptLiteForm.IsUnusablePage(false,0,"complete",
+                    t.AddSeconds(-10),t)) return 17;
+            if (ChatGptLiteForm.MayQuarantineTerminal(false,"verification_mismatch") ||
+                ChatGptLiteForm.MayQuarantineTerminal(true,"invalid_chat_url") ||
+                !ChatGptLiteForm.MayQuarantineTerminal(true,"verified")) return 17;
             return 0;
         }
         catch { return 5; }

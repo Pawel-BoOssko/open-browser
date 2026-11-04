@@ -1,0 +1,164 @@
+param([ValidateSet('Watch','SelfTest')][string]$Mode='Watch')
+$ErrorActionPreference='Stop'
+if($env:COMPUTERNAME -ne 'SATANAMD'){throw 'WRONG_HOST'}
+$root='D:\projects\open-browser\scripts'
+$diag=Join-Path $env:LOCALAPPDATA 'OpenBrowser\ChatGPT-Lite\diagnostics'
+$release=Join-Path $diag 'lite-release-satanamd-state.json'
+$wake=Join-Path $diag 'wake-lifecycle.jsonl'
+$preflight=Join-Path $diag 'live-preflight.json'
+$pause=Join-Path $diag 'keepalive-paused.json'
+$watchState=Join-Path $diag 'obl-force-watch-state.json'
+$events=Join-Path $diag 'obl-force-watch.jsonl'
+$force=Join-Path $root 'obl-force-deploy-satanamd.ps1'
+$utf8=[Text.UTF8Encoding]::new($false)
+function Audit([string]$decision,[string]$reason){
+ [IO.File]::AppendAllText($events,([ordered]@{utc=[DateTimeOffset]::UtcNow.ToString('o');decision=$decision;reason=$reason}|ConvertTo-Json -Compress)+[Environment]::NewLine,$utf8)
+}
+function Recover([string]$mode,[string]$reason){
+ $now=[DateTimeOffset]::UtcNow
+ if(Test-Path $watchState){
+  try{$last=Get-Content $watchState -Raw | ConvertFrom-Json
+   if(($now-[DateTimeOffset]::Parse([string]$last.lastRunUtc)).TotalMinutes -lt 10){Audit 'cooldown' $reason;return}
+  }catch{}
+ }
+ $temp=$watchState+'.tmp'
+ [IO.File]::WriteAllText($temp,([ordered]@{lastRunUtc=$now.ToString('o');reason=$reason;mode=$mode}|ConvertTo-Json),$utf8)
+ Move-Item $temp $watchState -Force
+ Audit 'recovery_start' ($reason+' mode='+$mode)
+ & $force -Mode $mode
+ Audit 'recovery_executed' $reason
+}
+if($Mode -eq 'SelfTest'){
+ if(-not(Test-Path $force)){throw 'FORCE_SCRIPT_MISSING'}
+ $state=Get-Content $release -Raw|ConvertFrom-Json
+ if($state.phase -notin @('queued','trial','rolled_back')){throw 'RELEASE_STATE_NOT_RECOVERABLE'}
+ if(-not(Test-Path $wake)){throw 'WAKE_JOURNAL_MISSING'}
+ Write-Output 'OBL_FORCE_WATCH_SELFTEST_OK';return
+}
+try{
+ if(Test-Path $pause){
+  $staleForcePause=$false
+  try{$hold=Get-Content $pause -Raw|ConvertFrom-Json
+   if($hold.owner -eq 'obl-force-deploy' -and ([DateTimeOffset]::UtcNow-[DateTimeOffset]::Parse([string]$hold.utc)).TotalMinutes -gt 3){$staleForcePause=$true}
+  }catch{}
+  if($staleForcePause){Remove-Item -LiteralPath $pause -Force;Audit 'stale_force_pause_cleared' 'older_than_3_minutes'}
+  else{Audit 'skip' 'keepalive_paused';return}
+ }
+ $state=Get-Content $release -Raw -Encoding UTF8|ConvertFrom-Json
+ $ps=@(Get-CimInstance Win32_Process -Filter "Name='BridgeBrowserAlpha0.exe'")
+ if($state.phase -eq 'queued'){
+  if(([DateTimeOffset]::UtcNow-[DateTimeOffset]::Parse([string]$state.queuedAtUtc)).TotalMinutes -ge 1){Recover 'Deploy' 'queued_release_pending';return}
+ }
+ if($ps.Count -eq 0 -and $state.phase -in @('trial','rolled_back')){Recover 'Restart' 'browser_missing';return}
+ if($ps.Count -gt 1){Recover 'Restart' 'multiple_browsers_detected';return}
+ if($ps.Count -eq 0){Audit 'warning' 'browser_missing_unknown_state';return}
+ $p=$ps[0]
+ $stale=$true
+ if(Test-Path $preflight){
+  try{$obs=Get-Content $preflight -Raw|ConvertFrom-Json
+    if($obs.pid -eq $p.ProcessId -and ([DateTimeOffset]::UtcNow-[DateTimeOffset]::Parse([string]$obs.utc)).TotalMinutes -lt 5){$stale=$false}
+  }catch{}
+ }
+ if($stale){
+  $age=999999
+  try{$rp=Get-Process -Id $p.ProcessId -ErrorAction Stop
+   $age=((Get-Date)-$rp.StartTime).TotalSeconds}catch{}
+  if($age -lt 150){Audit 'healthy' 'new_process_webview_startup_grace';return}
+  Recover 'Restart' 'no_fresh_webview_preflight';return
+ }
+ $rows=@(Get-Content $wake -Tail 1800 -Encoding UTF8|ForEach-Object {try{$_|ConvertFrom-Json}catch{}}|Where-Object {$_.actor -eq 'engine'})
+ $ack=@($rows|Where-Object {$_.stage -eq 'receipt_confirmed'}|Select-Object -Last 1)
+ $due=@($rows|Where-Object {$_.stage -eq 'due'}|Select-Object -Last 1)
+ if($ack.Count -eq 0 -or $due.Count -eq 0){Audit 'observe' 'no_wake_history';return}
+ $ackUtc=[DateTimeOffset]::Parse([string]$ack[0].utc)
+ $dueUtc=[DateTimeOffset]::Parse([string]$due[0].utc)
+ $now=[DateTimeOffset]::UtcNow
+ if($dueUtc -le $ackUtc){
+  $health=Join-Path $diag 'obl-wake-health.json'
+  if(Test-Path $health){
+   $hstatus=[ordered]@{schema=1;utc=$now.ToString('o');status='healthy';cause='recovered_after_ack';lastAckUtc=$ackUtc.ToString('o')}
+   $tmp=$health+'.tmp'
+   [IO.File]::WriteAllText($tmp,($hstatus|ConvertTo-Json -Compress),$utf8)
+   Move-Item $tmp $health -Force
+   Audit 'recovered' 'new_engine_ack_after_degraded'
+  }
+  Audit 'healthy' 'no_overdue_wake';return
+ }
+ if(($now-$ackUtc).TotalMinutes -lt 25){Audit 'healthy' 'recent_ack';return}
+ # A clicked wake with uncertain receipt must not be retried or
+ # immediately restarted during model generation. Bound grace to 10 min.
+ $latestAttempt=@($rows|Where-Object {$_.stage -in @('submission_attempted','receipt_uncertain')}|Select-Object -Last 1)
+ if($latestAttempt.Count -gt 0){
+  $attemptUtc=[DateTimeOffset]::Parse([string]$latestAttempt[0].utc)
+  if($attemptUtc -gt $ackUtc -and ($now-$attemptUtc).TotalMinutes -lt 10){
+   Audit 'healthy' 'recent_uncertain_send_grace'
+   return
+  }
+ }
+ $deferred=@($rows|Where-Object {$_.stage -eq 'deferred' -and ([DateTimeOffset]::Parse([string]$_.utc) -gt $ackUtc)})
+ # A backend GET 429 is external rate limiting, not a hung WebView2.
+ # Restarting a healthy browser cannot lift this limit and triggers GETs.
+ $lastDeferred=@($deferred|Select-Object -Last 1)
+ $recent429=@($deferred|Where-Object {
+   $_.result -eq 'backend_http_429' -and
+   ([DateTimeOffset]::Parse([string]$_.utc) -gt $now.AddMinutes(-60))
+ })
+ if($lastDeferred.Count -gt 0 -and $recent429.Count -gt 0 -and
+    $lastDeferred[0].result -in @('backend_http_429','response_error','assistant_not_complete')){
+  $health=Join-Path $diag 'obl-wake-health.json'
+  $status=[ordered]@{
+   schema=1; utc=$now.ToString('o'); status='degraded'
+   cause='backend_http_429'; action='backoff_no_restart'
+   lastAckUtc=$ackUtc.ToString('o')
+   deferredSinceAck=$deferred.Count; recent429=$recent429.Count
+   nextAction='retry_read_after_rate_limit_clears'
+  }
+  $htmp=$health+'.tmp'
+  [IO.File]::WriteAllText($htmp,($status|ConvertTo-Json -Compress),$utf8)
+  Move-Item $htmp $health -Force
+  Audit 'degraded' ('backend_http_429_no_restart deferred_'+$deferred.Count+
+    ' recent429_'+$recent429.Count)
+  return
+ }
+ # A stuck last USER turn is not a crashed process. Restarting cannot
+ # complete a pending ChatGPT answer and must not silently resend a prompt.
+ if($lastDeferred.Count -gt 0 -and $deferred.Count -ge 3 -and
+    $lastDeferred[0].result -in @('assistant_not_complete','same_answer_already_woken')){
+  $health=Join-Path $diag 'obl-wake-health.json'
+  $htmp=$health+'.tmp'
+  $status=[ordered]@{
+   schema=1;utc=$now.ToString('o');status='needs_attention'
+   cause=[string]$lastDeferred[0].result;action='no_restart_no_resend'
+   lastAckUtc=$ackUtc.ToString('o')
+   deferredSinceAck=$deferred.Count
+   nextAction='new_completed_answer_or_verified_handoff_required'
+  }
+  [IO.File]::WriteAllText($htmp,($status|ConvertTo-Json -Compress),$utf8)
+  Move-Item $htmp $health -Force
+  Audit 'needs_attention' (([string]$lastDeferred[0].result)+'_no_restart deferred_'+$deferred.Count)
+  return
+ }
+ # Purely conversational / server-side deferrals are not proof of a broken GUI.
+ # In particular same_answer_already_woken after a confirmed receipt can persist
+ # indefinitely; restarting the healthy WebView every 10 minutes did not help.
+ # Browser absence, stale preflight and multiple instances are handled above.
+ $conversationalReasons=@('same_answer_already_woken','assistant_not_complete',
+   'backend_http_429','response_error','generating','history_not_stable',
+   'answer_not_stable','draft_present','wrong_chat','conversation_length_exceeded')
+ if($lastDeferred.Count -gt 0 -and $deferred.Count -ge 3 -and
+    $lastDeferred[0].result -in $conversationalReasons){
+  $cause=[string]$lastDeferred[0].result
+  $health=Join-Path $diag 'obl-wake-health.json'
+  $htmp=$health+'.tmp'
+  $status=[ordered]@{schema=1;utc=$now.ToString('o');status='needs_attention'
+    cause=$cause;action='no_restart_no_resend';lastAckUtc=$ackUtc.ToString('o')
+    deferredSinceAck=$deferred.Count
+    nextAction='verify_last_reply_or_rotate_lead_using_durable_evidence'}
+  [IO.File]::WriteAllText($htmp,($status|ConvertTo-Json -Compress),$utf8)
+  Move-Item $htmp $health -Force
+  Audit 'needs_attention' ($cause+'_no_restart deferred_'+$deferred.Count)
+  return
+ }
+ if($deferred.Count -ge 3){Recover 'Restart' ('wake_stalled_deferred_'+$deferred.Count);return}
+ Audit 'observe' ('pending_wake_deferred_'+$deferred.Count)
+}catch{Audit 'error' $_.Exception.Message;throw}

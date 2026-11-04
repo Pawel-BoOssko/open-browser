@@ -8,7 +8,7 @@ namespace BridgeBrowserAlpha0;
 internal sealed class LiteHttpReadThrottle
 {
     private long _untilUtcTicks;
-    internal static readonly TimeSpan Cooldown = TimeSpan.FromMinutes(3);
+    internal static readonly TimeSpan Cooldown = TimeSpan.FromMinutes(15);
 
     internal DateTimeOffset Record429(DateTimeOffset now)
     {
@@ -32,7 +32,7 @@ internal sealed class LiteHttpReadThrottle
     internal static bool IsAutomatedRead429(
         int status, string method, string endpoint, string pathKind) =>
         status == 429 && method == "GET" && endpoint == "conversation" &&
-        pathKind is "conversation_list" or "conversation_detail" or "conversation_other";
+        pathKind is "conversation_detail" or "conversation_other";
 
     internal static int SelfTest()
     {
@@ -40,21 +40,21 @@ internal sealed class LiteHttpReadThrottle
         var limit = new LiteHttpReadThrottle();
         if (limit.Remaining(clock) != TimeSpan.Zero) return 1;
         if (!IsAutomatedRead429(429, "GET", "conversation", "conversation_detail") ||
-            !IsAutomatedRead429(429, "GET", "conversation", "conversation_list") ||
+            IsAutomatedRead429(429, "GET", "conversation", "conversation_list") ||
             IsAutomatedRead429(429, "POST", "conversation", "conversation_root") ||
             IsAutomatedRead429(404, "GET", "conversation", "conversation_detail") ||
             IsAutomatedRead429(429, "GET", "other_backend", "other_backend"))
             return 2;
-        if (limit.Record429(clock) != clock.AddMinutes(3) ||
-            limit.Remaining(clock.AddMinutes(1)) != TimeSpan.FromMinutes(2))
+        if (limit.Record429(clock) != clock.AddMinutes(15) ||
+            limit.Remaining(clock.AddMinutes(1)) != TimeSpan.FromMinutes(14))
             return 3;
-        if (limit.Record429(clock.AddMinutes(1)) != clock.AddMinutes(4) ||
-            limit.Remaining(clock.AddMinutes(3)) != TimeSpan.FromMinutes(1))
+        if (limit.Record429(clock.AddMinutes(1)) != clock.AddMinutes(16) ||
+            limit.Remaining(clock.AddMinutes(15)) != TimeSpan.FromMinutes(1))
             return 4;
         // A stale/earlier callback must not shorten the active cooldown.
-        if (limit.Record429(clock.AddMinutes(-1)) != clock.AddMinutes(4))
+        if (limit.Record429(clock.AddMinutes(-1)) != clock.AddMinutes(16))
             return 5;
-        if (limit.Remaining(clock.AddMinutes(4)) != TimeSpan.Zero)
+        if (limit.Remaining(clock.AddMinutes(16)) != TimeSpan.Zero)
             return 6;
         return 0;
     }

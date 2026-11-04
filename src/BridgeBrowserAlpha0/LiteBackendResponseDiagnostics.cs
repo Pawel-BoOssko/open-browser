@@ -5,6 +5,9 @@ namespace BridgeBrowserAlpha0;
 internal sealed partial class ChatGptLiteForm
 {
     private readonly LiteHttpReadThrottle _wakeRead429Throttle = new();
+    // P0 obl-5w3: a worker GET /conversations 429 is evidence of an
+    // unavailable backend, not proof that the existing project lead died.
+    private DateTimeOffset _lastWorkerConversationList429Utc = DateTimeOffset.MinValue;
 
     // Pure request classification: never log user IDs, chat IDs, URL query,
     // request/response bodies, headers, tokens or cookies.
@@ -42,6 +45,20 @@ internal sealed partial class ChatGptLiteForm
             var info = DescribeBackendRequest(e.Request.Uri, e.Request.Method);
             if (info.Endpoint == "ignore") return;
             int status = e.Response.StatusCode;
+            if (info.Endpoint == "conversation" &&
+                info.PathKind == "conversation_list" && info.HttpMethod == "GET" &&
+                webviewRole == "worker")
+            {
+                if (status == 429)
+                    _lastWorkerConversationList429Utc = DateTimeOffset.UtcNow;
+                else if (status is >= 200 and < 300)
+                {
+                    // P0 obl-5w3: a subsequent successful read invalidates
+                    // the older 429 observation. NIEAKTUALNE: hold the old
+                    // 429 classification for 2 minutes despite HTTP 200.
+                    _lastWorkerConversationList429Utc = DateTimeOffset.MinValue;
+                }
+            }
             if (LiteHttpReadThrottle.IsAutomatedRead429(status, info.HttpMethod,
                     info.Endpoint, info.PathKind))
             {

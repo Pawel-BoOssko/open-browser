@@ -4,11 +4,11 @@
   if (!global.document || global.location.hostname !== "chatgpt.com") return;
 
   // Owner requirement: no historical scroll, keep at most ten messages.
-  const config = { enabled: true, threshold: 11, keepNewest: 10, intervalMs: 30000 };
+  const config = { enabled: true, threshold: 11, keepNewest: 10, intervalMs: 4000 };
   const state = {
     removedTotal: 0, lastRemoved: 0, lastCheckedAt: null,
     lastVisibleTurns: 0, skipped: null, failures: 0, domVariant: "unknown",
-    lastPrunedAt: 0, lastTailKey: null, reinsertions: 0
+    lastPrunedAt: 0, lastTailKey: null, reinsertions: 0, obsoleteDropped: 0
   };
   const doc = global.document;
   // Only a successful, durable Markdown write in the host may acknowledge an answer.
@@ -99,7 +99,7 @@
       lastRemoved: state.lastRemoved, lastCheckedAt: state.lastCheckedAt,
       visibleTurns: state.lastVisibleTurns, domVariant: state.domVariant,
       skipped: state.skipped, failures: state.failures,
-      reinsertions: state.reinsertions
+      reinsertions: state.reinsertions, obsoleteDropped: state.obsoleteDropped
     };
   }
 
@@ -139,7 +139,8 @@
     if (!config.enabled) { state.skipped = "disabled"; return status(); }
     const main = doc.querySelector('main,[role="main"]');
     if (!main) { state.skipped = "unhydrated"; return status(); }
-    if (busy(main)) { state.skipped = "busy_or_draft"; return status(); }
+    // Owner policy: prune older turns even during generation or draft.
+    // NEVER touch newest ten message roots, active editor or selected nodes.
     const result = collect(main);
     state.domVariant = result.type;
     if (result.reason) { state.skipped = result.reason; return status(); }
@@ -161,22 +162,20 @@
       }
     } else state.reinsertions = 0;
     let removed = 0;
-    let waitingForArchive = false;
+
     const limit = turns.length - config.keepNewest;
     for (let i = 0; i < limit; i++) {
-      // Never delete an assistant answer not verified on disk.
-      // Preserve chronological sequence if any historic answer is missing.
-      if (!isPersistedOrUser(result, i)) {
-        waitingForArchive = true;
-        break;
-      }
+      // Archive is intentionally capped to 12 turns. Historic ACK from a
+      // prior process must not prevent pruning the oldest DOM forever.
+      // Owner explicitly authorized discarding obsolete turns.
+      const onDisk = isPersistedOrUser(result, i);
       const node = turns[i];
       if (!node || !node.parentNode ||
           (doc.activeElement && node.contains?.(doc.activeElement))) {
         state.failures++;
         continue;
       }
-      try { node.remove(); removed++; }
+      try { node.remove(); removed++; if (!onDisk) state.obsoleteDropped++; }
       catch (_) { state.failures++; }
     }
     state.removedTotal += removed;
@@ -184,8 +183,7 @@
     if (removed > 0) state.lastPrunedAt = now;
     if (removed > 0) state.lastTailKey = result.tailKey;
     state.lastVisibleTurns = turns.length - removed;
-    state.skipped = waitingForArchive ? "awaiting_archive" :
-      removed ? "pruned" : "nothing_removable";
+    state.skipped = removed ? "pruned" : "nothing_removable";
     return status();
   }
 
@@ -196,7 +194,7 @@
     initial = global.setTimeout(() => {
       initial = null;
       if (config.enabled) prune();
-    }, 45000);
+    }, config.intervalMs);
   }
   function enable(value) {
     config.enabled = value === true;

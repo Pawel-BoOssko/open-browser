@@ -9,6 +9,7 @@
   const PENDING_LIFETIME_MS = 15 * 60 * 1000;
   const attempted = new Set();
   const phases = new Map(); // receipt -> latest phase, no message text
+  const wakeMarkers = new Map(); // receipt -> numeric marker; no text in UI
   const directPending = new Map(); // receipt -> current editor/path/payload, briefly
   function rememberAttempt(id) {
     attempted.add(id);
@@ -60,11 +61,12 @@
   // Aria-busy on an unrelated sidebar or hidden streaming placeholder is
   // not evidence that the current composer cannot submit a new message.
   function busy() { return stopVisible(); }
-  function busyReason() {
+  function busyReason(ignoreDraft = false) {
     const el = composer();
     if (!el) return 'missing_composer';
     if (busy()) return 'generating';
-    if (String(el.value || el.innerText || '').trim()) return 'draft_present';
+    // NIEAKTUALNE dla OBL: obecny tekst edytora nie blokuje wybudzenia.
+    if (!ignoreDraft && String(el.value || el.innerText || '').trim()) return 'draft_present';
     return '';
   }
   function diagnose() {
@@ -110,17 +112,38 @@
     if (!legacy) return null;
     return !form || form.contains?.(legacy) ? legacy : null;
   }
-  function hasAck(receiptId) {
-    // Only the current conversation's MAIN user bubbles prove delivery.
-    // Sidebar previews or assistant text quoting a receipt are not an ACK.
-    // Never fall back to document-wide search on a shell without main.
-    if (!/^[a-f0-9]{32}$/.test(receiptId)) return false;
+  function hasUserBubbleMarker(marker, scanAll = false) {
+    // Only the MAIN user bubbles from this chat can prove delivery.
+    // Sidebar previews, assistant quotes and unsent editor drafts cannot.
+    if (typeof marker !== "string" || !/^\[OB-(?:[a-f0-9]{32}|WAKE-\d{6,})\]$/.test(marker))
+      return false;
     const main = w.document.querySelector('main,[role="main"]');
     if (!main) return false;
-    const marker = "[OB-" + receiptId + "]";
-    return Array.from(main.querySelectorAll(
-      '[data-message-author-role="user"],[data-user-message-bubble]'))
-      .slice(-8).some(n => String(n.innerText || n.textContent || "").includes(marker));
+    const userBubbles = Array.from(main.querySelectorAll(
+      '[data-message-author-role="user"],[data-user-message-bubble]'));
+    // P0 obl-5w3 wake368: NIEAKTUALNE for numbered OBL receipts:
+    // search only the last 8 user bubbles. A late DOM reconciliation may
+    // reorder messages; the unique numeric marker can still be present
+    // elsewhere in the current chat. This is read-only, never a resend.
+    const candidates = scanAll ? userBubbles : userBubbles.slice(-8);
+    return candidates.some(n =>
+      String(n.innerText || n.textContent || "").includes(marker));
+  }
+  function hasAck(receiptId, expectedWakeMarker = null) {
+    if (!/^[a-f0-9]{32}$/.test(receiptId)) return false;
+    // P0 obl-5w3 wake345/346: the OBL numeric marker is on-wire, but
+    // receipt -> marker is only per-document JS memory. After SPA reload,
+    // that memory may be lost although the USER bubble is already visible.
+    // NIEAKTUALNE: fall back to an invisible [OB-<receipt>] for OBL ACK.
+    if (expectedWakeMarker !== null) {
+      if (typeof expectedWakeMarker !== "string" ||
+          !/^\[OB-WAKE-\d{6,}\]$/.test(expectedWakeMarker)) return false;
+      const mapped = wakeMarkers.get(receiptId);
+      if (mapped && mapped !== expectedWakeMarker) return false;
+      return hasUserBubbleMarker(expectedWakeMarker, true);
+    }
+    return hasUserBubbleMarker(wakeMarkers.get(receiptId) ||
+      "[OB-" + receiptId + "]");
   }
   function send(text, receiptId) {
     if (!/^\/c\//.test(w.location.pathname) ||
@@ -194,8 +217,21 @@
         typeof text !== "string" || text.length < 16 || text.length > 45000)
       return "invalid";
     expireDirectPending();
+    // Internal correlation: the human-visible OBL wake contains ONLY a number.
+    // A receipt stays inside the engine and this transient per-page mapping.
+    const numbered = text.match(/^\[OB-WAKE-(\d{6})\](?:\n|$)/);
+    if (numbered) {
+      wakeMarkers.set(receiptId, numbered[0].trim());
+      while (wakeMarkers.size > MAX_RECEIPTS)
+        wakeMarkers.delete(wakeMarkers.keys().next().value);
+    }
     if (hasAck(receiptId)) { directPending.delete(receiptId); return "already_visible"; }
     if (attempted.has(receiptId)) return "already_attempted";
+    // Owner rule: a draft cannot indefinitely delay OBL, but it must never
+    // be overwritten. Return a definite no-click outcome: the host rotates
+    // to a clean lead and tries the numbered wake there instead.
+    // NIEAKTUALNE 2026-11-02: busyReason(!!numbered) ignored existing drafts
+    // and sendDirect replaced the user's text in the composer.
     const reason = busyReason();
     if (reason) return "busy_" + reason;
     const el = composer();
@@ -207,6 +243,17 @@
       editor: el, path: targetPath, payload, createdAt: Date.now()
     });
     el.focus();
+    // P0 obl-5w3 wake375: focus can rehydrate/replace the editor or
+    // reveal owner text after the initial busyReason() observation.
+    // Recheck before injection. NIEAKTUALNE: focus authorizes writing.
+    if (w.location.pathname !== targetPath)
+      return forgetDirect(receiptId, "blocked_navigation");
+    if (composer() !== el)
+      return forgetDirect(receiptId, "blocked_editor_replaced");
+    if (busy())
+      return forgetDirect(receiptId, "blocked_generation");
+    if (String(el.value || el.innerText || el.textContent || "").trim())
+      return forgetDirect(receiptId, "blocked_editor_changed");
     try {
       if ("value" in el) {
         const native = Object.getOwnPropertyDescriptor(
@@ -214,14 +261,40 @@
         if (native?.set) native.set.call(el, payload);
         else el.value = payload;
         el.dispatchEvent(new w.Event("input", { bubbles: true }));
-      } else if (!w.document.execCommand?.("insertText", false, payload)) {
-        el.textContent = payload;
+      } else {
+        // A rich editor may retain an empty paragraph/caret after a previous
+        // submit. Explicitly select its contents before insertText so the
+        // payload cannot be appended to a stale selection or phantom node.
+        const range = w.document.createRange();
+        range.selectNodeContents(el);
+        const selection = w.getSelection();
+        selection?.removeAllRanges();
+        selection?.addRange(range);
+        if (!w.document.execCommand?.("insertText", false, payload))
+          el.textContent = payload;
         el.dispatchEvent(new w.Event("input", { bubbles: true }));
       }
     } catch (_) {
-      el.textContent = payload;
-      el.dispatchEvent(new w.Event("input", { bubbles: true }));
+      // NIEAKTUALNE for OBL: injection exception permits blindly
+      // replacing unexpected editor text, possibly an owner draft.
+      const current = el.value || el.innerText || el.textContent || "";
+      if (w.location.pathname !== targetPath)
+        return forgetDirect(receiptId, "blocked_navigation");
+      if (composer() !== el)
+        return forgetDirect(receiptId, "blocked_editor_replaced");
+      if (busy())
+        return forgetDirect(receiptId, "blocked_generation");
+      if (String(current).trim() && !samePayload(current, payload))
+        return forgetDirect(receiptId, "blocked_editor_changed");
+      if (!samePayload(current, payload)) {
+        el.textContent = payload;
+        el.dispatchEvent(new w.Event("input", { bubbles: true }));
+      }
     }
+    // Never report staged success unless the DOM contains the exact payload.
+    // This also fences async changes by editor frameworks during injection.
+    if (!samePayload(el.value || el.innerText || el.textContent, payload))
+      return forgetDirect(receiptId, "blocked_editor_changed");
     rememberPhase(receiptId, "direct_injected");
     const trySubmit = (remaining) => {
       const phaseNow = phases.get(receiptId) || "";
@@ -290,10 +363,12 @@
   // Recover only our own persisted wake draft after a stopped or interrupted
   // send. Never touch ordinary user text. The host still confirms delivery.
   let lastRecoveredReceipt = null;
+  let lastRecoveredMarker = null;
   function recoveredDraftVisible() {
-    return lastRecoveredReceipt !== null && hasAck(lastRecoveredReceipt);
+    return lastRecoveredReceipt !== null &&
+      hasUserBubbleMarker(lastRecoveredMarker);
   }
-  function submitOwnDraft(expectedPath = null) {
+  function submitOwnDraft(expectedPath = null, expectedWakeSequence = null) {
     // Host-selected recovery has the same chat identity fence as sendDirect.
     // Never submit a recovered OB draft from a different SPA conversation.
     if (expectedPath !== null &&
@@ -303,13 +378,27 @@
     const el = composer();
     if (!el) return "missing_composer";
     const value = String(el.value || el.innerText || el.textContent || "");
-    const match = /^\[OB-([a-f0-9]{32})\]\s*\n[\s\S]{16,45000}$/.exec(value);
-    if (!match) return "not_own_draft";
-    lastRecoveredReceipt = match[1];
-    if (hasAck(match[1])) return "already_visible";
+    const legacy = /^\[OB-([a-f0-9]{32})\]\s*\n[\s\S]{16,45000}$/.exec(value);
+    // OBL has a deliberately receipt-free TWO-line on-wire protocol.
+    // Accept only its numbered header and one recognized work-instruction
+    // line; never submit arbitrary text or a user-authored draft.
+    const numbered = /^\[OB-WAKE-(\d{6,})\]\r?\n(?:Kontynuuj projekt: [^\r\n]{32,350}|Zapisz aktualny handoff projektu zgodnie z zasadami\.[^\r\n]{20,350})$/.exec(value);
+    if (!legacy && !numbered) return "not_own_draft";
+    // Host must authorize the exact current scheduled wake number.
+    // A numerically valid header alone cannot authorize a send.
+    if (numbered && (!Number.isSafeInteger(expectedWakeSequence) ||
+        String(expectedWakeSequence).padStart(6, "0") !== numbered[1]))
+      return "not_own_draft";
+    const key = legacy ? legacy[1] : "wake:" + numbered[1];
+    const marker = legacy
+      ? "[OB-" + legacy[1] + "]"
+      : "[OB-WAKE-" + numbered[1] + "]";
+    lastRecoveredReceipt = key;
+    lastRecoveredMarker = marker;
+    if (hasUserBubbleMarker(marker)) return "already_visible";
     // A previous click can lack a visible React ACK. Never click the same
-    // receipt twice inside one SPA document, even if the draft remains.
-    if (attempted.has(match[1])) return "already_attempted";
+    // message twice inside one SPA document, even if its draft remains.
+    if (attempted.has(key)) return "already_attempted";
     const form = el.closest?.("form") ||
       w.document.querySelector("form[data-chatgpt-composer]");
     const btn = sendButton(el) ||
@@ -319,13 +408,13 @@
       return "draft_button_missing";
     // Record the potential click BEFORE invoking UI code: a click handler may
     // throw after dispatch, so even click_failed is delivery-uncertain.
-    rememberAttempt(match[1]);
-    rememberPhase(match[1], "click_invoked");
+    rememberAttempt(key);
+    rememberPhase(key, "click_invoked");
     try {
       btn.click();
       return "click_invoked";
     } catch (_) {
-      rememberPhase(match[1], "click_failed");
+      rememberPhase(key, "click_failed");
       return "click_failed";
     }
   }

@@ -20,11 +20,37 @@ internal static class LiteChatWakeRegistry
         [System.Text.Json.Serialization.JsonIgnore]
         public int EffectiveMinutes => FastMinutes is >= 15 and < 20
             ? FastMinutes : Minutes;
-        // Durable per-conversation wake attempt ID. Incremented before sending.
+        // Project-owned wake number, never reset when a chat is rotated.
         public long WakeSequence { get; set; }
+        // Only the current project lead may attempt the next decade boundary.
+        // Stored in projects.json together with WakeSequence (not in the chat).
+        public string RotationPhase { get; set; } = "";
+        public string RotationReceipt { get; set; } = "";
+        public string RotationSeedSha256 { get; set; } = "";
+        public string RotationServerUrl { get; set; } = "";
         public DateTimeOffset DueUtc { get; set; }
+        // Stable clock phase. DueUtc may move for a brief retry; slot phase must not.
+        public DateTimeOffset SlotAnchorUtc { get; set; }
         public DateTimeOffset LastAttemptUtc { get; set; }
+        public DateTimeOffset RotationStartedUtc { get; set; }
+        public string EmergencyReason { get; set; } = "";
+        public string EmergencyPhase { get; set; } = "";
+        public string EmergencyMessageId { get; set; } = "";
+        public DateTimeOffset EmergencySentUtc { get; set; }
+        public DateTimeOffset EmergencyDeadlineUtc { get; set; }
+        public string EmergencyHandoffPath { get; set; } = "";
+        public int EmergencyOrdinal { get; set; }
+        public DateTimeOffset StallFirstDueUtc { get; set; }
+        public string StallPhase { get; set; } = "";
+        public DateTimeOffset StallResumeUtc { get; set; }
         public string LastState { get; set; } = "armed";
+        // Current project-owned deferral evidence, persisted atomically with
+        // DueUtc. Source is the actual engine decision, never UI inference.
+        public string LastDeferralReason { get; set; } = "";
+        public DateTimeOffset LastDeferralUtc { get; set; }
+        public DateTimeOffset LastDeferralPreviousDueUtc { get; set; }
+        public DateTimeOffset LastDeferralUntilUtc { get; set; }
+        public int ConsecutiveDeferrals { get; set; }
         public string LastAnswerFingerprint { get; set; } = "";
         // Durable dedup for each NEW model-confirmed owner intervention.
         // Never implies an email was actually delivered.
@@ -47,6 +73,10 @@ internal static class LiteChatWakeRegistry
 
     internal static List<Chat> Read()
     {
+        // New canonical source: project-owned schedules and their retired history.
+        // When first launched from a legacy build, migration occurs on Write.
+        var projectWakes = LiteProjectWakeStore.Read();
+        if (projectWakes is not null) return projectWakes;
         if (!File.Exists(PathOnDisk))
         {
             var legacy = LiteDevWakeState.Read();
@@ -90,6 +120,8 @@ internal static class LiteChatWakeRegistry
                 LiteProjectRegistry.OpenDefault().Projects, store.Chats))
                 throw new InvalidDataException(
                     "Multiple project executors or archive wake detected");
+            foreach (var c in store.Chats)
+                if (c.SlotAnchorUtc == default) c.SlotAnchorUtc = c.DueUtc;
             return store.Chats;
         }
         finally { CryptographicOperations.ZeroMemory(clear); }
@@ -126,8 +158,28 @@ internal static class LiteChatWakeRegistry
             File.Move(tmp, PathOnDisk, true);
         }
         finally { if (File.Exists(tmp)) File.Delete(tmp); }
+        // Rollback mirror retained only during transition: projects.json is authoritative.
+        LiteProjectWakeStore.Write(chats);
     }
 
+    // Only an explicit operator command may reset the fingerprint of a
+    // previously CONFIRMED wake response. Never rearm a draft/uncertain send.
+    // This is one fresh owner-authorized wake, with a new sequence and receipt.
+    internal static bool TryOwnerRearmNow(List<Chat> chats, string url,
+        DateTimeOffset now)
+    {
+        url = LiteDevWakeState.NormalizeUrl(url);
+        var entry = chats.SingleOrDefault(c => c.Url == url);
+        if (entry is null || !entry.Enabled ||
+            entry.LastState != "waiting_same_answer_already_woken" ||
+            entry.LastAnswerFingerprint.Length != 64 ||
+            entry.WakeSequence <= 0)
+            return false;
+        entry.LastAnswerFingerprint = "";
+        entry.DueUtc = now.AddSeconds(-1);
+        entry.LastState = "owner_explicit_rearm_due";
+        return true;
+    }
     internal static Chat Configure(List<Chat> chats, string url, int minutes,
         string prompt, DateTimeOffset now)
     {
@@ -141,11 +193,36 @@ internal static class LiteChatWakeRegistry
         entry.FastMinutes = minutes < 20 ? minutes : 0;
         entry.Prompt = prompt;
         entry.DueUtc = now.AddMinutes(minutes);
+        entry.SlotAnchorUtc = entry.DueUtc;
         entry.LastAnswerFingerprint = ""; // explicit reconfiguration permits one fresh wake
         entry.LastState = "armed";
         return entry;
     }
 
+    // Recompute from the original slot, never from the time an attempt completed.
+    // A retry may temporarily move DueUtc; that must not move SlotAnchorUtc.
+    internal static DateTimeOffset NextFixedSlotUtc(DateTimeOffset anchor,
+        DateTimeOffset now, int minutes)
+    {
+        if (minutes is < 15 or > 1440)
+            throw new ArgumentOutOfRangeException(nameof(minutes));
+        anchor = anchor.ToUniversalTime();
+        now = now.ToUniversalTime();
+        if (now < anchor) return anchor;
+        long intervalTicks = TimeSpan.FromMinutes(minutes).Ticks;
+        long elapsed = (now - anchor).Ticks;
+        long steps = checked(elapsed / intervalTicks + 1);
+        return anchor.AddTicks(checked(steps * intervalTicks));
+    }
+    // Fingerprint only the exact note characters included in the wake payload.
+    // No note text goes into diagnostics; edits beyond the 24k cutoff
+    // cannot falsely appear as delivered in the hash.
+    internal static string DeliveredNotesFingerprint(string notes)
+    {
+        if (string.IsNullOrWhiteSpace(notes)) return "";
+        string included = notes.Length <= 24000 ? notes : notes[..24000];
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(included)));
+    }
     internal static string Message(Chat entry, string notes)
     {
         var msg = string.IsNullOrWhiteSpace(entry.Prompt)
@@ -165,8 +242,48 @@ internal static class LiteChatWakeRegistry
     // One stable numeric ID per attempted wake in this chat, even if
     // the renderer later crashes or an ACK is missing. Gaps are intentional.
     internal static string NumberedMessage(Chat entry, string notes, string receipt,
-        DateTimeOffset? wakeStartedUtc = null)
+        DateTimeOffset? wakeStartedUtc = null, bool forceOrdinary = false,
+        bool? registeredOblLead = null)
     {
+        // Production caller supplies authoritative project-lead identity.
+        // Legacy prompt inference is used only by callers without identity
+        // (e.g., isolated self-test); a renamed prompt cannot change protocol.
+        bool isObl = registeredOblLead ??
+            (entry.Prompt.Contains("Open Browser Lite", StringComparison.OrdinalIgnoreCase) ||
+             entry.Prompt.Contains(@"D:\projects\open-browser",
+                 StringComparison.OrdinalIgnoreCase));
+        if (isObl)
+        {
+            string header = "[OB-WAKE-" + entry.WakeSequence.ToString("D6") + "]";
+            // P0 2026-11-02: real registered OBL leads receive the full
+            // owner-approved production instructions, not just a two-line ping.
+            // Legacy inferred-protocol self-test and unrelated projects stay unchanged.
+            if (registeredOblLead == true)
+            {
+                header += "\nOBL, tylko SATANAMD. Odczytaj D:/projects/open-browser/docs/OBL_BACKLOG.md " +
+                    "oraz docs/OPENBROWSER_LITE_CHECKPOINT.md. Wybierz jedno faktycznie " +
+                    "nieukonczone zadanie P0, wykonaj zmiane SOURCE i nie zatrzymuj sie " +
+                    "na samym planie ani diagnostyce.\n" +
+                    "WDROZENIE: po podstawowym sprawdzeniu kompiluj nowa wersje, " +
+                    "zapisz wydanie i SHA, ustaw QUEUED i aktywuj LIVE natychmiast, " +
+                    "takze gdy poprzednia wersja generuje, edytor ma szkic lub worker pracuje. " +
+                    "Nie czekaj na idle i nie uzalezniaj wdrozenia od odroczen. " +
+                    "Sprawdz rzeczywisty LIVE (PID, EXE, SHA i phase), zachowaj rollback.\n" +
+                    "WYBUDZENIA: przy niepewnosci domyslnie probuj nadawac, " +
+                    "bez dodatkowych serii testow. Nie nadpisuj szkicu uzytkownika; " +
+                    "gdy edytor jest zajety, kontynuuj przez nowego leada. " +
+                    "Maksymalnie trzy podstawowe wybudzenia kontrolne na etap.\n" +
+                    "DOKUMENTACJA: zapisz faktyczne zmiany i nastepny krok w checkpoint; " +
+                    "historyczne wymagania oznaczaj NIEAKTUALNE zamiast hurtowo usuwac. " +
+                    "Nie wykonuj recznych commit/push ani dzialan na innych projektach.";
+            }
+            bool handoff = !forceOrdinary && (entry.HandoffPhase == "request_pending" ||
+                LiteChatHandoff.ShouldPrestageSnapshot(entry, true));
+            return header + "\n" + (handoff
+                ? "Zapisz aktualny handoff projektu zgodnie z zasadami. Następnie wykonaj kolejny niezakończony etap z planu."
+                : "Kontynuuj projekt: wykonaj kolejny niezakończony etap z planu, przede wszystkim zmianę w kodzie lub wdrożenie. Nie powtarzaj zaliczonych testów bez konkretnej przyczyny.");
+        }
+        // Legacy format remains for unrelated scheduled chats.
         // The engine owns this timestamp. Never ask the model to guess the
         // actual time of dispatch from its own potentially stale clock.
         DateTimeOffset startedUtc = (wakeStartedUtc ?? DateTimeOffset.UtcNow)
@@ -191,14 +308,54 @@ internal static class LiteChatWakeRegistry
             " (Warszawa). To godzina rozpoczęcia wybudzenia podana przez silnik, " +
             "nie zgaduj innej i nie zastępuj jej czasem generowania odpowiedzi. " +
             "Następnie wykonaj polecenie projektu.\n\n" + body;
-        if (entry.HandoffPhase == "request_pending")
+        // The entire issued ID is diagnostic. CLI accepts only its first
+        // canonical project component (not the receipt or conversation URL).
+        var owner = LiteProjectRegistry.OpenDefault().Projects.FirstOrDefault(p =>
+            p.Chats.Any(c => c.Role == "lead" && c.Url == entry.Url));
+        if (owner is not null && LiteProjectWakeCli.ValidKey(owner.Key))
+        {
+            string completeId = owner.Key.ToUpperInvariant() + "-" +
+                entry.WakeSequence.ToString("D6",CultureInfo.InvariantCulture) +
+                "-A01-" + startedLocal.ToString("HHmmss",CultureInfo.InvariantCulture);
+            body = "PEŁNY IDENTYFIKATOR WYBUDZENIA: " + completeId +
+                "\nKOD PROJEKTU DO CLI: " + owner.Key +
+                "\nCLI: --lite-project-wake status " + owner.Key + "\n" + body;
+        }        if (entry.HandoffPhase == "request_pending")
             body += LiteChatHandoff.RequestText;
         // Project-only work instructions must be selected from the configured
         // schedule, NEVER from user notes attached to an unrelated chat.
-        bool project = entry.Prompt.Contains("Open Browser Lite",
-                StringComparison.OrdinalIgnoreCase) ||
-            entry.Prompt.Contains(@"D:\projects\open-browser",
-                StringComparison.OrdinalIgnoreCase);
+        // The registered project identity has priority over incidental
+        // mentions of OBL in an unrelated chat's prompt.
+        bool project = isObl;
+        if (LiteChatHandoff.ShouldPrestageSnapshot(entry, owner is not null))
+            body += owner!.Key == "obl" ? LiteChatHandoff.PrestageSnapshotText :
+                "\n\nROTACJA PROJEKTU " + owner.Key +
+                ": To wybudzenie konczy sie cyfra 9. Zapisz HANDOFF do " +
+                "D:/OpenBrowserLiteHandoffs/" + owner.Key +
+                "/HANDOFF_CURRENT.md na SATANAMD, NADPISZ ten jeden plik. " +
+                "Naglowek musi podawac kod projektu, numer zwyklego wybudzenia, " +
+                "pelny identyfikator tego wybudzenia, czas zapisu, URL starego " +
+                "czatu i host SATANAMD. Podaj faktyczne zmiany, stan projektu, " +
+                "niedokonczone prace, odpowiedni checkpoint, blokady i nastepny krok. " +
+                "Nie czytaj starych handoffow. " +
+                "Jesli zapis sie nie uda, zapisz blad i kontynuuj. " +
+                "Nastepne wybudzenie konczace sie na 0 nalezy do NOWEGO leada " +
+                "niezaleznie od handoffu. Nie zatrzymuj harmonogramu.";
+        if (project)
+            body += "\n\nBEADS — STAN ZADAN NA SATANAMD: przed wyborem nowej pracy uruchom " +
+                "powershell -NoProfile -ExecutionPolicy Bypass -File " +
+                "D:/projects/open-browser/scripts/obl-beads.ps1 -Action scan. " +
+                "Najpierw sprawdz zadania in_progress: ostatnie STOP oznacza normalne przerwanie, " +
+                "a ostatnie START bez STOP wymaga sprawdzenia checkpointu, artefaktow " +
+                "i czy poprzednia sesja nadal pracuje. Nie zamykaj zadania tylko z powodu czasu. " +
+                "Kontynuuj najpierw niewykonana prace; wybieraj tylko konkretne podzadania, nie epiki. Dopiero gdy jej nie ma, uzyj -Action ready " +
+                "i pobierz nowe zadanie. Przy rozpoczeciu pracy wywolaj " +
+                "obl-beads.ps1 -Action start -Task <ID_ZADANIA> -Wake <PELNE_ID_Z_NAGLOWKA>. " +
+                "Przy zakonczeniu TEGO WYBUDZENIA wywolaj -Action stop z tym samym ID " +
+                "nawet jesli zadanie jest niedokonczone (pozostaje in_progress). " +
+                "Tylko po rzeczywistym wykonaniu i sprawdzeniu zadania wywolaj -Action done -Evidence <WERYFIKOWANY_WYNIK>. " +
+                "Beads zarzadza stanem zadan, a zwykly checkpoint dalej opisuje przebieg wybudzenia.";
+        if (project) body += "\n\nKANONICZNY BACKLOG: D:/projects/open-browser/docs/OBL_BACKLOG.md. Zrodlo wymagan; stan wykonania i nastepne podzadanie przez Beads, bez czytania starych roadmap.";
         if (project)
             body += "\n\nOBOWIĄZKOWY CHECKPOINT [OB-WAKE-" +
                 entry.WakeSequence.ToString("D6") +
@@ -267,16 +424,57 @@ internal static class LiteChatWakeRegistry
     {
         try
         {
+            if (LiteProjectWakeCli.SelfTest() != 0) return 190;
+            if (LiteWakeRotation.SelfTest() != 0) return 177;
+            int projectWakeTest = LiteProjectWakeStore.SelfTest();
+            if (projectWakeTest != 0) return 180 + projectWakeTest;
             if (LiteChatHandoff.SelfTest() != 0) return 167;
             if (LiteHandoffEvidence.SelfTest() != 0) return 168;
             if (LiteHandoffSuccession.SelfTest() != 0) return 169;
-            var now = DateTimeOffset.UtcNow;
+            // Stable clock slots: attempt delays, retry and overrun do not drift.
+            var slot = new DateTimeOffset(2026, 10, 28, 11, 45, 0, TimeSpan.Zero);
+            if (NextFixedSlotUtc(slot, slot.AddMinutes(-2), 15) != slot) return 171;
+            if (NextFixedSlotUtc(slot, slot, 15) != slot.AddMinutes(15)) return 172;
+            if (NextFixedSlotUtc(slot, slot.AddMinutes(47), 15) != slot.AddMinutes(60))
+                return 173;
+            if (NextFixedSlotUtc(slot, slot.AddMinutes(3), 20) != slot.AddMinutes(20))
+                return 174;
+            // Different configured phases do not collide or inherit each other.
+            var otherSlot = slot.AddMinutes(5);
+            if (NextFixedSlotUtc(otherSlot, slot.AddMinutes(47), 15) !=
+                otherSlot.AddMinutes(45)) return 175;            var now = DateTimeOffset.UtcNow;
             string a = "https://chatgpt.com/c/11111111-1111-1111-1111-111111111111";
             string b = "https://chatgpt.com/c/22222222-2222-2222-2222-222222222222";
             var list = new List<Chat>();
             Configure(list, a, 25, "Rozwijaj projekt", now);
             Configure(list, b, 30, "Pisz następny rozdział", now);
-            if (list.Count != 2 || list[0].DueUtc != now.AddMinutes(25) ||
+            // A persistent per-chat note is appended to every wake, not consumed.
+            string testNoteA = "OBL_NOTE_A_20261027";
+            string testNoteB = "OBL_NOTE_B_20261027";
+            for (int testWake = 111; testWake <= 113; testWake++)
+            {
+                list[0].WakeSequence = testWake;
+                string output = NumberedMessage(list[0], testNoteA,
+                    testWake.ToString("D32"), now.AddMinutes(15*(testWake-111)));
+                if (!output.Contains(testNoteA) || output.Contains(testNoteB))
+                    return 151;
+            }
+            // Snapshot hashes are stable across wakes, change with owner edits,
+            // and ignore undispatched characters beyond the 24k limit.
+            if (DeliveredNotesFingerprint(testNoteA).Length != 64 ||
+                DeliveredNotesFingerprint(testNoteA) ==
+                    DeliveredNotesFingerprint(testNoteA+"_EDITED") ||
+                DeliveredNotesFingerprint("") != "" ||
+                DeliveredNotesFingerprint("   ") != "") return 153;
+            string longPrefix = new string('n',24000);
+            if (DeliveredNotesFingerprint(longPrefix+"OLD") !=
+                DeliveredNotesFingerprint(longPrefix+"NEW")) return 154;            string changedNote = NumberedMessage(list[0],
+                testNoteA+"_EDITED", new string('4',32), now.AddMinutes(45));
+            string otherNote = NumberedMessage(list[1], testNoteB,
+                new string('5',32), now.AddMinutes(45));
+            if (!changedNote.Contains(testNoteA+"_EDITED") ||
+                otherNote.Contains(testNoteA) || !otherNote.Contains(testNoteB))
+                return 152;            if (list.Count != 2 || list[0].DueUtc != now.AddMinutes(25) ||
                 list[1].DueUtc != now.AddMinutes(30)) return 2;
             Configure(list, a, 45, "Kontynuuj", now.AddMinutes(1));
             if (list.Count != 2 || list[1].Prompt != "Pisz następny rozdział" ||
@@ -295,39 +493,198 @@ internal static class LiteChatWakeRegistry
             if (!wire.Contains("\"Minutes\":20") ||
                 !wire.Contains("\"FastMinutes\":15") ||
                 wire.Contains("EffectiveMinutes")) return 11;
+            // Registered lead identity takes precedence over prompt text.
+            list[0].Prompt = "Kontynuuj zadanie";
+            list[0].WakeSequence = 26;
+            string promptIndependent = NumberedMessage(list[0], "PRIVATE_NOTES",
+                "0123456789abcdef0123456789abcdef",
+                registeredOblLead: true);
+            if (promptIndependent != "[OB-WAKE-000026]\nKontynuuj projekt: wykonaj kolejny niezakończony etap z planu, przede wszystkim zmianę w kodzie lub wdrożenie. Nie powtarzaj zaliczonych testów bez konkretnej przyczyny.")
+                return 182;
+            list[1].Prompt = "Opisz Open Browser Lite";
+            string unrelated = NumberedMessage(list[1], "PRIVATE_NOTES",
+                "0123456789abcdef0123456789abcdef",
+                registeredOblLead: false);
+            if (unrelated.StartsWith("[OB-WAKE-", StringComparison.Ordinal) ||
+                !unrelated.Contains("PRIVATE_NOTES", StringComparison.Ordinal) ||
+                unrelated.Contains("BEADS", StringComparison.Ordinal))
+                return 183;
+            list[0].Prompt = "Kontynuuj Open Browser Lite";
+            list[1].Prompt = "Pisz następny rozdział";
             list[0].WakeSequence = 27;
             string numbered = NumberedMessage(list[0], "",
                 "0123456789abcdef0123456789abcdef");
-            if (!numbered.Contains("[OB-WAKE-000027]") ||
-                !numbered.Contains("OBOWIĄZKOWY CHECKPOINT") ||
-                !numbered.Contains("OPENBROWSER_LITE_CHECKPOINT.md") ||
-                !numbered.Contains("OPENBROWSER_LITE_WORK_STATUS_2026-10-21.md"))
+            if (numbered != "[OB-WAKE-000027]\nKontynuuj projekt: wykonaj kolejny niezakończony etap z planu, przede wszystkim zmianę w kodzie lub wdrożenie. Nie powtarzaj zaliczonych testów bez konkretnej przyczyny.")
                 return 9;
+            if (numbered.Contains("0123456789abcdef") ||
+                numbered.Contains("WYBUDZENIE URUCHOMIONE") ||
+                numbered.Contains("OBL_BACKLOG") ||
+                numbered.Contains("BEADS") || numbered.Contains("checkpoint")) return 176;
+            list[0].WakeSequence = 29;
+            string handoff = NumberedMessage(list[0], "private notes",
+                "0123456789abcdef0123456789abcdef");
+            if (handoff != "[OB-WAKE-000029]\nZapisz aktualny handoff projektu zgodnie z zasadami. Następnie wykonaj kolejny niezakończony etap z planu.")
+                return 170;
+            string successorAtNine = NumberedMessage(list[0], "",
+                "0123456789abcdef0123456789abcdef",
+                forceOrdinary: true);
+            if (successorAtNine !=
+                "[OB-WAKE-000029]\nKontynuuj projekt: wykonaj kolejny niezakończony etap z planu, przede wszystkim zmianę w kodzie lub wdrożenie. Nie powtarzaj zaliczonych testów bez konkretnej przyczyny.")
+                return 177;
+            list[0].WakeSequence = 30;
+            if (NumberedMessage(list[0], "private notes",
+                "0123456789abcdef0123456789abcdef") !=
+                "[OB-WAKE-000030]\nKontynuuj projekt: wykonaj kolejny niezakończony etap z planu, przede wszystkim zmianę w kodzie lub wdrożenie. Nie powtarzaj zaliczonych testów bez konkretnej przyczyny.")
+                return 12;
             list[1].WakeSequence = 2;
             if (NumberedMessage(list[1], "", "0123456789abcdef0123456789abcdef")
                 .Contains("OBOWIĄZKOWY CHECKPOINT")) return 10;
-            if (NumberedMessage(list[1], "W notatkach padło Open Browser Lite",
-                    "0123456789abcdef0123456789abcdef")
-                .Contains("OBOWIĄZKOWY CHECKPOINT")) return 13;
-            if (!numbered.Contains("wake-lifecycle.jsonl") ||
-                !numbered.Contains("chat_started") ||
-                !numbered.Contains("chat_finished")) return 12;
-            // Every wake carries an engine-generated absolute timestamp that
-            // the model must repeat as the first line of its answer.
+            // OBL output is invariant under engine dispatch time and note edits.
             var summerUtc = new DateTimeOffset(2026, 10, 23, 8, 41, 12, TimeSpan.Zero);
-            var summer = NumberedMessage(list[0], "", "0123456789abcdef0123456789abcdef",
-                summerUtc);
-            if (!summer.Contains("WYBUDZENIE URUCHOMIONE: 2026-10-23 10:41:12 +02:00") ||
-                !summer.Contains("UTC 2026-10-23 08:41:12") ||
-                !summer.Contains("Napisz datę i godzinę.") ||
-                !summer.Contains("DATA I GODZINA WYBUDZENIA: 2026-10-23 10:41:12 +02:00"))
+            var summer = NumberedMessage(list[0], "edited notes",
+                "0123456789abcdef0123456789abcdef", summerUtc);
+            if (summer != "[OB-WAKE-000030]\nKontynuuj projekt: wykonaj kolejny niezakończony etap z planu, przede wszystkim zmianę w kodzie lub wdrożenie. Nie powtarzaj zaliczonych testów bez konkretnej przyczyny.")
                 return 14;
             var winterUtc = new DateTimeOffset(2026, 11, 2, 8, 41, 12, TimeSpan.Zero);
-            var winter = NumberedMessage(list[1], "", "0123456789abcdef0123456789abcdef",
-                winterUtc);
-            if (!winter.Contains("WYBUDZENIE URUCHOMIONE: 2026-11-02 09:41:12 +01:00") ||
-                !winter.Contains("DATA I GODZINA WYBUDZENIA: 2026-11-02 09:41:12 +01:00"))
-                return 15;
+            var winter = NumberedMessage(list[0], "", "0123456789abcdef0123456789abcdef", winterUtc);
+            if (winter != summer) return 15;
+            // A non-generating but unanswered user turn must not stall a
+            // project lead indefinitely. Other chats keep the old policy.
+            if (!ChatGptLiteForm.IsStalledLeadReason("generating", false) ||
+                !ChatGptLiteForm.IsStalledLeadReason("assistant_not_complete", true) ||
+                ChatGptLiteForm.IsStalledLeadReason("assistant_not_complete", false) ||
+                ChatGptLiteForm.IsStalledLeadReason("draft_present", true) ||
+                ChatGptLiteForm.IsStalledLeadReason("wrong_chat", true))
+                return 178;
+            if (ChatGptLiteForm.ShouldHoldUnconfirmedRecoveryForProject(
+                    ChatGptLiteForm.WakePreflightGate.HoldUnconfirmedRecovery, true) ||
+                !ChatGptLiteForm.ShouldHoldUnconfirmedRecoveryForProject(
+                    ChatGptLiteForm.WakePreflightGate.HoldUnconfirmedRecovery, false) ||
+                ChatGptLiteForm.ShouldHoldUnconfirmedRecoveryForProject(
+                    ChatGptLiteForm.WakePreflightGate.Continue, false) ||
+                ChatGptLiteForm.ShouldHoldUnconfirmedRecoveryForProject(
+                    ChatGptLiteForm.WakePreflightGate.Complete, false))
+                return 181;
+            // Alternating renderer failures must exhaust the SAME bounded
+            // recovery budget, even when the reason changes every poll.
+            if (ChatGptLiteForm.NextOblDeferralCount("draft_present", 1,
+                    "no_composer", true) != 2 ||
+                ChatGptLiteForm.NextOblDeferralCount("no_composer", 2,
+                    "probe_failed", true) != 3 ||
+                ChatGptLiteForm.NextOblDeferralCount("probe_failed", 3,
+                    "worker_exception", true) != 4 ||
+                !ChatGptLiteForm.RotateOblAfterRepeatedDeferral("probe_failed", 3) ||
+                !ChatGptLiteForm.RotateOblAfterRepeatedDeferral("worker_exception", 3) ||
+                ChatGptLiteForm.NextOblDeferralCount("no_composer", 2,
+                    "generating", true) != 1 ||
+                ChatGptLiteForm.NextOblDeferralCount("generating", 2,
+                    "draft_present", true) != 1 ||
+                ChatGptLiteForm.NextOblDeferralCount("draft_present", 2,
+                    "no_composer", false) != 1 ||
+                ChatGptLiteForm.RotateOblAfterRepeatedDeferral("backend_http_429", 99))
+                return 184;
+            var unsentFixture = new Chat {
+                Url = a, Enabled = true, WakeSequence = 316,
+                LastAnswerFingerprint = new string('a', 64),
+                DueUtc = now.AddMinutes(15)
+            };
+            if (ChatGptLiteForm.RecordDefinitelyUnsentWake(
+                    unsentFixture, now, "missing_composer", true) ||
+                unsentFixture.ConsecutiveDeferrals != 1 ||
+                unsentFixture.WakeSequence != 316 ||
+                unsentFixture.DueUtc != now.AddMinutes(2) ||
+                unsentFixture.LastAnswerFingerprint.Length != 0)
+                return 185;
+            // The next reserved N does not reset this counter.
+            unsentFixture.WakeSequence++;
+            if (ChatGptLiteForm.RecordDefinitelyUnsentWake(
+                    unsentFixture, now.AddMinutes(2), "blocked_navigation", true) ||
+                unsentFixture.ConsecutiveDeferrals != 2 ||
+                unsentFixture.EmergencyPhase.Length != 0) return 186;
+            unsentFixture.WakeSequence++;
+            if (!ChatGptLiteForm.RecordDefinitelyUnsentWake(
+                    unsentFixture, now.AddMinutes(4), "draft_button_missing", true) ||
+                unsentFixture.ConsecutiveDeferrals != 3 ||
+                unsentFixture.EmergencyPhase != "rotate" ||
+                unsentFixture.WakeSequence != 318 ||
+                unsentFixture.DueUtc >= now.AddMinutes(4) ||
+                !unsentFixture.Enabled) return 187;
+            var anotherProjectUnsent = new Chat {
+                Url = b, Enabled = true, WakeSequence = 40,
+                ConsecutiveDeferrals = 2, DueUtc = now.AddMinutes(15)
+            };
+            if (ChatGptLiteForm.RecordDefinitelyUnsentWake(
+                    anotherProjectUnsent, now, "blocked_navigation", false) ||
+                anotherProjectUnsent.EmergencyPhase.Length != 0 ||
+                anotherProjectUnsent.WakeSequence != 40) return 188;
+            var mixedFailure = new Chat {
+                Url = a, Enabled = true, WakeSequence = 50,
+                LastDeferralReason = "probe_failed", ConsecutiveDeferrals = 2
+            };
+            if (!ChatGptLiteForm.RecordDefinitelyUnsentWake(
+                    mixedFailure, now, "busy_draft_present", true) ||
+                mixedFailure.EmergencyPhase != "rotate") return 189;
+            var generationCameBack = new Chat {
+                Url = a, Enabled = true, WakeSequence = 60,
+                LastDeferralReason = "definitely_unsent",
+                ConsecutiveDeferrals = 2, DueUtc = now.AddMinutes(15)
+            };
+            if (ChatGptLiteForm.RecordDefinitelyUnsentWake(
+                    generationCameBack, now, "busy_generating", true) ||
+                generationCameBack.ConsecutiveDeferrals != 0 ||
+                generationCameBack.EmergencyPhase.Length != 0 ||
+                generationCameBack.LastDeferralReason != "generating" ||
+                generationCameBack.DueUtc != now.AddMinutes(2)) return 191;
+            var uncertainWake = new Chat {
+                Url = a, Enabled = true, WakeSequence = 317,
+                LastAnswerFingerprint = new string('c', 64),
+                DueUtc = now.AddMinutes(15),
+                LastDeferralReason = "probe_failed",
+                ConsecutiveDeferrals = 1
+            };
+            if (ChatGptLiteForm.RecordOblUncertainSend(
+                    uncertainWake, now, false) ||
+                uncertainWake.ConsecutiveDeferrals != 2 ||
+                uncertainWake.LastAnswerFingerprint.Length != 64 ||
+                uncertainWake.DueUtc != now.AddMinutes(2) ||
+                uncertainWake.LastState != "send_result_uncertain" ||
+                uncertainWake.EmergencyPhase.Length != 0)
+                return 192;
+            // Reservation increments N, but must not erase the failure budget.
+            uncertainWake.WakeSequence++;
+            if (!ChatGptLiteForm.RecordOblUncertainSend(
+                    uncertainWake, now.AddMinutes(2), false) ||
+                uncertainWake.ConsecutiveDeferrals != 3 ||
+                uncertainWake.WakeSequence != 318 ||
+                uncertainWake.EmergencyPhase != "rotate" ||
+                uncertainWake.DueUtc >= now.AddMinutes(2))
+                return 193;
+            var clickedWithoutAck = new Chat {
+                Url = a, Enabled = true,
+                LastDeferralReason = "receipt_uncertain",
+                ConsecutiveDeferrals = 2,
+                LastAnswerFingerprint = new string('d', 64)
+            };
+            if (ChatGptLiteForm.RecordOblUncertainSend(
+                    clickedWithoutAck, now, true) ||
+                clickedWithoutAck.ConsecutiveDeferrals != 0 ||
+                clickedWithoutAck.LastDeferralReason != "receipt_uncertain_click" ||
+                clickedWithoutAck.LastState != "receipt_uncertain_after_click" ||
+                clickedWithoutAck.DueUtc != now.AddMinutes(2) ||
+                clickedWithoutAck.LastAnswerFingerprint.Length != 64 ||
+                clickedWithoutAck.EmergencyPhase.Length != 0)
+                return 194;
+            if (ChatGptLiteForm.RotateOblAfterRepeatedDeferral("draft_present", 2) ||
+                !ChatGptLiteForm.RotateOblAfterRepeatedDeferral("draft_present", 3) ||
+                !ChatGptLiteForm.RotateOblAfterRepeatedDeferral("probe_failed", 3) ||
+                !ChatGptLiteForm.RotateOblAfterRepeatedDeferral("forced_wake_composer_not_ready", 3) ||
+                ChatGptLiteForm.RotateOblAfterRepeatedDeferral("generating", 99) ||
+                ChatGptLiteForm.RotateOblAfterRepeatedDeferral("backend_http_429", 99))
+                return 180;
+            if (ChatGptLiteForm.StallRecoveryMinutes(true, 15) != 2 ||
+                ChatGptLiteForm.StallRecoveryMinutes(true, 30) != 2 ||
+                ChatGptLiteForm.StallRecoveryMinutes(false, 15) != 15)
+                return 179;
             if (ChatGptLiteForm.WakeDeferralMinutes("response_error", 2) != 15 ||
                 ChatGptLiteForm.WakeDeferralMinutes("response_error", 20) != 20 ||
                 ChatGptLiteForm.WakeDeferralMinutes("assistant_not_complete", 2) != 15 ||
@@ -371,6 +728,21 @@ internal static class LiteChatWakeRegistry
                 !ChatGptLiteForm.ResponseProbeIsStalled(probeDelayed,
                     probeDelayed.AddSeconds(35)))
                 return 152;
+            // Headless regression for foreground follow after successor promotion.
+            // WebView2 fixture separately verifies GUI; these checks run in Session 0.
+            const string oldLead = "https://chatgpt.com/c/11111111-1111-1111-1111-111111111111";
+            const string newLead = "https://chatgpt.com/c/22222222-2222-2222-2222-222222222222";
+            const string unrelatedLead = "https://chatgpt.com/c/33333333-3333-3333-3333-333333333333";
+            if (!ChatGptLiteForm.ShouldFollowPromotedLeadForeground(
+                    oldLead, oldLead, newLead)) return 211;
+            if (!ChatGptLiteForm.ShouldFollowPromotedLeadForeground(
+                    "https://chatgpt.com/", oldLead, newLead)) return 212;
+            if (ChatGptLiteForm.ShouldFollowPromotedLeadForeground(
+                    unrelatedLead, oldLead, newLead)) return 213;
+            if (ChatGptLiteForm.ShouldFollowPromotedLeadForeground(
+                    "https://example.com/", oldLead, newLead)) return 214;
+            if (ChatGptLiteForm.ShouldFollowPromotedLeadForeground(
+                    oldLead, oldLead, "https://example.com/")) return 215;
             int keepalivePauseTest = LiteKeepalivePause.SelfTest();
             if (keepalivePauseTest != 0) return 155 + keepalivePauseTest;
             int noteIsolation = LiteChatNotes.SelfTest();

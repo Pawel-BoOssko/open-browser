@@ -6,6 +6,7 @@ namespace BridgeBrowserAlpha0;
 internal sealed partial class ChatGptLiteForm
 {
     private readonly System.Windows.Forms.Timer _responseTimer = new() { Interval = 20000 };
+    private bool _responseTimerHandlerInstalled;
     private bool _responseProbePending;
     private Task<string>? _responseProbeTask;
     // Navigation invalidates old in-flight probes without letting their
@@ -17,9 +18,18 @@ internal sealed partial class ChatGptLiteForm
     private bool _lastGenerationSignal;
     private DateTimeOffset? _responseProbeDelayedSinceUtc;
     private DateTimeOffset _lastResponseProbeStalledEventUtc;
+    private DateTimeOffset? _pageUnreadySinceUtc;
 
     // Keep one outstanding renderer request, but do not leave a stale
     // "Generowanie" label indefinitely if that request never completes.
+    // Generic fallback for a completed, empty ChatGPT shell. Do not call
+    // "Gotowe" when an error page uses an unforeseen localized heading.
+    internal static bool IsUnusablePage(bool hasComposer, int turns,
+        string documentReady, DateTimeOffset? sinceUtc,
+        DateTimeOffset nowUtc) =>
+        !hasComposer && turns == 0 && documentReady == "complete" &&
+        sinceUtc.HasValue && nowUtc - sinceUtc.Value >=
+            TimeSpan.FromSeconds(30);
     internal static bool ResponseProbeIsStalled(
         DateTimeOffset? delayedSinceUtc, DateTimeOffset nowUtc) =>
         delayedSinceUtc.HasValue &&
@@ -40,6 +50,7 @@ internal sealed partial class ChatGptLiteForm
         _lastGenerationSignal = false;
         _lastResponseFailure = "";
         _responseFailureSinceUtc = null;
+        _pageUnreadySinceUtc = null;
         if (hadPending)
             LiteEventLog.Write("response_probe_route_invalidated",
                 new { oldPendingIgnored = true, newRouteProbeAllowed = true });
@@ -60,7 +71,13 @@ internal sealed partial class ChatGptLiteForm
 
         core.WebResourceResponseReceived += (_, e) =>
             LogBackendResponseMetadata(e, "foreground");
-        _responseTimer.Tick += async (_, _) => await PollResponseDiagnosticsAsync();
+        // WebView2 may be replaced after BrowserProcessExited. The timer is
+        // owned by the form, not by an individual CoreWebView2 instance.
+        if (!_responseTimerHandlerInstalled)
+        {
+            _responseTimer.Tick += async (_, _) => await PollResponseDiagnosticsAsync();
+            _responseTimerHandlerInstalled = true;
+        }
         LiteEventLog.Write("response_signals_installed");
     }
 
@@ -71,6 +88,67 @@ internal sealed partial class ChatGptLiteForm
         Text = "Open Browser Lite | " + state + " | " + LiteBuildInfo.Display();
     }
 
+    // Terminal ChatGPT conversation length is not a transient response error.
+    // This writes a durable disabled schedule before another wake may send.
+    // Ownership remains unchanged until the independently verified successor
+    // protocol finishes. Repeated observations are idempotent.
+    // Never deactivate a terminal chat until its recovery file is durably
+    // readable. If saving fails, retry disk recovery at the next observation;
+    // a terminal page is still forbidden to send any new wake.
+    internal static bool MayQuarantineTerminal(bool saved, string reason) =>
+        saved && reason == "verified";
+    private void QuarantineTerminalConversation(string url, string evidenceSource)
+    {
+        try
+        {
+            if (!LiteDevWakeState.IsChatUrl(url)) return;
+            var normalized = LiteDevWakeState.NormalizeUrl(url);
+            var entries = LiteChatWakeRegistry.Read();
+            var entry = entries.FirstOrDefault(c => c.Url == normalized && c.Enabled);
+            if (entry is null) return;
+            // Save a self-contained recovery package before disabling this
+            // terminal chat. A UI rollback cannot erase these disk files.
+            var snapshot = LiteTerminalHandoffSnapshot.Save(
+                normalized, entry.WakeSequence, evidenceSource);
+            LiteEventLog.Write("terminal_handoff_disk_snapshot", new {
+                saved = snapshot.Saved, reason = snapshot.Reason,
+                wakeSequence = entry.WakeSequence,
+                source = evidenceSource, hasDurableRecovery = snapshot.Saved
+            });
+            if (!MayQuarantineTerminal(snapshot.Saved, snapshot.Reason))
+            {
+                LiteEventLog.Write("terminal_handoff_quarantine_deferred", new {
+                    source = evidenceSource, reason = snapshot.Reason,
+                    wakeSequence = entry.WakeSequence,
+                    scheduleUnchanged = true, sendAttempted = false
+                });
+                _status.Text = "KONIEC CZATU: zapis handoff nieudany — ponów odzyskiwanie";
+                return;
+            }
+            entry.Enabled = false;
+            entry.LastState = snapshot.Saved
+                ? "conversation_length_terminal_handoff_saved"
+                : "conversation_length_terminal";
+            LiteChatWakeRegistry.Write(entries);
+            LiteWakeJournal.Write("deferred", entry.WakeSequence + 1,
+                result: "conversation_length_terminal");
+            LiteEventLog.Write("conversation_limit_terminal_confirmed", new {
+                source = evidenceSource, engineStopped = true,
+                needsVerifiedSuccessor = true, sendAttempted = false
+            });
+            _status.Text = "KONIEC CZATU: wymagane przejecie przez nastepce";
+            _resumeEnabled = false;
+            _resumeToggle.Text = "Nadzor: WYL.";
+            _resumeStatus.Text = "Koniec rozmowy: sukcesja oczekuje";
+            UpdateMultiWakeStatus();
+        }
+        catch (Exception ex)
+        {
+            LiteEventLog.Write("conversation_limit_quarantine_failed", new {
+                errorType = ex.GetType().Name, source = evidenceSource
+            });
+        }
+    }
     private async Task PollResponseDiagnosticsAsync()
     {
         var core = _browser.CoreWebView2;
@@ -145,6 +223,33 @@ internal sealed partial class ChatGptLiteForm
             if (string.IsNullOrEmpty(inner)) return;
             using var json = JsonDocument.Parse(inner);
             var root = json.RootElement;
+            // Capture only whitelisted button actions, never text or prompts.
+            // isTrusted=false does NOT prove OBL automation; actor stays unknown.
+            if (root.TryGetProperty("uiActions", out var uiActions) &&
+                uiActions.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var item in uiActions.EnumerateArray().Take(32))
+                {
+                    try {
+                        string action = item.GetProperty("action").GetString() ?? "";
+                        if (action is not ("resume" or "retry" or "reload" or
+                            "stop" or "send" or "new_chat")) continue;
+                        bool trusted = item.GetProperty("trusted").GetBoolean();
+                        LiteEventLog.Write("webview_ui_click", new {
+                            action, actor = trusted ? "trusted_user_input" : "script_or_unknown",
+                            trusted, actionId = item.GetProperty("id").GetString(),
+                            clientUtcMs = item.GetProperty("utcMs").GetInt64(),
+                            clientMonotonicMs = item.GetProperty("monotonicMs").GetInt64(),
+                            routeEpoch = _foregroundWakeRouteEpoch,
+                            outcome = "click_observed_effect_not_proven"
+                        });
+                    }
+                    catch (Exception ex) {
+                        LiteEventLog.Write("webview_ui_click_parse_failed", new {
+                            errorType = ex.GetType().Name });
+                    }
+                }
+            }
             string failure = root.GetProperty("visibleError").ValueKind == JsonValueKind.String
                 ? root.GetProperty("visibleError").GetString() ?? "" : "";
             bool generating = root.GetProperty("generatingSignal").GetBoolean();
@@ -155,6 +260,20 @@ internal sealed partial class ChatGptLiteForm
                     ? hidden.GetInt32() : 0;
             int activeTurns = root.GetProperty("turnCount").GetInt32();
             int activeAssistants = root.GetProperty("assistantCount").GetInt32();
+            bool composer = root.GetProperty("hasComposer").GetBoolean();
+            string readyState = root.GetProperty("documentReady").GetString() ?? "";
+            bool emptyShell = !composer && activeTurns == 0 &&
+                readyState == "complete";
+            if (emptyShell)
+                _pageUnreadySinceUtc ??= DateTimeOffset.UtcNow;
+            else
+                _pageUnreadySinceUtc = null;
+            if (failure.Length == 0 && IsUnusablePage(composer,
+                activeTurns, readyState, _pageUnreadySinceUtc,
+                DateTimeOffset.UtcNow))
+                failure = "chat_page_unavailable";
+            if (failure is "chatgpt_app_problem" or "connection_interrupted")
+                MarkWakeEmergency(core.Source, failure, "foreground_probe");
             string domVariant = root.TryGetProperty("domVariant", out var variant)
                 ? variant.GetString() ?? "unknown" : "unknown";
             bool hasDraft = root.TryGetProperty("hasDraft", out var draftSignal) &&
@@ -177,7 +296,14 @@ internal sealed partial class ChatGptLiteForm
                 _resumeToggle.Text = "Nadzór: WYŁ.";
                 _resumeStatus.Text = "Nadzór: blokada po błędzie dostarczenia";
             }
-            if (failure != _lastResponseFailure)
+            if (failure == "conversation_length_exceeded" &&
+                _lastResponseFailure == failure &&
+                _responseFailureSinceUtc.HasValue &&
+                DateTimeOffset.UtcNow - _responseFailureSinceUtc.Value >= TimeSpan.FromSeconds(18))
+            {
+                MarkWakeEmergency(core.Source,
+                    "conversation_length_exceeded", "foreground_probe");
+            }            if (failure != _lastResponseFailure)
             {
                 var assessment = LiteDeliveryEvidence.Classify(new(
                     RendererResponsive: true, JavaScriptResponsive: true,

@@ -8,7 +8,7 @@
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <AssemblyName>BridgeBrowserAlpha0</AssemblyName>
     <RootNamespace>BridgeBrowserAlpha0</RootNamespace>
-    <Version>1.72.99</Version>
+    <Version>1.73.266</Version>
     <ApplicationIcon>OpenBrowserLite.ico</ApplicationIcon>
     <LiteBuildUtcStamp>$([System.DateTimeOffset]::UtcNow.ToString('yyyyMMddTHHmmssZ'))</LiteBuildUtcStamp>
     <InformationalVersion>$(Version)+build.$(LiteBuildUtcStamp)</InformationalVersion>
@@ -35,8 +35,40 @@
     <None Update="LiteResumeProbe.js">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <None Update="LiteSuccessorAssistantAnswer.js">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </None>
+    <None Update="LiteSuccessorSeedDirect.js">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </None>
     <None Update="LiteResumeSender.js">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="LiteChatGptNativeTitleRead.js">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </None>
+    <None Update="LiteRetiredLeadCleanup.js">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </None>
+    <None Update="LiteChatGptNativeRename.js">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </None>
+    <None Update="LiteChatGptNativeArchive.js">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </None>
+    <None Update="LiteChatGptSidebarArchiveAudit.js">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </None>
+    <None Update="LiteChatGptNativeArchiveVisibility.js">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
     </None>
     <None Update="LiteHighGuard.js">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
@@ -61,3 +93,4 @@
     </Content>
   </ItemGroup>
 </Project>
+

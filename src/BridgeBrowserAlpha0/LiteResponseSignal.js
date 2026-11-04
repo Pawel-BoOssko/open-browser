@@ -3,13 +3,105 @@
   if (global.__OPENBROWSER_RESPONSE_SIGNALS__) return;
   if (!global.document || global.location.hostname !== "chatgpt.com") return;
 
+  // Bounded, content-free click journal. isTrusted=false is NOT proof of OBL.
+  const clickQueue = [];
+  let clickSeq = 0;
+  const clickKinds = [
+    ["resume", /^(?:wzn[oó]w|kontynuuj|resume|continue)$/i],
+    ["retry", /^(?:spr[oó]buj ponownie|pon[oó]w|retry|try again)$/i],
+    ["reload", /^(?:od[sś]wie[zż]|prze[lł]aduj|reload|refresh)$/i],
+    ["stop", /^(?:zatrzymaj|przerwij|stop|stop generating)$/i],
+    ["send", /^(?:wy[sś]lij|send|send message)$/i],
+    ["new_chat", /^(?:rozpocznij nowy czat|nowy czat|start (?:a )?new chat|new chat)$/i]
+  ];
+  if (typeof global.document.addEventListener === "function")
+    global.document.addEventListener("click", event => {
+    const button = event.target?.closest?.('button,[role="button"],a');
+    if (!button || button.closest?.('aside,nav,[role="navigation"]')) return;
+    const label = String(button.getAttribute?.('aria-label') ||
+      button.innerText || button.textContent || '').trim().slice(0, 90);
+    const kind = clickKinds.find(item => item[1].test(label));
+    if (!kind) return;
+    clickQueue.push({
+      id: String(Date.now()) + '-' + (++clickSeq),
+      action: kind[0], trusted: event.isTrusted === true,
+      utcMs: Date.now(), monotonicMs: Math.round(global.performance.now())
+    });
+    if (clickQueue.length > 64) clickQueue.shift();
+  }, true);
+
   const phrases = [
     ["response_load_failed", /nie udało się wczytać tej odpowiedzi|couldn.t load this response|failed to load (this |the )?response/i],
     ["delivery_timeout", /przekroczono limit czasu dostarczenia|message delivery timed out|delivery time limit exceeded/i],
     ["reasoning_interrupted", /przerwano rozumowanie|reasoning interrupted/i]
   ];
-  function inspectNode(node) {
+  // A terminal banner is recognized only with its own "start new chat"
+  // control. User quotations and sidebar previews are never sufficient.
+  const lengthLimitPhrase = /osi[aą]gni[eę]to maksymaln[aą] d[lł]ugo[sś][cć] (?:dla )?tej konwersacji|(?:you['’]?ve|you have) reached the maximum length for this conversation|(?:this|the) conversation (?:has )?reached (?:its|the) (?:maximum )?length limit/i;
+  const extraLengthPhrase = /(?:przekroczono|osi[aą]gni[eę]to|osi[aą]gni[eę]ty) (?:maksymaln[aą] |dozwolon[aą] )?d[lł]ugo[sś][cć] (?:tego |tej )?(?:czatu|rozmowy|konwersacji)|(?:ten|ta) (?:czat|rozmowa) (?:jest |sta[lł]a si[eę] )?za d[lł]ug[ai]|conversation (?:is |has become )?too long|maximum conversation length reached/i;
+  const newChatControl = /^(?:rozpocznij nowy czat|utw[oó]rz nowy czat|start (?:a )?new chat|create (?:a )?new chat)$/i;
+  function conversationLengthPanel(main) {
+    if (!main) return false;
+    const controls = main.querySelectorAll('button,a,[role="button"]');
+    for (const btn of Array.from(controls).slice(-100)) {
+      if (!isVisible(btn) || btn.closest?.(
+          '[data-message-author-role],[data-user-message-bubble],aside,nav')) continue;
+      const label = String(btn.innerText || btn.textContent || '').trim();
+      if (!newChatControl.test(label)) continue;
+      let panel = btn.parentElement;
+      for (let depth = 0; panel && panel !== main && depth < 5;
+           depth++, panel = panel.parentElement) {
+        if (panel.closest?.('[data-message-author-role="user"],[data-user-message-bubble]')) break;
+        const content = String(panel.innerText || panel.textContent || '').trim();
+        if (content.length <= 750 && (lengthLimitPhrase.test(content) || extraLengthPhrase.test(content)) &&
+            isVisible(panel)) return true;
+      }
+    }
+    return false;
+  }
+  // The localized ChatGPT crash page is not an assistant error bubble.
+  // Require the error heading and a visible Retry control, with no turns.
+  function fullPageAppFailure(doc, turnCount) {
+    if (turnCount !== 0) return false;
+    const buttons = Array.from(doc.querySelectorAll('button,[role="button"]'));
+    const retry = buttons.some(n => isVisible(n) &&
+      /^(?:spr[oó]buj ponownie|try again|retry)$|^(?:od[sś]wie[zż]|reload)$/i.test(
+        String(n.textContent || n.innerText || '').trim()));
+    if (!retry) return false;
+    const pageProblem = /chatgpt napotka[łl] problem|chatgpt (?:ran into|encountered) (?:a |an )?(?:problem|error)/i;
+    const headings = Array.from(doc.querySelectorAll('h1,h2,h3,[role="heading"]'));
+    if (headings.some(n => isVisible(n) &&
+        pageProblem.test(String(n.textContent || '').trim()))) return true;
+    // ChatGPT DIL often renders the title as a plain div, not h1.
+    // Require a short, visible FULL-PAGE body and Retry; not quoted messages.
+    const body = String(doc.body?.innerText || '').trim();
+    return body.length > 0 && body.length < 1600 && pageProblem.test(body);
+  }
+  function terminalLengthNotice(doc) {
+    const nodes = Array.from(doc.querySelectorAll(
+      '[role="alert"],[role="status"],[aria-live],p,span')).slice(-350);
+    return nodes.some(n => {
+      if (!isVisible(n) || n.closest?.(
+        '[data-message-author-role],[data-user-message-bubble],[data-chatgpt-selection-message-id],textarea,[contenteditable="true"],aside,nav')) return false;
+      const text = String(n.innerText || n.textContent || '').trim();
+      return text.length > 0 && text.length <= 300 &&
+        (lengthLimitPhrase.test(text) || extraLengthPhrase.test(text));
+    });
+  }  function connectionFailure(doc) {
+    // Banner/toast outside message bubbles; never infer from the user's text.
+    const pattern = /(?:po[lł][aą]czenie zosta[lł]o przerwane|connection (?:was |has been )?interrupted|connection (?:was |has been )?lost|utracono po[lł][aą]czenie)/i;
+    const nodes = Array.from(doc.querySelectorAll(
+      '[role="status"],[role="alert"],[aria-live],p,span')).slice(-350);
+    return nodes.some(n => {
+      if (!isVisible(n) || n.closest?.(
+        '[data-message-author-role],[data-user-message-bubble],[data-chatgpt-selection-message-id],textarea,[contenteditable="true"],aside,nav')) return false;
+      const content = String(n.innerText || n.textContent || '').trim();
+      return content.length > 0 && content.length <= 180 &&
+        pattern.test(content);
+    });
+  }  function inspectNode(node) {
     const content = (node && node.textContent || "").slice(-900);
+    if (lengthLimitPhrase.test(content) || extraLengthPhrase.test(content)) return "conversation_length_exceeded";
     for (const [kind, pattern] of phrases) if (pattern.test(content)) return kind;
     return null;
   }
@@ -38,8 +130,12 @@
     const turnCount = modern ? dilTurns.length : legacyTurns.length;
     const assistants = main?.querySelectorAll(
       '[data-message-author-role="assistant"],[data-chatgpt-selection-message-id]') || [];
-    let error = null;
-    let errorSource = 'none';
+    let error = conversationLengthPanel(main) ? 'conversation_length_exceeded' : null;
+    let errorSource = error ? 'terminal_new_chat_panel' : 'none';
+    if (!error && fullPageAppFailure(doc, turnCount)) {
+      error = 'chatgpt_app_problem';
+      errorSource = 'full_page_app_error';
+    }
     let ignoredHiddenAlerts = 0;
     // Keep *visible* global error toasts, but ignore hidden stale alerts
     // and any alerts inside sidebar/navigation.
@@ -48,12 +144,22 @@
       .filter(node => !node.closest?.(
         'aside,nav,[role="navigation"],[data-testid="sidebar"]'));
     for (const node of alerts.slice(-35)) {
+      if (error === 'conversation_length_exceeded') break;
       if (!isVisible(node)) {
         if (inspectNode(node)) ignoredHiddenAlerts++;
         continue;
       }
-      error = inspectNode(node);
-      if (error) { errorSource = 'visible_alert'; break; }
+      const alertError = inspectNode(node);
+      if (alertError && !error) {
+        error = alertError; errorSource = 'visible_alert'; break;
+      }
+    }
+    if (!error && terminalLengthNotice(doc)) {
+      error = 'conversation_length_exceeded';
+      errorSource = 'visible_terminal_notice';
+    }    if (!error && connectionFailure(doc)) {
+      error = 'connection_interrupted';
+      errorSource = 'visible_connection_status';
     }
     if (!error && main && turnCount === 0) {
       // A failed conversation fetch often leaves only a short shell in MAIN.
@@ -103,6 +209,7 @@
       visibleError: error,
       errorSource,
       ignoredHiddenAlerts,
+      uiActions: clickQueue.splice(0, 32),
       durationMs: Math.round(global.performance.now() - t0)
     };
   }

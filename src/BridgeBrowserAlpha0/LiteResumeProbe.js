@@ -105,8 +105,10 @@
     // Old failed turns and stale toasts can persist in long DIL chats. A
     // substantial, completed newest assistant reply supersedes old errors.
     // A short current error placeholder is still treated as an error.
-    const error = !(role === 'assistant' && text.trim().length >= 180) &&
-      (alertError || !!responseError);
+    const terminalLimit = responseError === 'conversation_length_exceeded';
+    const error = terminalLimit ||
+      (!(role === 'assistant' && text.trim().length >= 180) &&
+       (alertError || !!responseError));
     const modelModes = Array.from(d.querySelectorAll('button')).slice(-45)
       .map(button => String(button.innerText || button.textContent || '').trim().toLowerCase())
       .filter(value => /^(high|instant|medium|extra high)$/.test(value));
@@ -125,6 +127,10 @@
       editorSource,
       editorVisible,
       error: !!error,
+      failureKind: responseError === 'conversation_length_exceeded' ||
+        responseError === 'chatgpt_app_problem' ||
+        responseError === 'connection_interrupted' ||
+        responseError === 'conversation_load_failed' ? responseError : '',
       composerReady: !!editor,
       turnCount: parts.length,
       assistantNodeCount,

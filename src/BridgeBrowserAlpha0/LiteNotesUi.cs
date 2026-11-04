@@ -8,26 +8,28 @@ internal sealed partial class ChatGptLiteForm
     private static extern void keybd_event(byte virtualKey, byte scan, uint flags, UIntPtr extra);
 
     private readonly LiteChatNotes _noteStore = new();
-    private readonly LiteNotesOutbox _notesOutbox = new();
     private readonly TextBox _noteEditor = new()
     {
         Multiline = true, Dock = DockStyle.Fill, ScrollBars = ScrollBars.Vertical,
         AcceptsReturn = true, AcceptsTab = true,
         Font = new Font("Segoe UI", 11f),
-        PlaceholderText = "Notuj obserwacje i pomysły. Zapis automatyczny."
+        PlaceholderText = "Notatki trwałe — dołączane do każdego wybudzenia. Zostają, dopóki ich nie zmienisz."
     };
     private readonly Label _noteState = new()
     {
         AutoSize = false, Dock = DockStyle.Bottom, Height = 54,
-        Text = "Zaszyfrowane notatki tego czatu są dołączane do następnego wybudzenia. W zwykłej rozmowie nie są wysyłane automatycznie."
+        Text = "TRWAŁE notatki tego czatu. Dołączane do kolejnych wybudzeń; NIE są automatycznie dopisywane do checkpointu."
     };
     private readonly Label _noteChat = new()
     {
         Dock = DockStyle.Top, Height = 44, AutoEllipsis = true,
-        Text = "Notatki bieżącego czatu", Padding = new Padding(8, 8, 0, 0)
+        Text = "Trwałe notatki bieżącego czatu", Padding = new Padding(8, 8, 0, 0)
     };
-    private readonly System.Windows.Forms.Timer _noteSaveTimer = new() { Interval = 850 };
+    internal const int NotesDebounceMs = 3000;
+    private readonly System.Windows.Forms.Timer _noteSaveTimer = new() { Interval = NotesDebounceMs };
     private string _noteKey = "inbox";
+    // Snapshot used to prevent overwriting edits saved in another notes window.
+    private string _noteBaseline = "";
     private bool _notesLoading;
     private bool _notesDirty;
 
@@ -36,12 +38,12 @@ internal sealed partial class ChatGptLiteForm
         var root = new Panel { Dock = DockStyle.Fill, Padding = new Padding(6) };
         var header = new Label
         {
-            Text = "Notatki i dyktowanie", Dock = DockStyle.Top, Height = 40,
+            Text = "Notatki trwałe i dyktowanie", Dock = DockStyle.Top, Height = 40,
             Font = new Font(SystemFonts.DefaultFont, FontStyle.Bold)
         };
         var actions = new FlowLayoutPanel
         {
-            Dock = DockStyle.Bottom, Height = 78, WrapContents = true, AutoScroll = true
+            Dock = DockStyle.Bottom, Height = 44, WrapContents = false, AutoScroll = false
         };
         var dictate = new Button { Text = "🎤 Dyktuj (Win+H)", Width = 145, Height = 32 };
         dictate.Click += (_, _) =>
@@ -50,39 +52,9 @@ internal sealed partial class ChatGptLiteForm
             StartWindowsDictation();
             LiteEventLog.Write("note_dictation_requested");
         };
-        var copy = new Button { Text = "Kopiuj do czatu", Width = 134, Height = 32 };
-        copy.Click += (_, _) =>
-        {
-            if (string.IsNullOrWhiteSpace(_noteEditor.Text)) return;
-            FlushNotes();
-            Clipboard.SetText("Informacje od Pawła:\n" + _noteEditor.Text);
-            _noteState.Text = "Skopiowano. Możesz wkleić do czatu; nie wysłano automatycznie.";
-            LiteEventLog.Write("notes_copied_to_clipboard");
-        };
-        var queue = new Button { Text = "Do kolejki", Width = 106, Height = 32 };
-        queue.Click += (_, _) =>
-        {
-            if (string.IsNullOrWhiteSpace(_noteEditor.Text)) return;
-            FlushNotes();
-            try
-            {
-                var item = _notesOutbox.EnqueueDraft(_noteKey, _noteEditor.Text);
-                _noteState.Text = item is null
-                    ? "Treść już jest w kolejce; nie wysłano do ChatGPT."
-                    : "Dodano do kolejki lokalnej; nie wysłano do ChatGPT.";
-                LiteEventLog.Write("notes_outbox_queued", new { newItem = item is not null });
-            }
-            catch (Exception ex)
-            {
-                _noteState.Text = "Błąd kolejki. Notatka pozostała w edytorze.";
-                LiteEventLog.Write("notes_outbox_failed", new { errorType = ex.GetType().Name });
-            }
-        };
         var save = new Button { Text = "Zapisz", Width = 78, Height = 32 };
         save.Click += (_, _) => FlushNotes();
         actions.Controls.Add(dictate);
-        actions.Controls.Add(copy);
-        actions.Controls.Add(queue);
         actions.Controls.Add(save);
 
         _noteEditor.TextChanged += (_, _) =>
@@ -123,10 +95,11 @@ internal sealed partial class ChatGptLiteForm
             string text = _noteStore.Load(target);
             _noteEditor.ReadOnly = false;
             _noteEditor.Text = text;
+            _noteBaseline = text;
             _notesDirty = false;
             _noteState.Text = target == "inbox"
-                ? "Zapis lokalny. Wybierz czat, aby jego notatki trafiły do wybudzenia."
-                : "Zapis lokalny, zaszyfrowany. Dołączane przy najbliższym wybudzeniu tego czatu.";
+                ? "Wczytano notatki ogólne. Nie do checkpointu ani do wybudzeń bez przypisanego czatu."
+                : "Wczytano notatki trwałe. Dołączane przy każdym wybudzeniu; NIE dopisywane do checkpointu.";
             _noteChat.Text = target == "inbox"
                 ? "Notatki ogólne (bez przypisanego czatu)"
                 : "Notatki: " + target.Replace("chatgpt.com", "");
@@ -147,10 +120,20 @@ internal sealed partial class ChatGptLiteForm
         if (!_notesDirty || _noteEditor.ReadOnly) return true;
         try
         {
+            // Project dashboard can edit the same note; never overwrite newer
+            // on-disk text from a stale inspector editor.
+            if (_noteStore.Load(_noteKey) != _noteBaseline)
+            {
+                _noteState.Text = "Konflikt zapisu: notatka zmieniona w innym oknie. Skopiuj swoj tekst przed odswiezeniem.";
+                LiteEventLog.Write("notes_conflict_external_update");
+                return false;
+            }
             _noteStore.Save(_noteKey, _noteEditor.Text);
+            if (_noteStore.Load(_noteKey) != _noteEditor.Text)
+                throw new IOException("Odczyt po zapisie notatki nie zgadza sie z edytorem.");
+            _noteBaseline = _noteEditor.Text;
             _notesDirty = false;
-            _noteState.Text = "Zapisano lokalnie • " + DateTime.Now.ToString("HH:mm:ss") +
-                ". Dołączę do następnego wybudzenia tego czatu.";
+            _noteState.Text = SavedNotesStatus(DateTime.Now.ToString("HH:mm:ss"));
             LiteEventLog.Write("notes_saved", new { length = _noteEditor.TextLength });
             return true;
         }
@@ -161,6 +144,9 @@ internal sealed partial class ChatGptLiteForm
             return false;
         }
     }
+
+    internal static string SavedNotesStatus(string time) =>
+        "Zapisano lokalnie • " + time + ". Trwała notatka do wybudzeń; NIE do checkpointu.";
 
     private static void StartWindowsDictation()
     {

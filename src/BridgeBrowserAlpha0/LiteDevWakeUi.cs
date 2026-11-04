@@ -21,6 +21,7 @@ internal sealed partial class ChatGptLiteForm
         AutoSize = true, Text = "Co 25 minut (jeden czat)",
         Padding = new Padding(6, 8, 0, 0)
     };
+    private readonly ToolTip _wakeStatusTooltip = new() { AutoPopDelay = 20000, InitialDelay = 350 };
     private LiteDevWakeState.Record _devWake = new();
     private bool _devWakePending;
     private string _devWakeLastSkipReason = "";
@@ -29,6 +30,7 @@ internal sealed partial class ChatGptLiteForm
 
     private void InitializeDevWake()
     {
+        FormClosed += (_, _) => _wakeStatusTooltip.Dispose();
         try {
             _devWake = LiteDevWakeState.Read();
             if (LiteDevWakeState.RecoverLegacyDefinitelyNotSent(

@@ -8,18 +8,52 @@ internal sealed partial class ChatGptLiteForm
     // The background wake worker renders responses for chats that may never
     // be opened in the foreground. They need the same durable archive.
     private bool _workerArchivePending;
+    private long _workerArchivePendingEpoch = -1;
     private Task<string>? _workerArchiveTask;
     private long _workerArchiveTaskEpoch = -1;
+    // A stalled worker script must not permanently block a chat's archive.
+    // Bound overlapping retries, and reset the budget on worker navigation.
+    private readonly List<Task<string>> _workerArchiveTimedOutTasks = new();
+    private const int MaxWorkerArchiveTimedOutTasks = 2;
+    private long _workerArchiveTimeoutEpoch = -1;
+    private bool _workerArchiveBudgetExhaustedLogged;
+
+    internal static bool IsWorkerArchiveRetryAllowed(int unresolved) =>
+        unresolved < MaxWorkerArchiveTimedOutTasks;
+
+    internal static bool IsWorkerArchivePendingForEpoch(bool pending,
+        long pendingEpoch, long currentEpoch) =>
+        pending && pendingEpoch == currentEpoch;
 
     private async Task CaptureWorkerAnswersAsync()
     {
         var core = _chatWakeWorker.CoreWebView2;
-        if (!_archiveEnabled || core is null || _chatWakeBusy || _workerArchivePending)
-            return;
         long epoch = _workerRouteEpoch;
+        if (_workerArchiveTimeoutEpoch != epoch)
+        {
+            _workerArchiveTimeoutEpoch = epoch;
+            _workerArchiveTimedOutTasks.Clear();
+            _workerArchiveBudgetExhaustedLogged = false;
+        }
+        _workerArchiveTimedOutTasks.RemoveAll(static task => task.IsCompleted);
+        if (!_archiveEnabled || core is null || _chatWakeBusy ||
+            IsWorkerArchivePendingForEpoch(_workerArchivePending,
+                _workerArchivePendingEpoch, epoch))
+            return;
         if (_workerArchiveTask is { IsCompleted: false } &&
             _workerArchiveTaskEpoch == epoch)
             return;
+        if (!IsWorkerArchiveRetryAllowed(_workerArchiveTimedOutTasks.Count))
+        {
+            if (!_workerArchiveBudgetExhaustedLogged)
+            {
+                LiteEventLog.Write("worker_archive_retry_budget_exhausted", new {
+                    outstanding = _workerArchiveTimedOutTasks.Count });
+                _workerArchiveBudgetExhaustedLogged = true;
+            }
+            return;
+        }
+        _workerArchiveBudgetExhaustedLogged = false;
         if (!Uri.TryCreate(core.Source, UriKind.Absolute, out var uri) ||
             uri.Host != "chatgpt.com" ||
             !LiteDevWakeState.IsChatUrl(core.Source))
@@ -30,7 +64,9 @@ internal sealed partial class ChatGptLiteForm
             string.Equals(front.GetLeftPart(UriPartial.Path),
                 uri.GetLeftPart(UriPartial.Path), StringComparison.OrdinalIgnoreCase))
             return;
+        RecoverArchiveIndex(uri);
         _workerArchivePending = true;
+        _workerArchivePendingEpoch = epoch;
         try
         {
             var task = core.ExecuteScriptAsync(
@@ -40,7 +76,16 @@ internal sealed partial class ChatGptLiteForm
             _workerArchiveTaskEpoch = epoch;
             if (await Task.WhenAny(task, Task.Delay(6500)) != task)
             {
-                LiteEventLog.Write("worker_archive_probe_timeout");
+                // A timeout must release this chat's active slot, but not
+                // mutate a newer document's slot or consume its retry budget.
+                if (IsArchiveCaptureLeaseCurrent(epoch, _workerRouteEpoch,
+                    task, _workerArchiveTask))
+                {
+                    _workerArchiveTimedOutTasks.Add(task);
+                    _workerArchiveTask = null;
+                    LiteEventLog.Write("worker_archive_probe_timeout", new {
+                        outstanding = _workerArchiveTimedOutTasks.Count });
+                }
                 _ = task.ContinueWith(t => { _ = t.Exception; },
                     CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted,
                     TaskScheduler.Default);
@@ -95,9 +140,14 @@ internal sealed partial class ChatGptLiteForm
         }
         finally
         {
-            _workerArchivePending = false;
-            if (_workerArchiveTask is { IsCompleted: true })
-                _workerArchiveTask = null;
+            // Late completion from an old worker route may not clear a new
+            // route's pending flag or overwrite its in-flight capture.
+            if (_workerArchivePendingEpoch == epoch)
+            {
+                _workerArchivePending = false;
+                if (_workerArchiveTask is { IsCompleted: true })
+                    _workerArchiveTask = null;
+            }
         }
     }
 }

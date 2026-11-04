@@ -9,13 +9,20 @@ internal sealed partial class ChatGptLiteForm
     internal const string WakeWorkerHydratedScript =
         "!!document.querySelector('#prompt-textarea,[data-testid=composer-text-input],textarea,[contenteditable=true]') " +
         "&& !!document.querySelector('main [data-user-message-bubble],main [data-message-author-role],main [data-chatgpt-selection-message-id]')";
+    // P0 wake396: NIEAKTUALNE for OBL: a history bubble was required
+    // before a newly rotated EMPTY lead could send its first message.
+    // After exact NavigationId and URL, an editor under main suffices.
+    // sendDirect still validates URL, draft, Stop and payload before click.
+    internal const string WakeWorkerOblComposerReadyScript =
+        "!!document.querySelector('main') && " +
+        "!!document.querySelector('#prompt-textarea,[data-testid=composer-text-input],textarea,[contenteditable=true]')";
     private readonly System.Windows.Forms.Timer _chatWakeTimer = new() { Interval = 20000 };
     private bool _multiWakeEnabled;
     private bool _chatWakeBusy;
     // One circuit breaker for the ONE shared background WebView2 worker.
     // Foreground chat waking must never depend on this background cooldown.
     private readonly LiteRendererBackpressure _workerProbeBackpressure = new();
-    // Set only after a full worker navigation and observed chat history.
+    // Set after full navigation and observed history, or for OBL a ready composer.
     // SPA SourceChanged and any full navigation revoke this identity.
     private string? _workerVerifiedChatUrl;
     // Monotonic per-worker route epoch prevents A->B->A during an awaited
@@ -49,7 +56,20 @@ internal sealed partial class ChatGptLiteForm
             Controls.Add(_chatWakeWorker);
             _chatWakeWorker.SendToBack();
             _chatWakeConfigure.Click += (_, _) => ConfigureCurrentChatWake();
-            _chatWakeTimer.Tick += async (_, _) => await PollAllChatWakesAsync();
+            _chatWakeTimer.Tick += async (_, _) => {
+                try {
+                    await PollAllChatWakesAsync();
+                    await ProbeSuccessorFromWorkerOnceAsync();
+                    await ProbeSeedAckedSuccessorReadbackOnceAsync();
+                    await ProbeUncertainSuccessorReadbackOnceAsync();
+                    await CaptureExistingUserBubbleHashOnceAsync();
+                    await ProbeExistingUserBubblePairOnceAsync();
+                }
+                catch (Exception ex) {
+                    LiteEventLog.Write("successor_probe_timer_failure",
+                        new { errorType=ex.GetType().Name });
+                }
+            };
             UpdateMultiWakeStatus();
             if (!_ownsMultiWakeMutex)
                 LiteEventLog.Write("multi_wake_secondary_window", new {
@@ -83,6 +103,7 @@ internal sealed partial class ChatGptLiteForm
 
     private void ToggleCurrentChatWake()
     {
+        string auditId = LiteUiActionAudit.Requested("current_chat_wake_toggle");
         var url = _browser.CoreWebView2?.Source;
         if (!LiteDevWakeState.IsChatUrl(url))
         {
@@ -97,11 +118,18 @@ internal sealed partial class ChatGptLiteForm
             entry.Enabled = !entry.Enabled;
             if (entry.Enabled) entry.DueUtc = DateTimeOffset.UtcNow.AddMinutes(entry.EffectiveMinutes);
             entry.LastState = entry.Enabled ? "armed" : "paused";
+            LiteUiActionAudit.Executed(auditId, "current_chat_wake_toggle", "registry_write_invoked");
             LiteChatWakeRegistry.Write(entries);
+            var stored = LiteChatWakeRegistry.Read().FirstOrDefault(x => x.Url == entry.Url);
+            LiteUiActionAudit.Result(auditId, "current_chat_wake_toggle",
+                stored?.Enabled == entry.Enabled ? "persisted_verified" : "readback_mismatch",
+                stored?.Enabled == entry.Enabled);
             UpdateMultiWakeStatus();
         }
         catch (Exception ex)
         {
+            LiteUiActionAudit.Result(auditId, "current_chat_wake_toggle",
+                "exception_" + ex.GetType().Name, false);
             LiteEventLog.Write("multi_wake_toggle_failed",
                 new { errorType = ex.GetType().Name });
         }
@@ -165,6 +193,20 @@ internal sealed partial class ChatGptLiteForm
         }
     }
 
+    // Display the LAST ACTUALLY RESERVED wake number, never infer from
+    // the next clock slot. Deferral must not increment the displayed number.
+    internal static string FormatWakeStatus(long wakeSequence,
+        DateTimeOffset dueUtc, bool enabled)
+    {
+        string previous = wakeSequence > 0
+            ? "#" + wakeSequence.ToString("D6",
+                System.Globalization.CultureInfo.InvariantCulture)
+            : "brak";
+        return enabled
+            ? "Poprz. " + previous + " | Nast. " +
+                dueUtc.ToLocalTime().ToString("HH:mm")
+            : "Poprz. " + previous + " | Pauza";
+    }
     private void UpdateMultiWakeStatus()
     {
         if (!_multiWakeEnabled) return;
@@ -183,9 +225,50 @@ internal sealed partial class ChatGptLiteForm
             _devWakeToggle.Text = entry?.Enabled == true
                 ? "Autopraca: WŁ. " + entry.EffectiveMinutes + "m" : "Autopraca: WYŁ.";
             _devWakeStatus.Text = entry is null
-                ? "Bieżący czat: bez wybudzenia | Inne aktywne: " + entries.Count(x => x.Enabled)
-                : (entry.Enabled ? "Następne: " + entry.DueUtc.ToLocalTime().ToString("HH:mm") : "Pauza") +
-                    " | Aktywne czaty: " + entries.Count(x => x.Enabled);
+                ? "Bieżący czat: bez wybudzenia | Aktywne: " +
+                    entries.Count(x => x.Enabled)
+                : FormatWakeStatus(entry.WakeSequence, entry.DueUtc,
+                    entry.Enabled);
+            string details = entry is null ? "Brak harmonogramu bieżącego czatu."
+                : LiteWakeStatusExplanation.Display(entry);
+            if (entry is not null &&
+                entry.LastState.StartsWith("waiting_", StringComparison.Ordinal))
+            {
+                string reasonCode = entry.LastState["waiting_".Length..];
+                string compact = reasonCode == "draft_present"
+                    ? "szkic starego czatu" : LiteWakeStatusExplanation.Reason(reasonCode);
+                _devWakeStatus.Text += " | Odroczono: " + compact;
+            }
+            _devWakeStatus.AccessibleDescription =
+                "Aktywne czaty: " + entries.Count(x => x.Enabled) +
+                Environment.NewLine + details;
+            _wakeStatusTooltip.SetToolTip(_devWakeStatus, details);
+            // Surface server backpressure instead of a misleading OK state.
+            var cooldown = _wakeRead429Throttle.Remaining(DateTimeOffset.UtcNow);
+            if (cooldown > TimeSpan.Zero)
+                _devWakeStatus.Text += " | HTTP 429: limit serwera, " +
+                    Math.Ceiling(cooldown.TotalMinutes) + " min";
+            else
+            {
+                string healthPath = Path.Combine(
+                    Environment.GetFolderPath(
+                        Environment.SpecialFolder.LocalApplicationData),
+                    "OpenBrowser", "ChatGPT-Lite", "diagnostics",
+                    "obl-wake-health.json");
+                if (File.Exists(healthPath))
+                {
+                    using var health = System.Text.Json.JsonDocument.Parse(
+                        File.ReadAllText(healthPath));
+                    var h = health.RootElement;
+                    if (h.TryGetProperty("status", out var status) &&
+                        h.TryGetProperty("utc", out var stamp) &&
+                        status.GetString() is "degraded" or "needs_attention" &&
+                        DateTimeOffset.TryParse(stamp.GetString(), out var seen) &&
+                        (DateTimeOffset.UtcNow-seen).TotalMinutes < 20)
+                        _devWakeStatus.Text +=
+                            " | Wybudzanie: wymaga uwagi (backend/odpowiedz)";
+                }
+            }
             _devWakePin.Text = "Ustaw ten czat";
         }
         catch { _devWakeStatus.Text = "Harmonogram: błąd odczytu"; }
@@ -209,9 +292,13 @@ internal sealed partial class ChatGptLiteForm
 
     internal static async Task<bool> WaitForWakeReceiptAsync(
         CoreWebView2 core, string receipt, string? targetUrl = null,
-        Func<long>? readEpoch = null)
+        Func<long>? readEpoch = null, string? expectedWakeMarker = null)
     {
-        const int totalBudgetMs = 4200;
+        // P0 wake356: a natural OBL wake reached click_invoked but its
+        // 15-second DOM receipt probe expired without visible ACK. NIEAKTUALNE
+        // for numbered OBL wakes: treating 15 seconds as the final observation
+        // window. Allow late React hydration, never a second send click.
+        int totalBudgetMs = expectedWakeMarker is null ? 15000 : 30000;
         if (receipt.Length != 32 || !receipt.All(c =>
             c is >= '0' and <= '9' or >= 'a' and <= 'f')) return false;
         // Callers outside the offline fixture supply BOTH target and route
@@ -222,10 +309,14 @@ internal sealed partial class ChatGptLiteForm
             IsWakeReceiptRouteStable(targetUrl, core.Source,
                 initialEpoch, readEpoch!());
         if (!stable()) return false;
+        // P0 wake345: pass OBL's visible numeric marker explicitly. A SPA
+        // reload can clear the JS receipt-to-marker map after a real click.
+        // NIEAKTUALNE: depend exclusively on the transient page map.
         string check = "window.__OPENBROWSER_RESUME_SENDER__?.hasAck(" +
-            JsonSerializer.Serialize(receipt) + ") === true";
+            JsonSerializer.Serialize(receipt) + "," +
+            JsonSerializer.Serialize(expectedWakeMarker) + ") === true";
         var clock = System.Diagnostics.Stopwatch.StartNew();
-        for (int probe = 0; probe < 8; probe++)
+        for (int probe = 0; clock.ElapsedMilliseconds < totalBudgetMs; probe++)
         {
             int left = totalBudgetMs - (int)clock.ElapsedMilliseconds;
             if (left <= 0) break;
@@ -268,6 +359,12 @@ internal sealed partial class ChatGptLiteForm
             Path.Combine(AppContext.BaseDirectory, "LiteResumeProbe.js"));
         var core = _chatWakeWorker.CoreWebView2
             ?? throw new InvalidOperationException("Background WebView2 not initialized");
+        // The background worker needs the same structural terminal-error
+        // detector as foreground, otherwise max-chat-length may stay invisible
+        // to the very wake engine expected to recognize it.
+        var responseScript = await File.ReadAllTextAsync(
+            Path.Combine(AppContext.BaseDirectory, "LiteResponseSignal.js"));
+        await core.AddScriptToExecuteOnDocumentCreatedAsync(responseScript);
         await core.AddScriptToExecuteOnDocumentCreatedAsync(script);
         await core.AddScriptToExecuteOnDocumentCreatedAsync(probeScript);
         await InstallCaptureScriptAsync(core);
@@ -338,7 +435,8 @@ internal sealed partial class ChatGptLiteForm
 
     internal static async Task<bool> IsWorkerHydratedForChatAsync(
         CoreWebView2 core, string url, string? verifiedUrl,
-        Func<string?>? readVerifiedUrl = null, Func<long>? readEpoch = null)
+        Func<string?>? readVerifiedUrl = null, Func<long>? readEpoch = null,
+        bool isOblLead = false)
     {
         // The current DOM may be from chat A during an SPA route change to B.
         // A matching address/composer/history alone is NOT proof of identity.
@@ -346,7 +444,9 @@ internal sealed partial class ChatGptLiteForm
         {
             return await VerifyWorkerHydrationAsync(
                 url, verifiedUrl, () => core.Source,
-                () => ExecuteWorkerScriptAsync(core, WakeWorkerHydratedScript),
+                () => ExecuteWorkerScriptAsync(core,
+                    isOblLead ? WakeWorkerOblComposerReadyScript :
+                        WakeWorkerHydratedScript),
                 readVerifiedUrl, readEpoch);
         }
         catch (TimeoutException)
@@ -357,12 +457,14 @@ internal sealed partial class ChatGptLiteForm
         }
     }
 
-    internal static int WorkerHistoryProbeBudgetMs(long elapsedMs)
+    internal static int WorkerHistoryProbeBudgetMs(long elapsedMs,
+        int maxBudgetMs = 25000)
     {
-        // A single broken chat must not occupy the shared worker for
-        // 35 separate 6.5-second renderer timeouts.
-        if (elapsedMs < 0 || elapsedMs >= 25000) return 0;
-        return (int)Math.Min(6500L, 25000L - elapsedMs);
+        // P0 obl-5w3 wake347: NIEAKTUALNE for OBL: 25 seconds and
+        // 36 repeated probes of an empty 0-turn worker app shell.
+        // Other projects retain their previous 25-second budget.
+        if (elapsedMs < 0 || elapsedMs >= maxBudgetMs) return 0;
+        return (int)Math.Min(6500L, maxBudgetMs - elapsedMs);
     }
 
     // NavigationCompleted is not necessarily for our latest Navigate(url):
@@ -388,17 +490,21 @@ internal sealed partial class ChatGptLiteForm
                 requestedChatUrl, StringComparison.Ordinal);
     }
 
-    private async Task<bool> NavigateWorkerAsync(string url)
+    private async Task<bool> NavigateWorkerAsync(string url,
+        bool isOblLead = false)
     {
         var core = _chatWakeWorker.CoreWebView2;
         if (core is null) return false;
-        // Reuse this worker only after checking both URL and hydrated history.
+        // P0 wake397 NIEAKTUALNE for OBL: worker reuse required history
+        // bubble even after a validated empty lead had hydrated its editor.
+        // Reuse on matching URL/epoch and clean composer; sender verifies
+        // draft/Stop/route at submission. Others still require history.
         // A timed-out reuse probe MUST NOT trigger another navigation/script.
         try
         {
             if (await IsWorkerHydratedForChatAsync(core, url,
                 _workerVerifiedChatUrl, () => _workerVerifiedChatUrl,
-                () => _workerRouteEpoch))
+                () => _workerRouteEpoch, isOblLead))
             {
                 LiteEventLog.Write("multi_wake_worker_reused_hydrated");
                 return true;
@@ -435,36 +541,46 @@ internal sealed partial class ChatGptLiteForm
             _workerVerifiedChatUrl = null;
             navigationIssued = true;
             core.Navigate(url);
-            var ready = await Task.WhenAny(completed.Task, Task.Delay(45000));
+            // P0 obl-5w3 wake367: NIEAKTUALNE for OBL: wait 45 seconds for
+            // NavigationCompleted before trying the same registered chat again.
+            // The OBL hydration budget is already 8 seconds. Keep strict
+            // NavigationId and URL checks; cap this earlier wait at 12 seconds.
+            var ready = await Task.WhenAny(completed.Task,
+                Task.Delay(isOblLead ? 12000 : 45000));
             if (ready != completed.Task || !await completed.Task)
             {
                 MarkWorkerProbeFailed("navigation_not_completed");
                 return false;
             }
             var hydrationClock = System.Diagnostics.Stopwatch.StartNew();
+            // P0 wake347: OBL retries the same URL sooner when the worker
+            // stays on an empty shell. Never bypass chat identity or draft checks.
+            int hydrationBudgetMs = isOblLead ? 8000 : 25000;
             int hydrationAttempts = 0;
             while (true)
             {
-                int remaining = WorkerHistoryProbeBudgetMs(hydrationClock.ElapsedMilliseconds);
+                int remaining = WorkerHistoryProbeBudgetMs(
+                    hydrationClock.ElapsedMilliseconds, hydrationBudgetMs);
                 if (remaining <= 0) break;
                 if (core.Source is null ||
                     !LiteDevWakeState.IsChatUrl(core.Source) ||
                     LiteDevWakeState.NormalizeUrl(core.Source) != url) return false;
                 // A composer can render before history, but may never hydrate.
-                // Never type into an empty shell; bound TOTAL attempts to 25 s.
+                // Never type into an empty shell; bound attempts per project.
                 hydrationAttempts++;
                 long probeRouteEpoch = _workerRouteEpoch;
                 string found;
                 try
                 {
                     found = await ExecuteWorkerScriptAsync(
-                        core, WakeWorkerHydratedScript, remaining);
+                        core, isOblLead ? WakeWorkerOblComposerReadyScript :
+                            WakeWorkerHydratedScript, remaining);
                 }
                 catch (TimeoutException)
                 {
                     LiteEventLog.Write("multi_wake_history_probe_timeout", new {
                         elapsedMs = hydrationClock.ElapsedMilliseconds,
-                        attempts = hydrationAttempts, waitBudgetMs = 25000
+                        attempts = hydrationAttempts, waitBudgetMs = hydrationBudgetMs
                     });
                     MarkWorkerProbeFailed("history_probe_timeout");
                     return false; // Do not queue another script on a hung renderer.
@@ -484,8 +600,26 @@ internal sealed partial class ChatGptLiteForm
                     return true;
                 }
                 int pause = Math.Min(700,
-                    WorkerHistoryProbeBudgetMs(hydrationClock.ElapsedMilliseconds));
+                    WorkerHistoryProbeBudgetMs(
+                        hydrationClock.ElapsedMilliseconds, hydrationBudgetMs));
                 if (pause > 0) await Task.Delay(pause);
+            }
+            // P0 obl-5w3 wake366: NIEAKTUALNE for OBL: after the bounded
+            // hydration wait, run another WebView2 script for metadata only.
+            // That probe cannot make the missing history eligible to send;
+            // retry the same URL without risking a second renderer timeout.
+            // Historical detailed diagnosis remains available for non-OBL.
+            if (isOblLead)
+            {
+                LiteEventLog.Write("multi_wake_history_not_ready", new {
+                    domWaitSeconds = hydrationBudgetMs / 1000,
+                    hydrationAttempts,
+                    elapsedMs = hydrationClock.ElapsedMilliseconds,
+                    diagnosticProbeSkipped = true,
+                    retrySameChat = true
+                });
+                MarkWorkerProbeFailed("history_not_ready");
+                return false;
             }
             // Metadata-only diagnostic for app shell rendered without history.
             try
@@ -509,7 +643,7 @@ internal sealed partial class ChatGptLiteForm
                     using var parsed = JsonDocument.Parse(metadata);
                     var v = parsed.RootElement;
                     LiteEventLog.Write("multi_wake_history_not_ready", new {
-                        domWaitSeconds = 25,
+                        domWaitSeconds = hydrationBudgetMs / 1000,
                         hydrationAttempts,
                         elapsedMs = hydrationClock.ElapsedMilliseconds,
                         bodyChars = v.GetProperty("bodyChars").GetInt32(),
@@ -526,7 +660,7 @@ internal sealed partial class ChatGptLiteForm
             catch (TimeoutException)
             {
                 LiteEventLog.Write("multi_wake_history_not_ready", new {
-                    domWaitSeconds = 25,
+                    domWaitSeconds = hydrationBudgetMs / 1000,
                     hydrationAttempts,
                     diagnosticError = "diagnostic_timeout"
                 });
@@ -537,15 +671,15 @@ internal sealed partial class ChatGptLiteForm
             catch (Exception ex)
             {
                 LiteEventLog.Write("multi_wake_history_not_ready", new {
-                    domWaitSeconds = 25,
+                    domWaitSeconds = hydrationBudgetMs / 1000,
                     hydrationAttempts,
                     elapsedMs = hydrationClock.ElapsedMilliseconds,
                     diagnosticError = ex.GetType().Name
                 });
             }
             // Successful NavigationCompleted is NOT a successful history
-            // hydration. Apply escalating cooldown to avoid repeatedly
-            // paying 25s for the same unhydrated ChatGPT application shell.
+            // hydration. NIEAKTUALNE for OBL: spend 25 s per empty shell.
+            // Preserve explicit same-URL retry without typing into an empty page.
             MarkWorkerProbeFailed("history_not_ready");
             return false;
         }
@@ -595,26 +729,113 @@ internal sealed partial class ChatGptLiteForm
         return stable() ? (first, second, true) : (null, null, false);
     }
 
+    // P0 obl-5w3: ordinary OBL wakes do not need a second read-only
+    // assistant-history probe separated by 1500ms. The sender still checks
+    // route, editor draft and Stop at the point of its actual click.
+    // NIEAKTUALNE for ordinary OBL wake: mandatory two-read preflight delay.
+    internal static async Task<(LiteChatWakePreflight.Observation? First,
+        LiteChatWakePreflight.Observation? Second, bool Stable)>
+        CaptureFastOblPreflightAsync(string targetUrl,
+            Func<string?> readSource, Func<long> readEpoch,
+            Func<Task<LiteChatWakePreflight.Observation?>> capture)
+    {
+        long epoch = readEpoch();
+        bool stable() => IsPreflightRouteStable(
+            targetUrl, readSource(), epoch, readEpoch());
+        if (!stable()) return (null, null, false);
+        var observed = await capture();
+        return stable() ? (observed, observed, true) : (null, null, false);
+    }
+
     private async Task<(string Reason, string Hash, bool Complete,
-        LiteModelStatus.Parsed? Status, int ObservedTurns)>
-        CheckWorkerPreflightAsync(CoreWebView2 core, string url, string previousHash)
+        LiteModelStatus.Parsed? Status, int ObservedTurns, bool DraftPresent)>
+        CheckWorkerPreflightAsync(CoreWebView2 core, string url, string previousHash,
+            bool isOblLead = false)
     {
         bool foreground = ReferenceEquals(core, _browser.CoreWebView2);
         long epoch() => foreground ? _foregroundWakeRouteEpoch : _workerRouteEpoch;
-        var result = await CaptureStablePreflightAsync(
-            url, () => core.Source, epoch,
-            () => ReadWorkerObservationAsync(core),
-            () => Task.Delay(1500));
+        var result = isOblLead
+            ? await CaptureFastOblPreflightAsync(url, () => core.Source, epoch,
+                () => ReadWorkerObservationAsync(core))
+            : await CaptureStablePreflightAsync(url, () => core.Source, epoch,
+                () => ReadWorkerObservationAsync(core), () => Task.Delay(1500));
+        // A single unhydrated WebView2 snapshot is not proof that the
+        // lead is broken. Confirm page failures and absent editors before
+        // any emergency rotation, just as terminal model decisions are
+        // independently confirmed. NIEAKTUALNE: one empty/error snapshot
+        // can immediately classify the OBL lead as permanently failed.
+        // P0 obl-5w3 wake362: NIEAKTUALNE for OBL: generic Error=true
+        // alone forced a second, delayed preflight. Response_error already
+        // qualifies for the direct sender's fresh URL, STOP and draft checks.
+        // Confirm only terminal failures; missing composer goes directly to no-click rotation without a second 1500ms read.
+        if (isOblLead && result.Stable && result.Second is { } quick &&
+            (quick.FailureKind == "conversation_length_exceeded" ||
+             // P0 wake391 NIEAKTUALNE: foreground error double-read.
+             // P0 wake395 NIEAKTUALNE for OBL worker: second 1500ms read
+             // for transient app/connection shells. Existing worker path
+             // defers same URL without rotation and never sends into it.
+             // P0 obl-5w3 wake387: NIEAKTUALNE for OBL: optional model DONE
+              // forced an unnecessary 1500ms preflight although it cannot
+              // stop the OBL project. Confirm actual whole-plan completion.
+              LiteChatWakePreflight.IsCompletion(quick.Text)))
+            result = await CaptureStablePreflightAsync(url,
+                () => core.Source, epoch, () => ReadWorkerObservationAsync(core),
+                () => Task.Delay(1500));
+        // P0 obl-5w3 wake363: NIEAKTUALNE for OBL: after the two-sample
+        // confirmation, an empty first assistant text forced up to TWO more
+        // 1500ms preflight passes. The OBL sender already checks route,
+        // STOP and draft at click time, so uncertainty must reach it now.
+        // Keep historical hydration retries for other projects only.
+        for (int retry = 0; !isOblLead && retry < 2 && result.Stable &&
+             result.First?.Role == "assistant" &&
+             result.Second?.Role == "assistant" &&
+             string.IsNullOrWhiteSpace(result.First.Text) &&
+             !string.IsNullOrWhiteSpace(result.Second.Text); retry++)
+        {
+            LiteEventLog.Write("multi_wake_preflight_hydration_retry", new {
+                attempt = retry + 1, foreground,
+                firstChars = result.First.Text.Length,
+                secondChars = result.Second.Text.Length
+            });
+            result = await CaptureStablePreflightAsync(
+                url, () => core.Source, epoch,
+                () => ReadWorkerObservationAsync(core),
+                () => Task.Delay(1500));
+        }
         if (!result.Stable)
         {
             LiteEventLog.Write("multi_wake_preflight_navigation_changed",
                 new { foreground, definitelyNotSent = true });
-            return ("navigation_changed", "", false, null, 0);
+            return ("navigation_changed", "", false, null, 0, false);
         }
         var (first, second, _) = result;
         string expectedPath = new Uri(url).AbsolutePath;
         string reason = LiteChatWakePreflight.Eligibility(
             first, second, expectedPath, previousHash);
+        // P0 wake398 NIEAKTUALNE for OBL: one fast preflight snapshot
+        // duplicated as first/second was mistaken for TWO independent
+        // failed conversation loads, classifying a visible clean composer
+        // as a terminal app failure. Only the exact URL, visible primary
+        // composer, zero turns, no draft and no Stop/tool activity qualify.
+        // Mark read uncertainty and let sendDirect independently validate
+        // the actual editor, route and Send button before trying a click.
+        if (isOblLead && reason == "chatgpt_app_problem" &&
+            first is { Error: true, FailureKind: "conversation_load_failed",
+                TurnCount: 0, ComposerReady: true, EditorVisible: true,
+                HasDraft: false, Generating: false, ToolBusy: false } editorReady &&
+            editorReady.Location == expectedPath &&
+            editorReady.EditorSource is "prompt-textarea" or "composer-text-input" &&
+            second is { Error: true, FailureKind: "conversation_load_failed",
+                TurnCount: 0, ComposerReady: true, EditorVisible: true,
+                HasDraft: false, Generating: false, ToolBusy: false } &&
+            second.Location == expectedPath)
+            reason = "response_error";        // P0 obl-5w3 wake370: NIEAKTUALNE for OBL: read error or
+        // generation can hide a positively observed owner draft.
+        // Prioritize draft: rotate to a separate lead, never overwrite it.
+        // Non-OBL projects retain their original preflight ordering.
+        if (isOblLead && (first?.HasDraft == true || second?.HasDraft == true) &&
+            reason is ("response_error" or "generating"))
+            reason = "draft_present";
         if (reason != "ready")
         {
             // Metadata only. Do not log response text, prompts or chat URLs.
@@ -646,7 +867,8 @@ internal sealed partial class ChatGptLiteForm
         var status = reason == "ready" ? LiteModelStatus.Parse(answer) : null;
         return (reason, hash,
             reason == "ready" && LiteChatWakePreflight.IsCompletion(answer),
-            status, second?.TurnCount ?? 0);
+            status, second?.TurnCount ?? 0,
+            first?.HasDraft == true || second?.HasDraft == true);
     }
 
     internal static TimeSpan RecordWorkerProbeFailure(
@@ -702,11 +924,19 @@ internal sealed partial class ChatGptLiteForm
         // requires a "ready" two-snapshot preflight in the intended chat.
         if (verifiedComplete && preflightReason == "ready")
             return WakePreflightGate.Complete;
-        return CanResumeAfterUnconfirmedRecovery(
-            priorState, priorHash, preflightReason, observedHash)
-                ? WakePreflightGate.Continue
-                : WakePreflightGate.HoldUnconfirmedRecovery;
+        // Owner 2026-10-30: prior unconfirmed wake is not a suppression
+        // fence. A stable reply in the verified chat must allow the NEXT wake,
+        // even when that causes a duplicate message. Retain route/draft checks.
+        return preflightReason == "ready"
+            ? WakePreflightGate.Continue
+            : WakePreflightGate.HoldUnconfirmedRecovery;
     }
+
+    // OBL identity is the registered project lead, never a phrase in Prompt:
+    // production wake prompts intentionally omit project names and paths.
+    internal static bool ShouldHoldUnconfirmedRecoveryForProject(
+        WakePreflightGate gate, bool isOblLead) =>
+        gate == WakePreflightGate.HoldUnconfirmedRecovery && !isOblLead;
 
     internal static string NextStateAfterWakeDeferral(string priorState,
         string reason) =>
@@ -717,20 +947,38 @@ internal sealed partial class ChatGptLiteForm
     // The ordinary wake path remains unchanged with no/invalid status.
     private bool HandleVerifiedModelStatus(LiteChatWakeRegistry.Chat due,
         List<LiteChatWakeRegistry.Chat> entries,
-        LiteModelStatus.Parsed? parsed, string reason, string answerHash)
+        LiteModelStatus.Parsed? parsed, string reason, string answerHash,
+        bool isOblLead)
     {
         var now = DateTimeOffset.UtcNow;
         string? decision = LiteModelStatus.ApplyDecision(parsed, now, reason);
         if (decision is null or "CONTINUE") return false;
         if (answerHash.Length != 64) return false;
-        // Owner explicitly requires autonomous continuation of Open Browser
-        // Lite. A tool rejecting ONE action must not disable this project
-        // indefinitely: retain the durable answer fence and retry the next
-        // safe wake after a short cooldown. Never bypass a tool refusal.
-        bool obLead = LiteProjectRegistry.OpenDefault().Projects.Any(p =>
-            p.Title == "Open Browser Lite" &&
-            p.Chats.Any(c => c.Url == due.Url && c.Role == "lead"));
-        if (LiteModelStatus.ShouldRecoverBlock(decision, obLead))
+        if (LiteModelStatus.IgnoreModelRequestedHold(decision, isOblLead))
+        {
+            LiteEventLog.Write("multi_wake_model_hold_ignored", new {
+                status = decision, project = "obl",
+                assistantRequestOnly = true, nextWake = due.WakeSequence + 1
+            });
+            return false;
+        }
+        // P0 obl-5w3 wake361: NIEAKTUALNE for OBL: BLOCKED model status
+        // imposed an unconditional two-minute wait before attempting a wake.
+        // A tool failure concerns that specific action, not the scheduler.
+        // Continue the ordinary safe sender now, retaining exact URL, live
+        // STOP/draft checks and independently enforced tool permissions.
+        if (isOblLead && decision == "BLOCKED")
+        {
+            LiteEventLog.Write("multi_wake_model_block_continue", new {
+                wakeSequence = due.WakeSequence + 1,
+                retryMinutes = 0, status = decision,
+                toolRefusalNotOverridden = true
+            });
+            return false;
+        }
+        // NIEAKTUALNE for OBL: recoverable-model-block cooldown below.
+        // Non-OBL scheduling behavior remains unchanged.
+        if (LiteModelStatus.ShouldRecoverBlock(decision, isOblLead))
         {
             string blockKey = LiteOwnerInterventions.EventKey(
                 due.Url, decision, answerHash);
@@ -767,24 +1015,36 @@ internal sealed partial class ChatGptLiteForm
             UpdateMultiWakeStatus();
             return true;
         }
+        // P0 wake384: NIEAKTUALNE OBL: stage DONE disables whole-project wake.
+        if (isOblLead && decision == "DONE") return false;
         if (decision == "DONE")
         {
+            string completedKey = LiteOwnerInterventions.EventKey(due.Url, decision, answerHash);
+            bool newCompletion = due.LastState != "status_done";
             due.Enabled = false;
             due.LastState = "status_done";
+            due.LastInterventionKey = completedKey;
             LiteChatWakeRegistry.Write(entries);
             LiteWakeJournal.Write("schedule_completed", due.WakeSequence,
                 result: "model_done");
-            LiteEventLog.Write("multi_wake_model_status", new { status = decision });
+            LiteEventLog.Write("multi_wake_model_status", new { status = decision, newEvent = newCompletion });
+            if (newCompletion)
+                _tray?.ShowBalloonTip(12000, "Open Browser: projekt ukończony",
+                    "Projekt zakończył pracę. Harmonogram wybudzeń wyłączono.",
+                    ToolTipIcon.Info);
             UpdateMultiWakeStatus();
             return true;
         }
         if (!LiteOwnerInterventions.IsIntervention(decision)) return false;
         string eventKey = LiteOwnerInterventions.EventKey(
             due.Url, decision, answerHash);
-        bool newEvent = !string.Equals(due.LastInterventionKey, eventKey,
-            StringComparison.Ordinal);
+        string nextStatus = decision == "WAIT_USER" ? "status_wait_user" : "status_blocked";
+        // Alert only on a real state transition. Changed answer hashes in the
+        // same WAIT_USER/BLOCKED state do not create new owner alerts.
+        // Keep the answer-specific event key for durable outbox dedup.
+        bool newEvent = !string.Equals(due.LastState, nextStatus, StringComparison.Ordinal);
         due.Enabled = false;
-        due.LastState = decision == "WAIT_USER" ? "status_wait_user" : "status_blocked";
+        due.LastState = nextStatus;
         string projectTitle = LiteProjectRegistry.OpenDefault().Projects
             .FirstOrDefault(p => p.Chats.Any(c => c.Url == due.Url))?.Title
             ?? "Projekt";
@@ -842,22 +1102,274 @@ internal sealed partial class ChatGptLiteForm
         reason is "response_error" or "assistant_not_complete"
             ? Math.Max(requested, 15) : requested;
 
+    // Recovery failures are one bounded class, even when the observed
+    // DOM symptom changes between consecutive polls. Do not let alternating
+    // failure labels keep an OBL lead blocked indefinitely.
+    internal static bool IsOblRecoverableDeferral(string reason) =>
+        reason is "definitely_unsent" or "receipt_uncertain" or
+            "draft_present" or "probe_failed" or "no_composer" or
+            "wrong_chat" or "response_error" or "worker_exception" or
+            "background_navigation_failed" or "worker_conversation_list_429" or
+            "worker_app_problem" or "view_recovery_unready" or
+            "view_recovery_navigation_failed" or
+            "forced_wake_composer_not_ready";
+
+    internal static int NextOblDeferralCount(string previousReason,
+        int previousCount, string currentReason, bool isOblLead)
+    {
+        bool sameReason = string.Equals(previousReason, currentReason,
+            StringComparison.Ordinal);
+        // P0 obl-5w3 wake340: HTTP429 has its own six-attempt budget.
+        // NIEAKTUALNE: mixing earlier editor failures into HTTP429 retries.
+        bool bothRecoverable = isOblLead &&
+            previousReason != "worker_conversation_list_429" &&
+            currentReason != "worker_conversation_list_429" &&
+            // P0 wake348: NIEAKTUALNE combining navigation failures with
+            // editor failures into one three-strike rotation counter.
+            previousReason != "background_navigation_failed" &&
+            currentReason != "background_navigation_failed" &&
+            // P0 wake349: transient worker error shells are not editor
+            // failures and must not inherit their rotation counter.
+            previousReason != "worker_app_problem" &&
+            currentReason != "worker_app_problem" &&
+            // P0 wake353: response_error is not proof of a missing composer.
+            previousReason != "response_error" &&
+            currentReason != "response_error" &&
+            // P0 wake354: a transient worker exception cannot prove a lost
+            // composer. NIEAKTUALNE: mixing worker exceptions with editor
+            // failures to trigger a three-strike successor rotation.
+            previousReason != "worker_exception" &&
+            currentReason != "worker_exception" &&
+            IsOblRecoverableDeferral(previousReason) &&
+            IsOblRecoverableDeferral(currentReason);
+        return sameReason || bothRecoverable
+            ? Math.Min(9999, previousCount + 1) : 1;
+    }
+
+    internal static bool RotateOblAfterRepeatedDeferral(string reason, int count) =>
+        count >= 3 && IsOblRecoverableDeferral(reason);
+
+    // A reserved N may be followed by an ambiguous JS/DOM result. Probe
+    // on the next poll after receipt checks, including uncertain clicks.
+    // A known click is not evidence of delivery and is NOT counted as a
+    // failed composer; an unknown click outcome retries the same chat.
+    internal static bool RecordOblUncertainSend(
+        LiteChatWakeRegistry.Chat entry, DateTimeOffset now,
+        bool clickInvoked)
+    {
+        var originalDue = entry.DueUtc;
+        // P0 obl-5w3 wake383: NIEAKTUALNE OBL: 2-minute hold when no Send click was confirmed.
+        // P0 wake385: NIEAKTUALNE OBL: 2m post-click hold after 30s receipt probe.
+        entry.DueUtc = now.AddSeconds(-1);
+        entry.LastState = clickInvoked
+            ? "receipt_uncertain_after_click" : "send_result_uncertain";
+        entry.LastDeferralUtc = now;
+        entry.LastDeferralPreviousDueUtc = originalDue;
+        entry.LastDeferralUntilUtc = entry.DueUtc;
+        if (clickInvoked)
+        {
+            entry.ConsecutiveDeferrals = 0;
+            entry.LastDeferralReason = "receipt_uncertain_click";
+            return false;
+        }
+        int count = NextOblDeferralCount(entry.LastDeferralReason,
+            entry.ConsecutiveDeferrals, "receipt_uncertain", true);
+        entry.LastDeferralReason = "receipt_uncertain";
+        entry.ConsecutiveDeferrals = count;
+        // P0 wake352: NIEAKTUALNE for OBL: three uncertain observations
+        // forced a new lead although none proved a missing editor or lost chat.
+        // Preserve the same URL and retry at the next poll. A possible click
+        // must never be mistaken for a proven click-free composer failure.
+        return false;
+    }
+
+    // A click-free outcome is a recoverable failure, not a sent wake.
+    // Keep a durable counter across reserved sequence numbers and across
+    // alternating preflight/post-send failures. Never touch the old draft.
+    internal static bool RecordDefinitelyUnsentWake(
+        LiteChatWakeRegistry.Chat entry, DateTimeOffset now,
+        string reason, bool isOblLead)
+    {
+        var originalDue = entry.DueUtc;
+        entry.LastAnswerFingerprint = "";
+        // P0 obl-5w3 wake374: NIEAKTUALNE for OBL: a generic 2-minute
+        // cooldown after an explicitly verified no-click sender result.
+        // P0 obl-5w3 wake382: NIEAKTUALNE for OBL: two-minute hold when
+        // sendDirect rejected input as invalid BEFORE any click. Retry on the
+        // next ordinary poll with fresh routing/payload; do not remove JS
+        // validation, route, draft, Stop or click safety guards.
+        // This never processes receipt_uncertain/attempted clicks.
+        entry.DueUtc = isOblLead ? now.AddSeconds(-1) : now.AddMinutes(2);
+        entry.LastState = "waiting_" + reason;
+        if (!isOblLead) return false;
+        // P0 obl-5w3 wake373: NIEAKTUALNE for OBL: treating a returned
+        // blocked_editor_changed as uncertain delivery although no click ran.
+        // The editor changed under our staged payload: leave it untouched
+        // and continue in a separate lead rather than overwrite or retry it.
+        if (reason == "blocked_editor_changed")
+        {
+            entry.ConsecutiveDeferrals = 0;
+            entry.LastDeferralReason = "editor_changed_before_click";
+            entry.LastDeferralUtc = now;
+            entry.LastDeferralPreviousDueUtc = originalDue;
+            if (entry.EmergencyPhase.Length != 0)
+            {
+                entry.LastDeferralUntilUtc = entry.DueUtc;
+                return false;
+            }
+            entry.EmergencyPhase = "rotate";
+            entry.EmergencyReason = "changed_editor_separate_lead";
+            entry.EmergencyHandoffPath = "";
+            entry.DueUtc = now.AddSeconds(-1);
+            entry.LastDeferralUntilUtc = entry.DueUtc;
+            entry.LastState = "recovery_rotating_changed_editor";
+            return true;
+        }
+        if (reason == "busy_draft_present" && entry.EmergencyPhase.Length == 0)
+        {
+            // P0 2026-11-02: no click was made, and this editor holds a draft.
+            // Preserve it untouched; rotate now, not after three 2-minute holds.
+            // This keeps the default decision to attempt a wake under uncertainty.
+            entry.LastDeferralReason = "draft_preserved_rotate";
+            entry.LastDeferralUtc = now;
+            entry.LastDeferralPreviousDueUtc = originalDue;
+            entry.EmergencyPhase = "rotate";
+            entry.EmergencyReason = "occupied_draft_separate_lead";
+            entry.EmergencyHandoffPath = "";
+            entry.DueUtc = now.AddSeconds(-1);
+            entry.LastDeferralUntilUtc = entry.DueUtc;
+            entry.LastState = "recovery_rotating_preserved_draft";
+            entry.ConsecutiveDeferrals = 0;
+            return true;
+        }
+        // A late Stop control can appear after the earlier preflight.
+        // Active generation is NOT a failed composer-recovery attempt.
+        if (reason is "busy_generating" or "blocked_generation")
+        {
+            // P0 obl-5w3 wake358: NIEAKTUALNE for OBL: two-minute
+            // retry on a generating editor. Do not interrupt generation
+            // or touch the draft; continue with a separate new lead.
+            entry.ConsecutiveDeferrals = 0;
+            entry.LastDeferralReason = "generating";
+            entry.LastDeferralUtc = now;
+            entry.LastDeferralPreviousDueUtc = originalDue;
+            if (entry.EmergencyPhase.Length != 0)
+            {
+                entry.LastDeferralUntilUtc = entry.DueUtc;
+                return false;
+            }
+            entry.EmergencyPhase = "rotate";
+            entry.EmergencyReason = "busy_generating_separate_lead";
+            entry.EmergencyHandoffPath = "";
+            entry.DueUtc = now.AddSeconds(-1);
+            entry.LastDeferralUntilUtc = entry.DueUtc;
+            entry.LastState = "recovery_rotating_busy_generating";
+            return true;
+        }
+        // P0 wake355: NIEAKTUALNE: blocked_navigation was treated as proof
+        // of a missing composer and forced immediate lead rotation.
+        // Route changes before click require retry on the original URL,
+        // not creation of another chat. Keep sender URL fencing intact.
+        // P0 obl-5w3 wake372: NIEAKTUALNE for OBL: waiting two minutes
+        // after submitDirect proves the composer was replaced BEFORE click.
+        // Reprobe the same registered chat on the normal poll; the fresh
+        // sender still fences owner draft, Stop, URL and composer identity.
+        if (reason is "blocked_navigation" or "blocked_editor_replaced")
+        {
+            // P0 obl-5w3 wake371: NIEAKTUALNE for OBL: two-minute
+            // hold after a proven no-click sender route change.
+            // Retry the registered URL at the next normal 20s poll.
+            // Do not rotate or click twice on an uncertain receipt.
+            entry.DueUtc = now.AddSeconds(-1);
+            entry.ConsecutiveDeferrals = 0;
+            entry.LastDeferralReason = reason == "blocked_navigation"
+                ? "navigation_changed" : "editor_replaced_before_click";
+            entry.LastDeferralUtc = now;
+            entry.LastDeferralPreviousDueUtc = originalDue;
+            entry.LastDeferralUntilUtc = entry.DueUtc;
+            return false;
+        }
+        int count = NextOblDeferralCount(entry.LastDeferralReason,
+            entry.ConsecutiveDeferrals, "definitely_unsent", true);
+        entry.ConsecutiveDeferrals = count;
+        entry.LastDeferralReason = "definitely_unsent";
+        entry.LastDeferralUtc = now;
+        entry.LastDeferralPreviousDueUtc = originalDue;
+        entry.LastDeferralUntilUtc = entry.DueUtc;
+        // P0 obl-5w3 2026-11-02: the JS sender explicitly reported no editor
+        // and no click, so waiting for three further attempts cannot help.
+        // NIEAKTUALNE for these two causes: repeated-deferral threshold.
+        bool missingComposer = reason is "missing_composer" or "busy_missing_composer" or "draft_button_missing";
+        // P0 wake360: NIEAKTUALNE for OBL: generic three-strike rotation
+        // on an explicit no-click result that did NOT prove a lost editor.
+        // Only a concrete missing composer warrants a separate lead here.
+        // Other definite no-click states retain diagnostics and retry the
+        // same target URL; never overwrite an existing user-owned draft.
+        if (!missingComposer || entry.EmergencyPhase.Length != 0) return false;
+        entry.EmergencyPhase = "rotate";
+        entry.EmergencyReason = "sender_missing_composer_separate_lead";
+        entry.EmergencyHandoffPath = "";
+        entry.DueUtc = now.AddSeconds(-1);
+        entry.LastDeferralUntilUtc = entry.DueUtc;
+        entry.LastState = "recovery_rotating_sender_no_composer";
+        return true;
+    }
+
     private void DeferWakeWithoutSend(string url, DateTimeOffset now,
         string reason, int minutes = 2)
     {
-        minutes = WakeDeferralMinutes(reason, minutes);
+        bool oblLead = LiteProjectRegistry.OpenDefault().Projects.Any(p =>
+            p.Key == "obl" && p.Chats.Any(c => c.Url == url && c.Role == "lead"));
+        if (!oblLead) minutes = WakeDeferralMinutes(reason, minutes);
         var registered = LiteChatWakeRegistry.Read();
         var entry = registered.FirstOrDefault(c => c.Url == url && c.Enabled);
         if (entry is null) return;
+        var originalDue = entry.DueUtc;
         entry.DueUtc = now.AddMinutes(minutes);
+        int consecutive = NextOblDeferralCount(entry.LastDeferralReason,
+            entry.ConsecutiveDeferrals, reason, oblLead);
+        entry.LastDeferralReason = reason;
+        entry.LastDeferralUtc = now;
+        entry.LastDeferralPreviousDueUtc = originalDue;
+        entry.LastDeferralUntilUtc = entry.DueUtc;
+        entry.ConsecutiveDeferrals = consecutive;
         // Backpressure, generation and hydration deferrals are NOT proof
         // that an earlier own-draft recovery did not click. Keep the
         // ambiguity marker durable through every unrelated deferral.
         entry.LastState = NextStateAfterWakeDeferral(entry.LastState, reason);
+        bool draftRequiresNewLead = oblLead && reason == "draft_present";
+        // NIEAKTUALNE for OBL: rotation on view_recovery_unready,
+        // view_recovery_navigation_failed or forced_wake_composer_not_ready.
+        // These are navigation/preflight states, not proof that the editor
+        // is absent. Only explicit no_composer warrants immediate rotation.
+        bool composerUnavailable = oblLead && reason == "no_composer";
+        // P0 wake360: NIEAKTUALNE for OBL: generic repeated-deferral
+        // threshold could create a new chat without proving editor loss.
+        // Only a known draft or concretely unavailable composer rotates;
+        // all other preflight uncertainties retry the same registered URL.
+        bool rotate = oblLead && entry.EmergencyPhase.Length == 0 &&
+            (draftRequiresNewLead || composerUnavailable);
+        if (rotate)
+        {
+            // Do not touch the unreadable /c/ or its possible user draft.
+            // The next poll creates a separate successor and retains N+1.
+            entry.EmergencyPhase = "rotate";
+            entry.EmergencyReason = draftRequiresNewLead
+                ? "occupied_draft_separate_lead" : composerUnavailable
+                ? "editor_unavailable_separate_lead" : "repeated_" + reason;
+            entry.EmergencyHandoffPath = "";
+            entry.DueUtc = now.AddSeconds(-1);
+            entry.LastDeferralUntilUtc = entry.DueUtc;
+            entry.LastState = draftRequiresNewLead
+                ? "recovery_rotating_preserved_draft" : composerUnavailable
+                ? "recovery_rotating_no_composer" : "recovery_rotating_after_deferrals";
+        }
         LiteChatWakeRegistry.Write(registered);
-        LiteWakeJournal.Write("deferred", entry.WakeSequence + 1, result: reason);
+        LiteWakeJournal.Write("deferred", entry.WakeSequence + 1,
+            result: rotate ? "rotation_after_" + reason : reason);
         LiteEventLog.Write("multi_wake_preflight_skipped", new {
-            reason, retryMinutes = minutes, definitelyNotSent = true
+            reason, retryMinutes = rotate ? 0 : minutes,
+            consecutive, rotateToSeparateChat = rotate, definitelyNotSent = true
         });
         UpdateMultiWakeStatus();
     }
@@ -869,7 +1381,7 @@ internal sealed partial class ChatGptLiteForm
         var now = DateTimeOffset.UtcNow;
         TimeSpan remaining = _wakeRead429Throttle.Remaining(now);
         if (remaining <= TimeSpan.Zero) return false;
-        int retryMinutes = Math.Clamp((int)Math.Ceiling(remaining.TotalMinutes), 1, 5);
+        int retryMinutes = Math.Clamp((int)Math.Ceiling(remaining.TotalMinutes), 1, 30);
         DeferWakeWithoutSend(due.Url, now, "backend_http_429", retryMinutes);
         return true;
     }
@@ -880,15 +1392,26 @@ internal sealed partial class ChatGptLiteForm
         return !useForeground && !gate.MayProbe(now);
     }
 
-    internal static bool IsDefinitelyUnsentWake(string result, string phase)
+    internal static bool IsDefinitelyUnsentWake(string result, string phase, bool isOblLead = false)
     {
         // A committed attempt is NOT synonymous with a clicked Send button.
         // Only explicit no-click states may release the durable answer fence.
         // already_attempted MAY have clicked previously; never auto-retry it.
-        return result.StartsWith("busy_", StringComparison.Ordinal) ||
-            result is "missing_composer" or "invalid" or "blocked_navigation" ||
+        // P0 wake393: NIEAKTUALNE for OBL: pre-injection editor replacement
+        // or generation was treated as uncertain delivery. sendDirect returns
+        // these states before any submitDirect/click; preserve owner draft.
+        return (isOblLead && (result is "blocked_editor_replaced" or "blocked_generation")) ||
+            result.StartsWith("busy_", StringComparison.Ordinal) ||
+            // P0 obl-5w3 wake379: NIEAKTUALNE for OBL: missing JS sender
+            // classified as uncertain delivery. The optional sendDirect call
+            // returns null when the sender is absent: no click was possible.
+            // This does NOT include already_attempted or a timed-out click.
+            result is "missing_composer" or "invalid" or "blocked_navigation" or
+                "blocked_editor_changed" or "sender_missing" ||
             (result == "submission_requested" &&
-                (phase == "draft_button_missing" ||
+                // P0 wake392 NIEAKTUALNE for OBL: missing submitDirect after
+                // host-managed staging was marked uncertain despite no click.
+                (phase == "draft_button_missing" || phase == "sender_missing" ||
                  phase.StartsWith("blocked_", StringComparison.Ordinal)));
     }
 
@@ -910,6 +1433,16 @@ internal sealed partial class ChatGptLiteForm
                 ? foreground : due[0];
     }
 
+    private readonly Dictionary<string, DateTimeOffset> _wakeViewRecoveryUtc =
+        new(StringComparer.Ordinal);
+
+    internal static bool ShouldRestoreChatView(string reason, bool draftPresent,
+        DateTimeOffset now, DateTimeOffset lastRestore, TimeSpan? cooldown = null)
+    {
+        if (draftPresent || reason is not ("no_composer" or "response_error"))
+            return false;
+        return now - lastRestore >= (cooldown ?? TimeSpan.FromMinutes(5));
+    }
     private async Task PollAllChatWakesAsync()
     {
         if (!_multiWakeEnabled || !_ownsMultiWakeMutex ||
@@ -917,16 +1450,26 @@ internal sealed partial class ChatGptLiteForm
         _chatWakeBusy = true;
         try
         {
+            LiteWakeEvidenceReconciler.Observe();
+            LiteCheckpointRetention.Observe();
             var entries = LiteChatWakeRegistry.Read();
             var now = DateTimeOffset.UtcNow;
             var foregroundUrl = _browser.CoreWebView2?.Source;
             var due = SelectDueChat(entries, now, foregroundUrl);
             if (due is null) { UpdateMultiWakeStatus(); return; }
+            bool minimalOblWake = LiteProjectRegistry.OpenDefault().Projects.Any(p => p.Key == "obl" && p.Chats.Any(c => c.Url == due.Url && c.Role == "lead"));
+            // Emergency N.1 is independent of normal N+1 numbering.
+            if (await HandleEmergencyBeforeWakeAsync(due))
+            { UpdateMultiWakeStatus(); return; }
+            // Boundary ...0 or emergency takeover: first message to successor
+            // is the next ordinary numbered wake, never an extra seed.
+            if (await RotateLeadBeforeWakeAsync(due))
+            { UpdateMultiWakeStatus(); return; }
             LiteWakeJournal.Write("due", due.WakeSequence + 1);
             // The read-only API cooldown applies to automated probes only.
             // Post submission and user-initiated foreground browsing are not retried.
-            if (HoldWakeOnBackendRead429(due)) return;
-            if (!FlushNotes())
+            if (!minimalOblWake && HoldWakeOnBackendRead429(due)) return;
+            if (!minimalOblWake && !FlushNotes())
             {
                 LiteWakeJournal.Write("deferred", due.WakeSequence + 1,
                     result: "notes_save_failed");
@@ -945,7 +1488,7 @@ internal sealed partial class ChatGptLiteForm
                     LiteDevWakeState.IsChatUrl(foreground.Source) &&
                     LiteDevWakeState.NormalizeUrl(foreground.Source) == due.Url;
                 backgroundAttempt = !useForeground;
-                if (ShouldDeferWorkerProbe(useForeground,
+                if (!minimalOblWake && ShouldDeferWorkerProbe(useForeground,
                     _workerProbeBackpressure, DateTimeOffset.UtcNow))
                 {
                     LiteEventLog.Write("multi_wake_worker_cooldown", new {
@@ -965,15 +1508,32 @@ internal sealed partial class ChatGptLiteForm
                         workerCore.MemoryUsageTargetLevel = CoreWebView2MemoryUsageTargetLevel.Normal;
                 }
                 var wakeCore = useForeground ? foreground! : _chatWakeWorker.CoreWebView2;
-                if (wakeCore is null || (!useForeground && !await NavigateWorkerAsync(due.Url)))
+                if (wakeCore is null || (!useForeground && !await NavigateWorkerAsync(due.Url, minimalOblWake)))
                 {
-                    DeferWakeWithoutSend(due.Url, now, "background_navigation_failed");
+                    // P0 incident rollback: NIEAKTUALNE: immediate OBL rotation for navigation failure.
+                    // Preserve the two-minute retry instead of creating another chat.
+                    // P0 obl-5w3: HTTP 429 on GET /conversations is not proof
+                    // the old lead is gone. NIEAKTUALNE: rotate after three
+                    // fast failed hydration reads under this backend limit.
+                    bool workerList429 = minimalOblWake &&
+                        DateTimeOffset.UtcNow - _lastWorkerConversationList429Utc <
+                            TimeSpan.FromMinutes(2);
+                    // P0 obl-5w3 wake369: NIEAKTUALNE: one-minute OBL hold
+                    // after ordinary worker navigation failure without 429.
+                    // Retry the same URL on the next 20s poll. Keep the 1m
+                    // backoff only for a real worker conversation-list 429.
+                    // P0 wake388: NIEAKTUALNE OBL: 1m worker-429 hold even
+                    // though no Send click occurred; retry next normal poll.
+                    DeferWakeWithoutSend(due.Url, DateTimeOffset.UtcNow,
+                        workerList429 ? "worker_conversation_list_429" :
+                        "background_navigation_failed",
+                        minimalOblWake ? 0 : workerList429 ? 1 : 2);
                     return;
                 }
                 else
                 {
                     // Navigation can receive HTTP 429 after the first gate.
-                    if (HoldWakeOnBackendRead429(due)) return;
+                    if (!minimalOblWake && HoldWakeOnBackendRead429(due)) return;
                     LiteEventLog.Write("multi_wake_target_selected", new { foreground = useForeground });
                     // Re-read the settings in case the operator paused the chat
                     // while the worker was navigating.
@@ -985,10 +1545,126 @@ internal sealed partial class ChatGptLiteForm
                     due = selected;
                     var preflight = await CheckWorkerPreflightAsync(
                         wakeCore, due.Url,
-                        due.LastAnswerFingerprint);
+                        due.LastAnswerFingerprint, minimalOblWake);
+                    // P0 2026-11-02 wake334: foreground conversation can be an
+                    // unhydrated error shell for minutes while the same URL
+                    // remains usable in the existing background worker.
+                    // NIEAKTUALNE for OBL: poll the broken foreground shell
+                    // on every tick without attempting the same-chat worker.
+                    // This fallback does not open a new conversation or rotate.
+                    // P0 obl-5w3 wake344: NIEAKTUALNE immediate foreground
+                    // connection_interrupted emergency before same-chat worker fallback.
+                    // P0 obl-5w3 wake400: NIEAKTUALNE for OBL: a foreground
+                    // no_composer forces a new lead without first trying the
+                    // existing background worker on the SAME verified URL.
+                    // A missing foreground editor is not proof that the chat
+                    // cannot send from its isolated worker. No owner draft is
+                    // touched; sendDirect still checks route, Stop and draft.
+                    if (minimalOblWake && useForeground &&
+                        preflight.Reason is ("chatgpt_app_problem" or "connection_interrupted" or "no_composer") &&
+                        !preflight.DraftPresent)
+                    {
+                        LiteEventLog.Write("multi_wake_foreground_error_worker_fallback",
+                            new { wakeSequence = due.WakeSequence + 1,
+                                reason = preflight.Reason, sameChat = true });
+                        await EnsureWakeWorkerAsync();
+                        var fallbackCore = _chatWakeWorker.CoreWebView2;
+                        if (fallbackCore is null ||
+                            !await NavigateWorkerAsync(due.Url, minimalOblWake))
+                        {
+                            // P0 obl-5w3 wake341: NIEAKTUALNE for worker 429:
+                            // generic two-minute navigation deferral in this fallback.
+                            // [NIEAKTUALNE for OBL no_composer 2026-11-03]
+                            // Keep retrying the same lead, never create another chat here.
+                            // [END NIEAKTUALNE] Applies only to transient worker errors.
+                            bool workerList429 = DateTimeOffset.UtcNow -
+                                _lastWorkerConversationList429Utc < TimeSpan.FromMinutes(2);
+                            // P0 wake401: NIEAKTUALNE for OBL: after a visible
+                            // foreground no_composer and failed same-chat worker,
+                            // retrying that unsendable pair forever. No draft
+                            // was observed and no Send click was made. Without
+                            // HTTP 429, rotate to a clean lead on next poll.
+                            // With actual 429, keep the original lead: a rate
+                            // limit alone does not prove editor loss.
+                            if (minimalOblWake && preflight.Reason == "no_composer" &&
+                                !workerList429)
+                            {
+                                DeferWakeWithoutSend(due.Url, DateTimeOffset.UtcNow,
+                                    "no_composer", 0);
+                                return;
+                            }
+                            // P0 obl-5w3 wake369: same no-429 fast retry
+                            // in foreground error -> worker fallback.
+                            // No duplicate click: this path is pre-send.
+                            // P0 wake388 NIEAKTUALNE OBL: 1m worker-429 hold.
+                            DeferWakeWithoutSend(due.Url, DateTimeOffset.UtcNow,
+                                workerList429 ? "worker_conversation_list_429" :
+                                "background_navigation_failed",
+                                minimalOblWake ? 0 : workerList429 ? 1 : 2);
+                            return;
+                        }
+                        // The owner may disable the schedule while navigating.
+                        entries = LiteChatWakeRegistry.Read();
+                        var currentTarget = entries.FirstOrDefault(
+                            x => x.Url == due.Url && x.Enabled);
+                        if (currentTarget is null ||
+                            currentTarget.DueUtc > DateTimeOffset.UtcNow) return;
+                        due = currentTarget;
+                        wakeCore = fallbackCore;
+                        useForeground = false;
+                        backgroundAttempt = true;
+                        preflight = await CheckWorkerPreflightAsync(
+                            wakeCore, due.Url, due.LastAnswerFingerprint,
+                            minimalOblWake);
+                    }
                     // A blocked history request during preflight must not be
                     // misinterpreted as a hydrated, eligible conversation.
-                    if (HoldWakeOnBackendRead429(due)) return;
+                    if (!minimalOblWake && HoldWakeOnBackendRead429(due)) return;
+                    // P0 obl-5w3: worker navigation can finish before a
+                    // rate-limited conversation-list request is resolved.
+                    // An unhydrated worker page under a recent HTTP 429 is
+                    // not proof that the existing lead was lost. Retry its
+                    // exact URL before allowing emergency chat rotation.
+                    // NIEAKTUALNE: rotate on this transient worker 429 shell.
+                    // P0 wake343: interrupted connection under actual worker 429
+                    // is the same transient hydration failure, not a lost chat.
+                    // P0 wake388 NIEAKTUALNE OBL: 1m hold for this pre-send shell.
+                    if (minimalOblWake && !useForeground &&
+                        preflight.Reason is ("chatgpt_app_problem" or "connection_interrupted") &&
+                        DateTimeOffset.UtcNow - _lastWorkerConversationList429Utc <
+                            TimeSpan.FromMinutes(2))
+                    {
+                        DeferWakeWithoutSend(due.Url, DateTimeOffset.UtcNow,
+                            "worker_conversation_list_429", 0);
+                        return;
+                    }
+                    // P0 obl-5w3 wake342: a worker app-error shell without
+                    // HTTP429 is still not evidence that this chat is gone.
+                    // NIEAKTUALNE for OBL: immediate emergency rotation on
+                    // the first worker chatgpt_app_problem observation.
+                    // P0 wake349: NIEAKTUALNE for a transient worker app
+                    // shell: rotate the lead after three such deferrals.
+                    // Retry the SAME URL; do not touch user drafts.
+                    // P0 wake343: NIEAKTUALNE immediate new-lead rotation on
+                    // a single worker connection_interrupted observation.
+                    if (minimalOblWake && !useForeground &&
+                        preflight.Reason is ("chatgpt_app_problem" or "connection_interrupted"))
+                    {
+                        DeferWakeWithoutSend(due.Url, DateTimeOffset.UtcNow,
+                            // P0 obl-5w3 wake376: NIEAKTUALNE for OBL:
+                            // 1m cooldown for transient non-429 app shell.
+                            // Keep HTTP 429 throttle on its separate path.
+                            "worker_app_problem", 0);
+                        return;
+                    }
+                    if (preflight.Reason is "conversation_length_exceeded" or
+                        "chatgpt_app_problem" or "connection_interrupted")
+                    {
+                        MarkWakeEmergency(due.Url, preflight.Reason, "wake_preflight");
+                        return;
+                    }
+                    if (await HandleStalledLeadAsync(due, wakeCore,
+                        preflight.Reason)) return;
                     var gate = ChooseWakePreflightGate(
                         preflight.Complete, due.LastState,
                         due.LastAnswerFingerprint, preflight.Reason, preflight.Hash);
@@ -1002,7 +1678,10 @@ internal sealed partial class ChatGptLiteForm
                         UpdateMultiWakeStatus();
                         return;
                     }
-                    if (gate == WakePreflightGate.HoldUnconfirmedRecovery)
+                    // An uncertain previous wake is NOT a reason to hold OBL.
+                    // Extra wake is allowed; continuity has priority.
+                    if (ShouldHoldUnconfirmedRecoveryForProject(
+                        gate, minimalOblWake))
                     {
                         // Only verified terminal completion may override the
                         // recovery fence without the old answer's fingerprint.
@@ -1017,15 +1696,19 @@ internal sealed partial class ChatGptLiteForm
                         return;
                     }
                     if (HandleVerifiedModelStatus(due, entries,
-                        preflight.Status, preflight.Reason, preflight.Hash))
+                        preflight.Status, preflight.Reason, preflight.Hash,
+                        minimalOblWake))
                         return;
-                    if (preflight.Reason == "draft_present")
+                    // NIEAKTUALNE dla OBL od 2026-11-02: analiza/odzyskiwanie szkicow
+                    // nie jest bramka wybudzenia. Stara sciezka dotyczy innych projektow.
+                    if (!minimalOblWake && preflight.Reason == "draft_present")
                     {
                         // A previous attempt may have left OUR unique OB wake
                         // in the editor. Retry only that draft, never user text.
                         var encoded = await ExecuteWorkerScriptAsync(wakeCore,
                             "window.__OPENBROWSER_RESUME_SENDER__?.submitOwnDraft(" +
-                            JsonSerializer.Serialize(new Uri(due.Url).AbsolutePath) + ")");
+                            JsonSerializer.Serialize(new Uri(due.Url).AbsolutePath) + "," +
+                            JsonSerializer.Serialize(due.WakeSequence) + ")");
                         var recovery = JsonSerializer.Deserialize<string>(encoded)
                             ?? "sender_missing";
                         if (recovery is "click_invoked" or "already_visible" or
@@ -1074,46 +1757,197 @@ internal sealed partial class ChatGptLiteForm
                             return;
                         }
                     }
-                    if (preflight.Reason != "ready")
+                    // P0 obl-5w3 2026-11-02: NIEAKTUALNE dla OBL: view reload and 45-second cooldown.
+                    // A missing or failed editor means rotate to a clean lead now, without touching the old draft.
+                    if (minimalOblWake && preflight.Reason == "no_composer")
                     {
-                        DeferWakeWithoutSend(due.Url, now, preflight.Reason,
-                            preflight.Reason == "same_answer_already_woken"
-                                ? due.EffectiveMinutes : 2);
+                        DeferWakeWithoutSend(due.Url, DateTimeOffset.UtcNow, preflight.Reason, 0);
                         return;
                     }
-                    // Request a handoff ONCE at a conservative wake-age
-                    // threshold; normal wake safety and answer fencing remain.
-                    bool isLead = LiteProjectRegistry.OpenDefault().Projects.Any(p =>
-                        p.Chats.Any(c => c.Role == "lead" && c.Url == due.Url));
-                    if (LiteChatHandoff.NeedsRotation(due, isLead,
-                        preflight.ObservedTurns) &&
-                        !LiteChatHandoff.AutonomousSuccessorReady)
-                        LiteEventLog.Write("project_handoff_auto_gated", new {
-                            wakeSequence = due.WakeSequence,
-                            reason = "unattended_successor_not_verified"
-                        });
-                    if (LiteChatHandoff.Request(due, manual: false,
-                        isRegisteredProjectLead: isLead,
-                        observedTurns: preflight.ObservedTurns))
-                        LiteEventLog.Write("project_handoff_auto_requested", new {
-                            wakeSequence = due.WakeSequence, threshold =
-                                LiteChatHandoff.SuggestAfterWakeAttempts
-                        });
+                    // P0: ChatGPT's full-page failure or missing editor can
+                    // recover by reopening the exact same chat URL.
+                    // Navigation is NOT a send; do not issue a second click.
+                    var restoreNow = DateTimeOffset.UtcNow;
+                    _wakeViewRecoveryUtc.TryGetValue(due.Url, out var lastRestore);
+                    if (!minimalOblWake && ShouldRestoreChatView(preflight.Reason,
+                        preflight.DraftPresent, restoreNow, lastRestore,
+                        minimalOblWake ? TimeSpan.FromSeconds(45) : null) &&
+                        LiteDevWakeState.IsChatUrl(wakeCore.Source) &&
+                        LiteDevWakeState.NormalizeUrl(wakeCore.Source) == due.Url)
+                    {
+                        var latest = LiteChatWakeRegistry.Read()
+                            .FirstOrDefault(c => c.Url == due.Url);
+                        if (latest is not null && latest.Enabled)
+                        {
+                            _wakeViewRecoveryUtc[due.Url] = restoreNow;
+                            if (!minimalOblWake)
+                            {
+                                wakeCore.Navigate(due.Url);
+                                DeferWakeWithoutSend(due.Url, restoreNow,
+                                    "view_recovery_navigation", 2);
+                                return;
+                            }
+                            // Only OBL: one bounded reload and immediate stable
+                            // preflight, instead of a separate 2-minute hold.
+                            var navigation = new TaskCompletionSource<bool>(
+                                TaskCreationOptions.RunContinuationsAsynchronously);
+                            void OnReload(object? _, CoreWebView2NavigationCompletedEventArgs e)
+                                => navigation.TrySetResult(e.IsSuccess);
+                            bool reloadOk = false;
+                            wakeCore.NavigationCompleted += OnReload;
+                            try
+                            {
+                                wakeCore.Navigate(due.Url);
+                                reloadOk = await navigation.Task.WaitAsync(
+                                    TimeSpan.FromSeconds(12));
+                            }
+                            catch (TimeoutException)
+                            {
+                                LiteEventLog.Write("multi_wake_view_recovery_timeout",
+                                    new { wakeSequence = due.WakeSequence + 1 });
+                            }
+                            finally { wakeCore.NavigationCompleted -= OnReload; }
+                            if (reloadOk && LiteDevWakeState.IsChatUrl(wakeCore.Source) &&
+                                LiteDevWakeState.NormalizeUrl(wakeCore.Source) == due.Url)
+                            {
+                                preflight = await CheckWorkerPreflightAsync(
+                                    wakeCore, due.Url, due.LastAnswerFingerprint,
+                                    minimalOblWake);
+                                if (preflight.Reason is "conversation_length_exceeded" or
+                                    "chatgpt_app_problem" or "connection_interrupted")
+                                {
+                                    MarkWakeEmergency(due.Url, preflight.Reason,
+                                        "wake_restored_preflight");
+                                    return;
+                                }
+                                if (preflight.Reason == "ready" && !preflight.DraftPresent &&
+                                    !preflight.Complete)
+                                {
+                                    entries = LiteChatWakeRegistry.Read();
+                                    var restored = entries.FirstOrDefault(
+                                        c => c.Url == due.Url);
+                                    if (restored is null || !restored.Enabled ||
+                                        restored.DueUtc > DateTimeOffset.UtcNow) return;
+                                    due = restored;
+                                    LiteEventLog.Write("multi_wake_view_recovered_same_tick",
+                                        new { wakeSequence = due.WakeSequence + 1,
+                                            noAdditionalWait = true });
+                                }
+                                else
+                                {
+                                    DeferWakeWithoutSend(due.Url,
+                                        DateTimeOffset.UtcNow, "view_recovery_unready", 1);
+                                    return;
+                                }
+                            }
+                            else
+                            {
+                                DeferWakeWithoutSend(due.Url, DateTimeOffset.UtcNow,
+                                    "view_recovery_navigation_failed", 1);
+                                return;
+                            }
+                        }
+                    }
+                    // P0 2026-11-02: a pre-existing draft is not an excuse to
+                    // postpone the wake and must never be overwritten. Switch
+                    // to a separate clean lead before reserving a wake number.
+                    if (minimalOblWake && preflight.Reason == "draft_present")
+                    {
+                        DeferWakeWithoutSend(due.Url, DateTimeOffset.UtcNow,
+                            "draft_present", 0);
+                        return;
+                    }
+                    // P0 obl-5w3 2026-11-02: history/answer instability is
+                    // not proof that the editor cannot send. When both reads
+                    // succeed Eligibility confirms route, composer and no draft.
+                    // A failed read is likewise not evidence of an unsafe send.
+                    // The sender itself must verify exact URL, composer, Stop
+                    // and draft immediately before injecting the wake.
+                    bool uncertainHistorySend = minimalOblWake &&
+                        preflight.Reason is "response_error" or "history_not_stable" or
+                        "answer_not_stable" or "probe_failed" or
+                        "assistant_not_complete"; // NIEAKTUALNE OBL: waiting for a reply before trying.
+                    // P0 2026-11-02: probe_failed is read uncertainty, not
+                    // proof that the JS sender cannot inspect its own editor.
+                    // sendDirect fences the exact URL and preserves drafts.
+                    // NIEAKTUALNE dla OBL: a failed read always deferred.
+                    // NIEAKTUALNE dla OBL: unstable history always deferred.
+                    // NIEAKTUALNE dla OBL: draft_present nie wstrzymuje wake.
+                    if (preflight.Reason != "ready" && !uncertainHistorySend &&
+                        !(minimalOblWake && preflight.Reason == "draft_present") &&
+                        due.StallPhase != "force")
+                    {
+                        // P0 obl-5w3 wake377: NIEAKTUALNE for OBL: 2m hold
+                        // after wrong-chat or navigation-changed preflight.
+                        // No click was made; retry the registered URL next poll.
+                        // Never submit into a mismatched SPA route.
+                        // P0 obl-5w3 wake380: NIEAKTUALNE for OBL: generic 2m delay after a failed preflight before any click.
+                        // Retry the same exact registered URL at the next normal poll; sendDirect still enforces URL, Stop and draft guards.
+                        int preflightRetryMinutes = minimalOblWake ? 0 : 2;
+                        DeferWakeWithoutSend(due.Url, now, preflight.Reason,
+                            preflightRetryMinutes);
+                        return;
+                    }
+                    // An explicitly forced wake continues after the single bounded STOP.
+                    if (due.StallPhase == "force" &&
+                        ((!minimalOblWake && preflight.DraftPresent) ||
+                         preflight.Reason is "wrong_chat" or "no_composer" ||
+                         (!minimalOblWake && preflight.Reason == "probe_failed")))
+                    {
+                        // P0 obl-5w3 wake381: NIEAKTUALNE for OBL: 2m hold after forced wake preflight rejects wrong route.
+                        // Keep the no-send safety fence; retry the registered lead at the next poll.
+                        DeferWakeWithoutSend(due.Url, now,
+                            "forced_wake_composer_not_ready", minimalOblWake ? 0 : 2);
+                        return;
+                    }
+                    // Automatic project rotation is now by sequence % 10:
+                    // N...9 receives HANDOFF instructions, N...0 is sent
+                    // only after RotateLeadBeforeWakeAsync verified a new lead.
+                    // The old age-based automatic WAIT_USER path is obsolete.
                     // Durable fingerprint fences uncertain sends: never resend
                     // for an unchanged assistant answer after a crash/restart.
                     due.LastAnswerFingerprint = preflight.Hash;
                     due.LastAttemptUtc = now;
-                    due.DueUtc = now.AddMinutes(due.EffectiveMinutes);
+                    // Preserve configured clock slots across delayed attempts.
+                    if (due.SlotAnchorUtc == default)
+                        due.SlotAnchorUtc = due.DueUtc;
+                    due.DueUtc = LiteChatWakeRegistry.NextFixedSlotUtc(
+                        due.SlotAnchorUtc, now, due.EffectiveMinutes);
                     due.LastState = "attempting";
                     due.WakeSequence = checked(due.WakeSequence + 1);
+                    // OBL keeps its recovery budget until a real outcome:
+                    // a reserved number is NOT evidence of a send click.
+                    if (!minimalOblWake) due.ConsecutiveDeferrals = 0;
+                    due.StallFirstDueUtc = default;
+                    due.StallPhase = "";
+                    due.StallResumeUtc = default;
+                    due.EmergencyOrdinal = 0;
                     LiteChatWakeRegistry.Write(entries);
                     attemptCommitted = true;
-                    var key = LiteChatNotes.NormalizeKey(due.Url);
+                    // P0 obl-5w3 wake402: NIEAKTUALNE for registered OBL
+                    // leads: loading notes before each numbered wake. The
+                    // OBL NumberedMessage branch never includes notes, so
+                    // that disk read cannot affect the payload and can fail
+                    // or delay the send. Other projects still attach notes.
+                    string notesSnapshot = minimalOblWake ? string.Empty :
+                        _noteStore.Load(LiteChatNotes.NormalizeKey(due.Url));
                     string receipt = Guid.NewGuid().ToString("N");
                     LiteWakeJournal.Write("attempt_reserved", due.WakeSequence, receipt);
                     string payload = LiteChatWakeRegistry.NumberedMessage(
-                        due, _noteStore.Load(key), receipt, DateTimeOffset.UtcNow);
-                    // Bind target identity inside the *same* script invocation
+                        due, notesSnapshot, receipt, DateTimeOffset.UtcNow,
+                        registeredOblLead: minimalOblWake);
+                    // Evidence of the immutable notes snapshot used for THIS receipt.
+                    // Log only length/hash of included characters, never note contents.
+                    LiteEventLog.Write("multi_wake_notes_snapshot", new {
+                        wakeSequence = due.WakeSequence, receipt,
+                        sourceChars = notesSnapshot.Length,
+                        includedChars = string.IsNullOrWhiteSpace(notesSnapshot)
+                            ? 0 : Math.Min(24000, notesSnapshot.Length),
+                        truncated = notesSnapshot.Length > 24000,
+                        includedSha256 = LiteChatWakeRegistry.DeliveredNotesFingerprint(
+                            notesSnapshot),
+                        payloadUtf8Bytes = System.Text.Encoding.UTF8.GetByteCount(payload)
+                    });                    // Bind target identity inside the *same* script invocation
                     // that injects the prompt. A changed SPA route must not send.
                     string js = "window.__OPENBROWSER_RESUME_SENDER__?.sendDirect(" +
                         JsonSerializer.Serialize(payload) + "," +
@@ -1122,23 +1956,31 @@ internal sealed partial class ChatGptLiteForm
                     var result = await ExecuteWorkerScriptAsync(
                         wakeCore, js);
                     state = JsonSerializer.Deserialize<string>(result) ?? "sender_missing";
-                    if (IsDefinitelyUnsentWake(state, "not_submitted"))
+                    if (IsDefinitelyUnsentWake(state, "not_submitted", minimalOblWake))
                     {
                         // Confirmed no editor submission: release the answer fence,
                         // unlike an unacknowledged click where outcome is uncertain.
                         entries = LiteChatWakeRegistry.Read();
                         var unsent = entries.FirstOrDefault(x => x.Url == due.Url);
-                        if (unsent is not null && unsent.LastAttemptUtc == now)
+                        bool rotated = false;
+                        int failedCount = 0;
+                        if (unsent is not null && unsent.Enabled &&
+                            unsent.EmergencyPhase.Length == 0 &&
+                            unsent.LastAttemptUtc == now &&
+                            unsent.WakeSequence == due.WakeSequence)
                         {
-                            unsent.LastAnswerFingerprint = "";
-                            unsent.DueUtc = now.AddMinutes(2);
-                            unsent.LastState = "waiting_" + state;
+                            rotated = RecordDefinitelyUnsentWake(unsent,
+                                DateTimeOffset.UtcNow, state, minimalOblWake);
+                            failedCount = unsent.ConsecutiveDeferrals;
                             LiteChatWakeRegistry.Write(entries);
                         }
                         LiteWakeJournal.Write("definitely_unsent",
                             due.WakeSequence, receipt, "not_submitted");
                         LiteEventLog.Write("multi_wake_definitely_unsent",
-                            new { reason = state });
+                            new { reason = state, definitelyNotSent = true,
+                                failedCount, rotateToSeparateChat = rotated,
+                                retryMinutes = rotated ? 0 : 2 });
+                        UpdateMultiWakeStatus();
                         return;
                     }
                     // Page timers may be throttled when the worker is occluded.
@@ -1147,17 +1989,31 @@ internal sealed partial class ChatGptLiteForm
                     string phase = "draft_button_missing";
                     for (int attempt = 0; attempt < 7 && state == "submission_requested"; attempt++)
                     {
-                        await Task.Delay(attempt == 0 ? 750 : 400);
+                        // P0 obl-5w3 wake389: NIEAKTUALNE for OBL: mandatory 750ms
+                        // pre-submit hold. Try submitDirect immediately; its live
+                        // URL, Stop, draft, composer and payload guards remain.
+                        // If React has not hydrated Send yet, retain 400ms retries.
+                        if (!minimalOblWake || attempt > 0)
+                            await Task.Delay(attempt == 0 ? 750 : 400);
                         string flush = await ExecuteWorkerScriptAsync(
                             wakeCore,
                             "window.__OPENBROWSER_RESUME_SENDER__?.submitDirect(" +
                             JsonSerializer.Serialize(receipt) + ")");
                         phase = JsonSerializer.Deserialize<string>(flush) ?? "sender_missing";
-                        if (phase is "click_invoked" or "form_submitted" ||
+                        // P0 wake394 NIEAKTUALNE for OBL: repeatedly querying a lost
+                        // per-page receipt cannot recreate its pending entry.
+                        // Keep uncertain-delivery handling, never repeat a click.
+                        if (phase is "click_invoked" or "form_submitted" or "sender_missing" ||
+                            (minimalOblWake && phase == "unknown_receipt") ||
                             phase.StartsWith("blocked_", StringComparison.Ordinal))
                             break;
                     }
-                    if (phase == "draft_button_missing")
+                    // P0 wake399 NIEAKTUALNE for OBL: after bounded
+                    // submitDirect retries exhaust with draft_button_missing,
+                    // a second DOM metadata script cannot create a Send
+                    // control. Return the already known no-click result
+                    // without diagnostics. Other projects retain the probe.
+                    if (!minimalOblWake && phase == "draft_button_missing")
                     {
                         try
                         {
@@ -1188,33 +2044,74 @@ internal sealed partial class ChatGptLiteForm
                         // The unique receipt was NOT confirmed as submitted.
                     }
                     if (phase is "click_invoked" or "form_submitted")
+                    {
                         LiteWakeJournal.Write("submission_attempted",
                             due.WakeSequence, receipt, phase);
+                        // This is a click-attempt, NOT proof of delivery.
+                        // Hash/length of exact prepared notes can be joined
+                        // by receipt with multi_wake_notes_snapshot.
+                        LiteWakeJournal.Write("notes_submitted",
+                            due.WakeSequence, receipt, phase);
+                        LiteEventLog.Write("multi_wake_notes_submitted", new {
+                            wakeSequence=due.WakeSequence, receipt,
+                            includedChars=string.IsNullOrWhiteSpace(notesSnapshot)
+                                ? 0 : Math.Min(24000,notesSnapshot.Length),
+                            includedSha256=LiteChatWakeRegistry.DeliveredNotesFingerprint(
+                                notesSnapshot), submissionPhase=phase,
+                            deliveryNotYetConfirmed=true
+                        });
+                        // Prestage handoff at the real ...9 click. The ...0
+                        // rotation refreshes this snapshot independently.
+                        // Snapshot errors are reported but never hold the wake.
+                        if (minimalOblWake &&
+                            LiteWakeRotation.HandoffWake(due.WakeSequence))
+                        {
+                            var handoff = LiteRotationHandoffSnapshot.Save(
+                                due.Url, due.WakeSequence);
+                            LiteEventLog.Write("rotation_handoff_prestaged_on_send",
+                                new {
+                                    oldWake=due.WakeSequence,
+                                    nextWake=due.WakeSequence+1,
+                                    saved=handoff.Saved,
+                                    reason=handoff.Reason,
+                                    sha256=handoff.Sha256
+                                });
+                        }
+                    }
                     // Only after a successful submit click: wait briefly
                     // for React's real USER bubble in this exact chat.
                     // This never clicks Send a second time.
+                    var receiptClock = System.Diagnostics.Stopwatch.StartNew();
                     bool visible = state == "submission_requested" &&
                         phase is "click_invoked" or "form_submitted" &&
                         await WaitForWakeReceiptAsync(wakeCore, receipt, due.Url,
                             () => useForeground ?
-                                _foregroundWakeRouteEpoch : _workerRouteEpoch);
-                    if (!visible && IsDefinitelyUnsentWake(state, phase))
+                                _foregroundWakeRouteEpoch : _workerRouteEpoch,
+                            minimalOblWake ? "[OB-WAKE-" +
+                                due.WakeSequence.ToString("D6") + "]" : null);
+                    long receiptWaitMs = receiptClock.ElapsedMilliseconds;
+                    if (!visible && IsDefinitelyUnsentWake(state, phase, minimalOblWake))
                     {
                         entries = LiteChatWakeRegistry.Read();
                         var unsent = entries.FirstOrDefault(x => x.Url == due.Url);
+                        bool rotated = false;
+                        int failedCount = 0;
                         if (unsent is not null && unsent.Enabled &&
-                            unsent.LastAttemptUtc == now)
+                            unsent.EmergencyPhase.Length == 0 &&
+                            unsent.LastAttemptUtc == now &&
+                            unsent.WakeSequence == due.WakeSequence)
                         {
-                            unsent.LastAnswerFingerprint = "";
-                            unsent.DueUtc = DateTimeOffset.UtcNow.AddMinutes(2);
-                            unsent.LastState = "waiting_" + phase;
+                            rotated = RecordDefinitelyUnsentWake(unsent,
+                                DateTimeOffset.UtcNow, phase, minimalOblWake);
+                            failedCount = unsent.ConsecutiveDeferrals;
                             LiteChatWakeRegistry.Write(entries);
                         }
                         LiteWakeJournal.Write("definitely_unsent",
                             due.WakeSequence, receipt, phase);
                         LiteEventLog.Write("multi_wake_definitely_unsent", new {
                             reason = phase, definitelyNotSent = true,
-                            retryMinutes = 2
+                            failedCount, rotateToSeparateChat = rotated,
+                            retryMinutes = rotated ? 0 : 2
                         });
                         UpdateMultiWakeStatus();
                         return;
@@ -1222,11 +2119,18 @@ internal sealed partial class ChatGptLiteForm
                     LiteWakeJournal.Write(visible ? "receipt_confirmed" :
                         "receipt_uncertain", due.WakeSequence, receipt,
                         visible ? "visible_ack" : phase);
+                    if (visible)
+                        LiteEventLog.Write("multi_wake_delivery_confirmed", new {
+                            wakeSequence = due.WakeSequence, receipt,
+                            source = "DOM_user_bubble", elapsedMs = receiptWaitMs
+                        });
                     LiteEventLog.Write("multi_wake_send", new {
                         wakeSequence = due.WakeSequence,
                         state, phase, visibleUserBubble = visible,
                         receiptConfirmed = visible, // unique receipt; never match older messages
-                        includesNotes = !string.IsNullOrWhiteSpace(_noteStore.Load(key)),
+                        includesNotes = !string.IsNullOrWhiteSpace(notesSnapshot),
+                        receiptWaitMs, receiptEvidence = visible ? "DOM_user_bubble" : "none",
+                        receiptBudgetMs = minimalOblWake ? 30000 : 15000,
                         intervalMinutes = due.EffectiveMinutes
                     });
                     state = visible ? "visible_ack" : phase;
@@ -1249,21 +2153,62 @@ internal sealed partial class ChatGptLiteForm
                 });
                 if (!attemptCommitted)
                 {
+                    // P0 rollback: NIEAKTUALNE: immediate OBL rotation on worker_exception.
+                    // Preserve former deferral; no new chat is created for a transient error.
+                    // P0 obl-5w3 wake378: NIEAKTUALNE for OBL: two-minute
+                    // hold on an exception before reservation or any Send click.
+                    // Retry the registered URL on the normal next poll.
+                    // Exceptions after attemptCommitted retain uncertain receipts.
                     DeferWakeWithoutSend(due.Url, DateTimeOffset.UtcNow,
-                        "worker_exception");
+                        "worker_exception", minimalOblWake ? 0 : 2);
                     return;
                 }
             }
             // Merge against current DPAPI content: CLI/UI may have changed other chats meanwhile.
             entries = LiteChatWakeRegistry.Read();
             var current = entries.FirstOrDefault(x => x.Url == due.Url);
-            if (current is not null && current.LastAttemptUtc == now)
+            if (current is not null && current.LastAttemptUtc == now &&
+                current.WakeSequence == due.WakeSequence)
             {
-                // A committed send attempt might have clicked even without
-                // visible ACK: one-shot handoff requests must not be repeated.
-                LiteChatHandoff.MarkAttempted(current, attemptCommitted);
-                current.LastState = state;
-                LiteChatWakeRegistry.Write(entries);
+                // Never overwrite an owner pause or an emergency handoff
+                // that another action registered during the send attempt.
+                if (!minimalOblWake ||
+                    (current.Enabled && current.EmergencyPhase.Length == 0))
+                {
+                    LiteChatHandoff.MarkAttempted(current, attemptCommitted);
+                    bool clicked = state is "click_invoked" or "form_submitted";
+                    bool uncertain = minimalOblWake && attemptCommitted &&
+                        state != "visible_ack";
+                    bool rotate = false;
+                    if (uncertain)
+                    {
+                        rotate = RecordOblUncertainSend(current,
+                            DateTimeOffset.UtcNow, clicked);
+                        if (state.StartsWith("failed_", StringComparison.Ordinal))
+                            LiteWakeJournal.Write("receipt_uncertain",
+                                due.WakeSequence, result: "exception_after_reservation");
+                        LiteEventLog.Write("multi_wake_uncertain_retry", new {
+                            wakeSequence = due.WakeSequence,
+                            state, clicked, rotate, retryMinutes = 0,
+                            recoveryCount = current.ConsecutiveDeferrals
+                        });
+                    }
+                    else
+                    {
+                        current.LastState = state;
+                        if (minimalOblWake && (state == "visible_ack" || clicked))
+                        {
+                            current.ConsecutiveDeferrals = 0;
+                            current.LastDeferralReason = "";
+                        }
+                    }
+                    LiteChatWakeRegistry.Write(entries);
+                }
+            }
+            if (state == "visible_ack")
+            {
+                await ArchiveOlderNativeChatBatchAsync(due.Url);
+                await AuditNativeArchiveVisibilityAsync(due.Url);
             }
             UpdateMultiWakeStatus();
         }

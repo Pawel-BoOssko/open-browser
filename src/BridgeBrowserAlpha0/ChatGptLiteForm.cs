@@ -12,7 +12,7 @@ namespace BridgeBrowserAlpha0;
 internal sealed partial class ChatGptLiteForm : Form
 {
     private const string HomeUrl = "https://chatgpt.com/";
-    private readonly WebView2 _browser = new() { Dock = DockStyle.Fill };
+    private WebView2 _browser = new() { Dock = DockStyle.Fill };
     private readonly System.Windows.Forms.Timer _heartbeat = new() { Interval = 30000 };
     private readonly System.Windows.Forms.Timer _domMonitor = new() { Interval = 30000 };
     private readonly Button _domToggle = new() { Text = "DOM: włączony", Width = 125 };
@@ -87,12 +87,11 @@ internal sealed partial class ChatGptLiteForm : Form
         _status.Height = 30;
         _status.AutoEllipsis = true;
         _devWakeStatus.AutoSize = false;
-        _devWakeStatus.Width = 258;
+        _devWakeStatus.Width = 408;
         _devWakeStatus.Height = 30;
         _devWakeStatus.AutoEllipsis = true;
         overviewRow.Controls.AddRange(new Control[] {
-            _buildVersion, _status, _highIndicator, _devWakeStatus,
-            _resumeStatus
+            _buildVersion, _status, _highIndicator, _devWakeStatus
         });
         var navigationRow = new FlowLayoutPanel
         {
@@ -104,9 +103,11 @@ internal sealed partial class ChatGptLiteForm : Form
         var advancedPanel = new FlowLayoutPanel
         {
             FlowDirection = FlowDirection.TopDown, WrapContents = false,
-            Width = 225, Height = 302, Padding = new Padding(6)
+            Width = 235, Height = 450, Padding = new Padding(6),
+            AutoScroll = true
         };
         foreach (var control in new Control[] {
+            _chatWakeConfigure, _devWakeToggle, _keepalivePauseButton,
             _technicalInfoButton, _devWakePin, _resumeToggle,
             _domToggle, _hardPruneToggle, _archiveToggle,
             _openArchive, _domInfo
@@ -122,9 +123,14 @@ internal sealed partial class ChatGptLiteForm : Form
         });
         advancedButton.Click += (_, _) =>
             advanced.Show(advancedButton, new Point(0, advancedButton.Height));
+        var openProjectDashboard = new Button
+        {
+            Text = "Projekty", Width = 104
+        };
+        openProjectDashboard.Click += (_, _) =>
+            ShowProjectWorkspace();
         navigationRow.Controls.AddRange(new Control[] {
-            _back, _forward, _reload, _home, _chatWakeConfigure,
-            _devWakeToggle, _keepalivePauseButton, _inspectorToggle,
+            _back, _forward, _reload, _home, openProjectDashboard,
             advancedButton
         });
         toolbar.Controls.Add(overviewRow, 0, 0);
@@ -141,6 +147,28 @@ internal sealed partial class ChatGptLiteForm : Form
         content.SplitterDistance = 270;
         content.Panel1.Controls.Add(CreateProjectsUi());
         content.Panel2.Controls.Add(_browser);
+        // New project workspace is the default. Legacy sidebar is an
+        // explicit reversible advanced tool until all functions migrate.
+        content.Panel1Collapsed = true;
+        var legacyProjects = new Button
+        {
+            Text = "Stary panel projektow: pokaz", Width = 205, Height = 32
+        };
+        legacyProjects.Click += (_, _) =>
+        {
+            content.Panel1Collapsed = !content.Panel1Collapsed;
+            legacyProjects.Text = content.Panel1Collapsed
+                ? "Stary panel projektow: pokaz"
+                : "Stary panel projektow: ukryj";
+        };
+        advancedPanel.Controls.Add(legacyProjects);
+        advancedPanel.Controls.Add(_inspectorToggle);
+        _resumeStatus.Width = 205;
+        advancedPanel.Controls.Add(_resumeStatus);
+        var notesQuick = new Button { Text = "Notatki czatu", Width = 205, Height = 32 };
+        var activityQuick = new Button { Text = "Zdarzenia", Width = 205, Height = 32 };
+        advancedPanel.Controls.Add(notesQuick);
+        advancedPanel.Controls.Add(activityQuick);
         var workspace = new SplitContainer
         {
             Dock = DockStyle.Fill,
@@ -153,6 +181,22 @@ internal sealed partial class ChatGptLiteForm : Form
         workspace.SplitterDistance = 900;
         workspace.Panel1.Controls.Add(content);
         workspace.Panel2.Controls.Add(CreateInspectorUi());
+        // ChatGPT content owns the full window by default. The existing
+        // inspector is still available on demand without another WebView.
+        workspace.Panel2Collapsed = true;
+        _inspectorToggle.Text = "Pokaz panel";
+        notesQuick.Click += (_, _) =>
+        {
+            workspace.Panel2Collapsed = false;
+            _inspectorTabs!.SelectedIndex = 0;
+            _inspectorToggle.Text = "Ukryj panel";
+        };
+        activityQuick.Click += (_, _) =>
+        {
+            workspace.Panel2Collapsed = false;
+            _inspectorTabs!.SelectedIndex = 1;
+            _inspectorToggle.Text = "Ukryj panel";
+        };
         _inspectorToggle.Click += (_, _) =>
         {
             workspace.Panel2Collapsed = !workspace.Panel2Collapsed;
@@ -167,16 +211,32 @@ internal sealed partial class ChatGptLiteForm : Form
         InitializeKeepalivePauseUi();
         _back.Enabled = false;
         _forward.Enabled = false;
-        _reload.Click += async (_, _) => await ReloadCurrentChatSafelyAsync();
-        _home.Click += (_, _) => _browser.CoreWebView2?.Navigate(HomeUrl);
-        _openArchive.Click += (_, _) => new LiteArchiveViewer().Show(this);
-        _back.Click += (_, _) =>
-        {
-            if (_browser.CanGoBack) _browser.GoBack();
+        _reload.Click += async (_, _) => {
+            string id = LiteUiActionAudit.Requested("reload");
+            LiteUiActionAudit.Executed(id, "reload", "handler_invoked");
+            try {
+                await ReloadCurrentChatSafelyAsync();
+                LiteUiActionAudit.Result(id, "reload", "handler_returned_navigation_not_proven", false);
+            }
+            catch (Exception ex) {
+                LiteUiActionAudit.Result(id, "reload", "exception_" + ex.GetType().Name, false);
+            }
         };
-        _forward.Click += (_, _) =>
-        {
-            if (_browser.CanGoForward) _browser.GoForward();
+        _home.Click += (_, _) => {
+            string id = LiteUiActionAudit.Requested("home");
+            _browser.CoreWebView2?.Navigate(HomeUrl);
+            LiteUiActionAudit.Executed(id, "home", "navigate_invoked");
+        };
+        _openArchive.Click += (_, _) => new LiteArchiveViewer().Show(this);
+        _back.Click += (_, _) => {
+            string id = LiteUiActionAudit.Requested("back");
+            if (_browser.CanGoBack) { _browser.GoBack(); LiteUiActionAudit.Executed(id, "back", "go_back_invoked"); }
+            else LiteUiActionAudit.Result(id, "back", "not_available", false);
+        };
+        _forward.Click += (_, _) => {
+            string id = LiteUiActionAudit.Requested("forward");
+            if (_browser.CanGoForward) { _browser.GoForward(); LiteUiActionAudit.Executed(id, "forward", "go_forward_invoked"); }
+            else LiteUiActionAudit.Result(id, "forward", "not_available", false);
         };
 
         _domToggle.Click += async (_, _) =>
@@ -230,7 +290,7 @@ internal sealed partial class ChatGptLiteForm : Form
         Load += async (_, _) => await InitializeBrowserAsync();
     }
 
-    private async Task InitializeBrowserAsync()
+    private async Task<bool> InitializeBrowserAsync(string? recoveryUrl = null, bool recovering = false)
     {
         try
         {
@@ -315,14 +375,30 @@ internal sealed partial class ChatGptLiteForm : Form
                 });
                 _status.Text = "Błąd procesu strony: " + e.ProcessFailedKind;
                 _domInfo.Text = "DOM: renderer niedostępny";
-                // Preserve session data. The user can use Odśwież to retry.
-            };
+                if (e.ProcessFailedKind == CoreWebView2ProcessFailedKind.BrowserProcessExited &&
+                    !IsDisposed && !Disposing && IsHandleCreated)
+                {
+                    // Restore only the failed foreground view; the wake worker
+                    // and project/schedule registries remain untouched.
+                    string failedRoute;
+                    try { failedRoute = core.Source; }
+                    catch { failedRoute = ""; }
+                    BeginInvoke((Action)(() =>
+                    {
+                        _ = RecoverForegroundWebViewAfterExitAsync(failedRoute);
+                    }));
+                }            };
 
             // Start on an explicitly enabled chat, not an obsolete legacy pin.
             var scheduled = LiteChatWakeRegistry.Read().Where(c => c.Enabled).ToArray();
             var preferred = scheduled.FirstOrDefault(c => c.Url == _devWake.TargetUrl)
                 ?? scheduled.OrderByDescending(c => c.DueUtc).FirstOrDefault();
             var startUrl = preferred?.Url ?? HomeUrl;
+            if (Uri.TryCreate(recoveryUrl, UriKind.Absolute, out var restored) &&
+                restored.Scheme == Uri.UriSchemeHttps &&
+                restored.Host == "chatgpt.com" &&
+                restored.AbsolutePath.StartsWith("/c/", StringComparison.Ordinal))
+                startUrl = restored.GetLeftPart(UriPartial.Path);
             core.Navigate(startUrl);
             _domMonitor.Start();
             _captureTimer.Start();
@@ -334,13 +410,16 @@ internal sealed partial class ChatGptLiteForm : Form
             _chatWakeTimer.Start();
             _highTimer.Start();
             _ = VerifyHighAsync();
+            return true;
         }
         catch (Exception ex)
         {
             LiteEventLog.Write("webview_initialization_failed", new { errorType = ex.GetType().Name, ex.HResult });
             _status.Text = "Nie udało się uruchomić";
-            MessageBox.Show(this, ex.Message, "Open Browser ChatGPT Lite",
-                MessageBoxButtons.OK, MessageBoxIcon.Error);
+            if (!recovering)
+                MessageBox.Show(this, ex.Message, "Open Browser ChatGPT Lite",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            return false;
         }
     }
 
